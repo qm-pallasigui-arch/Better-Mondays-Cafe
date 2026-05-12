@@ -72,8 +72,8 @@ jobs:
         with:
           script: |
             const commits = context.payload.commits || [];
-            const minLength = 12;
-            const generic = /^(wip|update|updates|fix|fixes|changes?|temp|minor)$/i;
+            const minLength = 20;
+            const generic = /^(wip|update|updates|fix|fixes|changes?|temp|minor)(\s|$)/i;
 
             const invalid = commits
               .map(c => ({

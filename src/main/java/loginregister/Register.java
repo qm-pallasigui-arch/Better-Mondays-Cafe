@@ -162,8 +162,9 @@ public class Register extends javax.swing.JFrame {
         }
 
         try {
-            UserDataManager.saveUser(username, password);
-            javax.swing.JOptionPane.showMessageDialog(this, "Registration successful!");
+            // New users are registered with STAFF role by default
+            UserDataManager.saveUser(username, password, UserDataManager.Role.STAFF);
+            javax.swing.JOptionPane.showMessageDialog(this, "Registration successful! You have been registered as a Staff member.");
             new Login().setVisible(true);
             this.dispose();
             

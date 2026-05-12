@@ -1,5 +1,6 @@
 loginregister\Login$3.class
 pos\HerbalTeaItem.class
+loginregister\UserDataManager$Role.class
 monitoring\Monitoring.class
 pos\POSSystem$3.class
 pos\POSSystem$17.class
@@ -15,6 +16,7 @@ pos\FruitTeaItem.class
 pos\POSSystem$28.class
 pos\POSSystem$13.class
 pos\POSSystem$16.class
+loginregister\PasswordHasher.class
 pos\POSSystem$4.class
 pos\POSSystem$7.class
 inventory\InventoryItem.class

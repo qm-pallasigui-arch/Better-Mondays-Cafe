@@ -13,17 +13,71 @@ import monitoring.SalesRecord;
 import java.util.Date;
 import java.text.SimpleDateFormat;
 import java.text.DecimalFormat;
+import loginregister.UserDataManager;
 
 public class POSSystem extends javax.swing.JFrame {
 
     private Monitoring monitoring;
+    private String currentUsername;
+    private UserDataManager.Role currentUserRole;
 
-    public POSSystem() {
+    /**
+     * Creates new form POSSystem with user authentication.
+     *
+     * @param username the logged-in username
+     * @param role the user's role (ADMIN or STAFF)
+     */
+    public POSSystem(String username, UserDataManager.Role role) {
+        this.currentUsername = username;
+        this.currentUserRole = role;
         initComponents();
         loadInventoryTable();
 
         monitoring = new Monitoring(jTableMonitoring, jTableSales);
         monitoring.loadLowStockIngredients();
+        
+        // Apply role-based access control
+        applyRoleBasedAccessControl();
+    }
+
+    /**
+     * Legacy constructor for backward compatibility (uses default STAFF role).
+     * @deprecated Use POSSystem(String username, UserDataManager.Role role) instead.
+     */
+    @Deprecated
+    public POSSystem() {
+        this("unknown", UserDataManager.Role.STAFF);
+    }
+
+    /**
+     * Apply role-based access control to the UI.
+     * ADMIN: Can access all tabs (Ordering, Inventory, Monitoring)
+     * STAFF: Can only access Ordering tab
+     */
+    private void applyRoleBasedAccessControl() {
+        if (currentUserRole == UserDataManager.Role.STAFF) {
+            // Remove or disable Inventory and Monitoring tabs for STAFF users
+            // Find tab indices
+            int inventoryTabIndex = -1;
+            int monitoringTabIndex = -1;
+            
+            for (int i = 0; i < jTabbedPaneI.getTabCount(); i++) {
+                String tabTitle = jTabbedPaneI.getTitleAt(i);
+                if ("Inventory".equals(tabTitle)) {
+                    inventoryTabIndex = i;
+                } else if ("Monitoring".equals(tabTitle)) {
+                    monitoringTabIndex = i;
+                }
+            }
+            
+            // Remove tabs in reverse order to maintain correct indices
+            if (monitoringTabIndex > -1) {
+                jTabbedPaneI.removeTabAt(monitoringTabIndex);
+            }
+            if (inventoryTabIndex > -1) {
+                jTabbedPaneI.removeTabAt(inventoryTabIndex);
+            }
+        }
     }
 
     /**

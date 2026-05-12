@@ -165,32 +165,13 @@ public class Login extends javax.swing.JFrame {
             return;
         }
 
-        boolean loginSuccess = false;
-
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(
-                new java.io.FileReader("users.txt"))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String[] parts = line.split(",");
-                if (parts.length == 2) {
-                    String fileUser = parts[0].trim();
-                    String filePass = parts[1].trim();
-
-                    if (fileUser.equals(username) && filePass.equals(password)) {
-                        loginSuccess = true;
-                        break;
-                    }
-                }
-            }
-        } catch (java.io.IOException e) {
-            javax.swing.JOptionPane.showMessageDialog(this,
-                    "Error reading user data: " + e.getMessage(),
-                    "Error", javax.swing.JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
-        if (loginSuccess) {
-            new POSSystem().setVisible(true);
+        // Use UserDataManager to verify credentials
+        if (UserDataManager.verifyCredentials(username, password)) {
+            // Get user's role
+            UserDataManager.Role userRole = UserDataManager.getUserRole(username);
+            
+            // Open POSSystem with user role
+            new POSSystem(username, userRole).setVisible(true);
             this.dispose();
         } else {
             javax.swing.JOptionPane.showMessageDialog(this,

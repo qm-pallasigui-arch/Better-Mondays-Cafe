@@ -5,7 +5,7 @@ import javax.swing.table.DefaultTableModel;
 import java.util.List;
 import inventory.Inventory;
 import inventory.InventoryItem;
-import monitoring.SalesRecord;
+import persistence.sqlite.SQLiteInventoryRepository;
 
 public class Monitoring {
 
@@ -48,18 +48,33 @@ public class Monitoring {
 
     public void loadLowStockIngredients() {
         monitoringModel.setRowCount(0);
-        Inventory inventory = Inventory.getInstance();
-
-        for (InventoryItem item : inventory.getAllItems().values()) {
-            if (item.isLowStock()) {
-                String status = "⚠️ Low Stock";
-                monitoringModel.addRow(new Object[]{
-                    item.getName(),
-                    item.getQuantity(),
-                    item.getUnit(),
-                    item.getAlertLevel(),
-                    status
-                });
+        try {
+            SQLiteInventoryRepository repository = new SQLiteInventoryRepository();
+            for (InventoryItem item : repository.findAll()) {
+                if (item.isLowStock()) {
+                    String status = "⚠️ Low Stock";
+                    monitoringModel.addRow(new Object[]{
+                        item.getName(),
+                        item.getQuantity(),
+                        item.getUnit(),
+                        item.getAlertLevel(),
+                        status
+                    });
+                }
+            }
+        } catch (Exception e) {
+            Inventory inventory = Inventory.getInstance();
+            for (InventoryItem item : inventory.getAllItems().values()) {
+                if (item.isLowStock()) {
+                    String status = "⚠️ Low Stock";
+                    monitoringModel.addRow(new Object[]{
+                        item.getName(),
+                        item.getQuantity(),
+                        item.getUnit(),
+                        item.getAlertLevel(),
+                        status
+                    });
+                }
             }
         }
     }

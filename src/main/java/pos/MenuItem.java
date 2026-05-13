@@ -25,13 +25,6 @@ public abstract class MenuItem {
         return new HashMap<>(ingredients);   
     }
 
-    public void replaceIngredients(Map<String, Double> newIngredients) {
-        ingredients.clear();
-        if (newIngredients != null) {
-            ingredients.putAll(newIngredients);
-        }
-    }
-
     public void addIngredient(String ingredient, double quantity) {
         ingredients.put(ingredient, quantity);
     }

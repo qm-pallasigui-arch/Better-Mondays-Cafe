@@ -14,6 +14,7 @@ import java.util.Date;
 import java.text.SimpleDateFormat;
 import java.text.DecimalFormat;
 import loginregister.UserDataManager;
+import persistence.Phase2Bootstrap;
 
 public class POSSystem extends javax.swing.JFrame {
 
@@ -31,6 +32,15 @@ public class POSSystem extends javax.swing.JFrame {
         this.currentUsername = username;
         this.currentUserRole = role;
         initComponents();
+        try {
+            Phase2Bootstrap.seedCatalogIfEmpty();
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this,
+                    "Database initialization warning: " + e.getMessage(),
+                    "Database",
+                    JOptionPane.WARNING_MESSAGE);
+        }
+
         loadInventoryTable();
 
         monitoring = new Monitoring(jTableMonitoring, jTableSales);
@@ -921,7 +931,7 @@ public boolean Change() {
 
         Inventory inventory = Inventory.getInstance();
 
-        for (InventoryItem item : Inventory.getInstance().getAllItems().values()) {
+        for (InventoryItem item : inventory.getAllItems().values()) {
             String status = item.isLowStock() ? "⚠️ Low Stock" : "";
             model.addRow(new Object[]{item.getName(), item.getQuantity(), item.getUnit(), item.getAlertLevel(), status});
         }
@@ -1042,12 +1052,27 @@ for (int i = 0; i < orderModel.getRowCount(); i++) {
 }
 monitoring.addMultipleSales(salesList);
 
-
 double cash = Double.parseDouble(cashpayment.getText().replace("P", "").trim());
 double change = Double.parseDouble(jTextFieldChange.getText().replace("P", "").trim());
 
+try {
+    persistence.sqlite.SQLiteSalesRepository salesRepository = new persistence.sqlite.SQLiteSalesRepository();
+    salesRepository.saveAll(
+            "TXN" + String.format("%06d", transactionCounter),
+            salesList,
+            subTotal / 1.12,
+            subTotal * 0.12 / 1.12,
+            subTotal,
+            cash,
+            change
+    );
+} catch (Exception e) {
+    JOptionPane.showMessageDialog(this,
+            "Unable to save sales to database: " + e.getMessage(),
+            "Database",
+            JOptionPane.WARNING_MESSAGE);
+}
 
-DecimalFormat df = new DecimalFormat("0.00");         
 String lineSep   = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
 
 String receipt = " ☕ Better Mondays Cafe ☕\n"
@@ -1131,10 +1156,7 @@ monitoring.loadLowStockIngredients();
             item.setUnit(unit);
             item.setAlertLevel(newAlert);
 
-            if (!newName.equals(currentName)) {
-                inventory.getAllItems().remove(currentName.trim());
-                inventory.getAllItems().put(newName, item);
-            }
+            inventory.updateItem(currentName.trim(), item);
 
             loadInventoryTable();
             monitoring.loadLowStockIngredients();
@@ -1156,7 +1178,7 @@ monitoring.loadLowStockIngredients();
         int confirm = JOptionPane.showConfirmDialog(this, "Remove " + name + " from inventory?", "Confirm", JOptionPane.YES_NO_OPTION);
 
         if (confirm == JOptionPane.YES_OPTION) {
-            Inventory.getInstance().getAllItems().remove(name);
+            Inventory.getInstance().removeItem(name);
             loadInventoryTable();
         }
     }//GEN-LAST:event_InventoryRemoveActionPerformed

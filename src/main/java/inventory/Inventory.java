@@ -129,10 +129,20 @@ public class Inventory {
     public void deductIngredient(String name, double amount) {
         InventoryItem item = inventoryItems.get(name);
         if (item != null) {
-            item.deduct(amount);
             try {
-                repository.save(item);
+                // Prefer FEFO deduction when batches exist; falls back internally to aggregate-only flow.
+                repository.deductFEFO(name, amount);
+                repository.findByName(name).ifPresent(updated -> {
+                    item.setQuantity(updated.getQuantity());
+                    item.setUnit(updated.getUnit());
+                    item.setAlertLevel(updated.getAlertLevel());
+                });
             } catch (Exception e) {
+                item.deduct(amount);
+                try {
+                    repository.save(item);
+                } catch (Exception ignored) {
+                }
                 JOptionPane.showMessageDialog(null,
                         "Unable to persist inventory deduction: " + e.getMessage(),
                         "Database", JOptionPane.WARNING_MESSAGE);

@@ -83,4 +83,36 @@ public class SQLiteSalesRepository implements SalesRepository {
             }
         }
     }
+
+    @Override
+    public void updateOrderStatus(String transactionRef, String status) throws Exception {
+        try (Connection connection = AppDatabase.openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                long transactionId;
+                try (PreparedStatement find = connection.prepareStatement("SELECT id FROM sales_transactions WHERE transaction_ref = ?")) {
+                    find.setString(1, transactionRef);
+                    try (ResultSet rs = find.executeQuery()) {
+                        if (!rs.next()) throw new IllegalStateException("Transaction not found: " + transactionRef);
+                        transactionId = rs.getLong("id");
+                    }
+                }
+
+                try (PreparedStatement upsert = connection.prepareStatement(
+                        "INSERT INTO sales_order_status(transaction_id, status) VALUES (?, ?) "
+                                + "ON CONFLICT(transaction_id) DO UPDATE SET status = excluded.status, updated_at = CURRENT_TIMESTAMP")) {
+                    upsert.setLong(1, transactionId);
+                    upsert.setString(2, status);
+                    upsert.executeUpdate();
+                }
+
+                connection.commit();
+            } catch (Exception e) {
+                connection.rollback();
+                throw e;
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        }
+    }
 }

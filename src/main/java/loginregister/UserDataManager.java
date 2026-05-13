@@ -1,5 +1,7 @@
 package loginregister;
 
+import java.util.ArrayList;
+import java.util.List;
 import persistence.sqlite.SQLiteUserRepository;
 
 public class UserDataManager {
@@ -66,6 +68,23 @@ public class UserDataManager {
             return role != null ? role : Role.STAFF;
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    public static List<UserAccount> listUsers() {
+        try {
+            return USER_REPOSITORY.listUsers();
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
+    }
+
+    public static boolean updateUserRole(String username, Role role) {
+        try {
+            USER_REPOSITORY.updateUserRole(username, role);
+            return true;
+        } catch (Exception e) {
+            return false;
         }
     }
 }

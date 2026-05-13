@@ -3,6 +3,7 @@ package persistence;
 import java.util.List;
 import java.util.Optional;
 import inventory.InventoryItem;
+import inventory.InventoryBatch;
 
 public interface InventoryRepository {
 
@@ -13,4 +14,12 @@ public interface InventoryRepository {
     void save(InventoryItem item) throws Exception;
 
     void delete(String name) throws Exception;
+
+    // Batch-level operations for product registration and FEFO handling
+    List<InventoryBatch> findBatchesForItem(String itemName) throws Exception;
+
+    void addBatch(String itemName, InventoryBatch batch) throws Exception;
+
+    // Deduct inventory using FEFO (first-expire-first-out) behavior
+    void deductFEFO(String itemName, double amount) throws Exception;
 }

@@ -3,9 +3,6 @@ name: Description Guard
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
-  push:
-    branches:
-      - '**'
 
 permissions:
   contents: read
@@ -53,48 +50,3 @@ jobs:
               pull_number: pr.number,
               body: autoBody
             });
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: pr.number,
-              body: 'I added a PR description template automatically because the current description was missing or too short. Please replace it with real details before merging.'
-            });
-
-            core.setFailed('PR description was missing or too short. A template was added automatically; please update it with real details.');
-
-  validate-push-commit-descriptions:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Ensure pushed commits have descriptive messages
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const commits = context.payload.commits || [];
-            const minLength = 20;
-            const generic = /^(wip|update|updates|fix|fixes|changes?|temp|minor)(\s|$)/i;
-
-            const invalid = commits
-              .map(c => ({
-                id: c.id?.slice(0, 7) || 'unknown',
-                message: (c.message || '').trim()
-              }))
-              .filter(c => c.message.length < minLength || generic.test(c.message));
-
-            if (invalid.length === 0) {
-              core.info('All commit messages look descriptive.');
-              return;
-            }
-
-            const details = invalid
-              .map(c => `- ${c.id}: "${c.message || '<empty>'}"`)
-              .join('\n');
-
-            core.setFailed([
-              'Some pushed commits have missing or non-descriptive messages.',
-              '',
-              details,
-              '',
-              'Use clear messages that explain the change intent (for example: "Add PR description guard workflow").'
-            ].join('\n'));

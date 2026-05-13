@@ -8,7 +8,7 @@ A Java Swing desktop application for a small café that combines:
 
 ## Tech Stack
 
-- **Language:** Java (configured for Java 21 in `pom.xml`)
+- **Language:** Java (configured for Java 25 in `pom.xml`)
 - **Build tool:** Maven
 - **UI:** Java Swing (NetBeans GUI Builder, `.form` files)
 - **Layout dependency:** `org.netbeans.external:AbsoluteLayout`
@@ -66,7 +66,7 @@ pom.xml                  # Maven configuration
 ## Build and Run
 
 ### Requirements
-- JDK **21** (project uses `maven.compiler.release=21`)
+- JDK **25** (project uses `maven.compiler.release=25`)
 - Maven 3.9+
 
 ### Commands

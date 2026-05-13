@@ -1,7 +1,1 @@
-# Phase 1 Update: Users database format changed
-# Old format: username,password
-# New format: username,passwordHash,role
-# Roles: ADMIN (full access), STAFF (limited to Ordering tab only)
-# All new users are registered with STAFF role by default.
-# Register a new user to test the system.
-migs,FgCF+nGJSnR0TfGDiA4g/A==:gDCDJZhk4XK83+ioo8F3bYK1SUbRVjthDOuF/iWF2F8=,ADMIN
+

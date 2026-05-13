@@ -1,0 +1,14 @@
+Q: Where is data stored?
+A: Local SQLite database at data/coffee-cafe.db.
+
+Q: How do I become admin?
+A: Existing ADMIN users can change roles in Staff tab -> Admin Account Management.
+
+Q: Can staff see inventory?
+A: No, staff only see ordering.
+
+Q: What does ABC and EOQ in inventory mean?
+A: ABC is inventory priority class; EOQ is estimated optimal reorder quantity.
+
+Q: Is this ready for Firebase later?
+A: Yes. Account/role management is behind repository interfaces so a Firebase adapter can be added without UI rewrite.

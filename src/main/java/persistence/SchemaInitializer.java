@@ -45,6 +45,16 @@ public final class SchemaInitializer {
                     + "unit TEXT NOT NULL, "
                     + "alert_level REAL NOT NULL"
                     + ")");
+            // Batches allow tracking SKU, expiry dates and per-batch quantities for FEFO logic
+            statement.execute("CREATE TABLE IF NOT EXISTS inventory_batches ("
+                    + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    + "inventory_item_id INTEGER NOT NULL, "
+                    + "sku TEXT, "
+                    + "quantity REAL NOT NULL, "
+                    + "expiry_date TEXT, "
+                    + "created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    + "FOREIGN KEY(inventory_item_id) REFERENCES inventory_items(id) ON DELETE CASCADE"
+                    + ")");
             statement.execute("CREATE TABLE IF NOT EXISTS sales_records ("
                     + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
                     + "product_name TEXT NOT NULL, "
@@ -63,6 +73,13 @@ public final class SchemaInitializer {
                     + "change_amount REAL NOT NULL, "
                     + "created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
                     + ")");
+            // Order status table stores status for transactions (PENDING, COMPLETED, CANCELLED, etc.)
+            statement.execute("CREATE TABLE IF NOT EXISTS sales_order_status ("
+                    + "transaction_id INTEGER NOT NULL UNIQUE, "
+                    + "status TEXT NOT NULL, "
+                    + "updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    + "FOREIGN KEY(transaction_id) REFERENCES sales_transactions(id) ON DELETE CASCADE"
+                    + ")");
             statement.execute("CREATE TABLE IF NOT EXISTS sales_transaction_items ("
                     + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
                     + "transaction_id INTEGER NOT NULL, "
@@ -71,6 +88,14 @@ public final class SchemaInitializer {
                     + "price REAL NOT NULL, "
                     + "total REAL NOT NULL, "
                     + "FOREIGN KEY(transaction_id) REFERENCES sales_transactions(id) ON DELETE CASCADE"
+                    + ")");
+            // Staff shift tracking
+            statement.execute("CREATE TABLE IF NOT EXISTS staff_shifts ("
+                    + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    + "username TEXT NOT NULL, "
+                    + "started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    + "ended_at TEXT, "
+                    + "notes TEXT"
                     + ")");
         }
     }

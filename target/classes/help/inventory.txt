@@ -1,0 +1,23 @@
+Inventory Help
+- Admins can add, edit, and remove stock items.
+- Product batches support SKU + expiry date tracking.
+- FEFO is enabled: earliest expiry batches are deducted first.
+- Inventory status column includes:
+	- LOW STOCK
+	- EXPIRING<7D
+	- EXPIRED
+	- ABC=<A|B|C>
+	- EOQ~N (recommended reorder quantity)
+- Color cue:
+	- Red = expired batch risk
+	- Orange = low stock or expiring batch
+	- Green = healthy status
+
+ABC Guide
+- A: high value/critical inventory focus (top cumulative usage)
+- B: medium control priority
+- C: routine control priority
+
+EOQ Guide
+- EOQ is the suggested reorder quantity minimizing ordering + holding cost.
+- Use EOQ as a planning baseline, then adjust with supplier constraints.

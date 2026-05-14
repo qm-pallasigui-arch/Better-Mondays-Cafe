@@ -15,8 +15,8 @@ public class SQLiteStaffShiftRepository implements StaffShiftRepository {
     @Override
     public void startShift(String username) throws Exception {
         try (Connection connection = AppDatabase.openConnection();
-             PreparedStatement stmt = connection.prepareStatement(
-                     "INSERT INTO staff_shifts(username) VALUES (?)")) {
+                PreparedStatement stmt = connection.prepareStatement(
+                        "INSERT INTO staff_shifts(username) VALUES (?)")) {
             stmt.setString(1, username);
             stmt.executeUpdate();
         }
@@ -33,10 +33,12 @@ public class SQLiteStaffShiftRepository implements StaffShiftRepository {
                         "SELECT id FROM staff_shifts WHERE username = ? AND ended_at IS NULL ORDER BY id DESC LIMIT 1")) {
                     find.setString(1, username);
                     try (ResultSet rs = find.executeQuery()) {
-                        if (rs.next()) shiftId = rs.getLong("id");
+                        if (rs.next())
+                            shiftId = rs.getLong("id");
                     }
                 }
-                if (shiftId == -1) return;
+                if (shiftId == -1)
+                    return;
                 try (PreparedStatement upd = connection.prepareStatement(
                         "UPDATE staff_shifts SET ended_at = CURRENT_TIMESTAMP, notes = ? WHERE id = ?")) {
                     upd.setString(1, notes);
@@ -57,8 +59,8 @@ public class SQLiteStaffShiftRepository implements StaffShiftRepository {
     public List<StaffShift> findShifts(String username) throws Exception {
         List<StaffShift> shifts = new ArrayList<>();
         try (Connection connection = AppDatabase.openConnection();
-             PreparedStatement stmt = connection.prepareStatement(
-                     "SELECT id, username, started_at, ended_at, notes FROM staff_shifts WHERE username = ? ORDER BY id DESC")) {
+                PreparedStatement stmt = connection.prepareStatement(
+                        "SELECT id, username, started_at, ended_at, notes FROM staff_shifts WHERE username = ? ORDER BY id DESC")) {
             stmt.setString(1, username);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
@@ -67,8 +69,7 @@ public class SQLiteStaffShiftRepository implements StaffShiftRepository {
                             rs.getString("username"),
                             rs.getString("started_at"),
                             rs.getString("ended_at"),
-                            rs.getString("notes")
-                    ));
+                            rs.getString("notes")));
                 }
             }
         }

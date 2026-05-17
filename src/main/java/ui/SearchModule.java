@@ -415,6 +415,12 @@ public class SearchModule extends JPanel {
         }
     }
 
+    // ── Inner helpers ─────────────────────────────────────────────────────────
+
+    /**
+     * Renders an Available / Unavailable pill badge for menu items; plain cell for
+     * other rows.
+     */
     private static class AvailabilityBadgeCellRenderer extends DefaultTableCellRenderer {
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value,
@@ -461,6 +467,7 @@ public class SearchModule extends JPanel {
         }
     }
 
+    /** Table cell renderer that draws a colored badge for the type column. */
     private static class BadgeCellRenderer extends DefaultTableCellRenderer {
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value,
@@ -500,6 +507,7 @@ public class SearchModule extends JPanel {
         }
     }
 
+    /** Rounded border. */
     private static class RoundedBorder extends javax.swing.border.AbstractBorder {
         private final int radius;
         private final Color color;
@@ -525,6 +533,7 @@ public class SearchModule extends JPanel {
         }
     }
 
+    /** Panel with rounded corners and solid background. */
     private static class RoundedPanel extends JPanel {
         private final int radius;
         private final Color bg;
@@ -549,6 +558,7 @@ public class SearchModule extends JPanel {
         }
     }
 
+    /** Styled combo box. */
     private static class StyledComboBox extends JComboBox<String> {
         StyledComboBox(String[] items) {
             super(items);
@@ -563,6 +573,7 @@ public class SearchModule extends JPanel {
         }
     }
 
+    /** Text field with placeholder text. */
     private static class PlaceholderTextField extends JTextField {
         private final String placeholder;
 

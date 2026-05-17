@@ -11,6 +11,7 @@ import java.util.Optional;
 import persistence.AppDatabase;
 import persistence.MenuRepository;
 import pos.CoffeeItem;
+import pos.FoodItem;
 import pos.FruitTeaItem;
 import pos.HerbalTeaItem;
 import pos.MenuItem;
@@ -140,10 +141,10 @@ public class SQLiteMenuRepository implements MenuRepository {
     private MenuItem mapRow(String category, String name, double hotPrice, double regularPrice, double largePrice) {
         return switch (category) {
             case "Coffee" -> new CoffeeItem(name, hotPrice, regularPrice, largePrice);
-            case "NonCoffee" -> new NonCoffeeItem(name, hotPrice, regularPrice, largePrice);
-            case "FruitTea" -> new FruitTeaItem(name, hotPrice, regularPrice, largePrice);
-            case "HerbalTea" -> new HerbalTeaItem(name, hotPrice, regularPrice, largePrice);
-            default -> new CoffeeItem(name, hotPrice, regularPrice, largePrice);
+            case "Non-Coffee" -> new NonCoffeeItem(name, hotPrice, regularPrice, largePrice);
+            case "Fruit Tea" -> new FruitTeaItem(name, hotPrice, regularPrice, largePrice);
+            case "Herbal Tea" -> new HerbalTeaItem(name, hotPrice, regularPrice, largePrice);
+            default -> new FoodItem(name, "Food", hotPrice > 0 ? hotPrice : (regularPrice > 0 ? regularPrice : largePrice));
         };
     }
 }

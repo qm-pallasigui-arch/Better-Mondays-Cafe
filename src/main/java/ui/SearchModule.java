@@ -570,7 +570,6 @@ public class SearchModule extends JPanel {
             this.placeholder = placeholder;
         }
 
-        // BULBUL KALBO JESS
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);

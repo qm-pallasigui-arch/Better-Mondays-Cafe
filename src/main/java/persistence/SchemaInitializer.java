@@ -29,8 +29,12 @@ public final class SchemaInitializer {
                     + "category TEXT NOT NULL, "
                     + "hot_price REAL NOT NULL, "
                     + "iced_regular_price REAL NOT NULL, "
-                    + "iced_large_price REAL NOT NULL"
+                    + "iced_large_price REAL NOT NULL, "
+                    + "is_available INTEGER NOT NULL DEFAULT 1"
                     + ")");
+            // Migration: add is_available to existing databases that predate this column
+            try { statement.execute("ALTER TABLE menu_items ADD COLUMN is_available INTEGER NOT NULL DEFAULT 1");
+            } catch (SQLException ignored) {}
             statement.execute("CREATE TABLE IF NOT EXISTS menu_item_ingredients ("
                     + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
                     + "menu_item_id INTEGER NOT NULL, "

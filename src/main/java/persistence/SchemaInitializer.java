@@ -6,12 +6,13 @@ import java.sql.Statement;
 
 /**
  * Creates the initial schema used by the local SQLite implementation.
- * The schema is intentionally relational so future Firebase adapters can map the same entities.
+ * The schema is intentionally relational so future Firebase adapters can map
+ * the same entities.
  */
 public final class SchemaInitializer {
 
-    private SchemaInitializer() {
-    }
+        private SchemaInitializer() {
+        }
 
     public static void initialize(Connection connection) throws SQLException {
         try (Statement statement = connection.createStatement()) {
@@ -102,5 +103,4 @@ public final class SchemaInitializer {
                     + "notes TEXT"
                     + ")");
         }
-    }
 }

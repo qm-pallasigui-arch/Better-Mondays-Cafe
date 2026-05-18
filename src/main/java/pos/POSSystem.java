@@ -7,13 +7,31 @@ import javax.swing.JButton;
 import javax.swing.JOptionPane;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.border.LineBorder;
 import monitoring.Monitoring;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.stream.Collectors;
 import monitoring.SalesRecord;
 import java.util.Date;
 import java.text.SimpleDateFormat;
 import java.awt.Color;
+import java.awt.BorderLayout;
+import java.awt.GridLayout;
+import java.awt.FlowLayout;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.Insets;
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextField;
+import javax.swing.SwingConstants;
 import loginregister.UserDataManager;
 import persistence.Phase2Bootstrap;
 import ui.MenuMaintenancePanel;
@@ -40,18 +58,80 @@ public class POSSystem extends javax.swing.JFrame {
     private InventoryController inventoryController;
     private OrderController orderController;
 
-    /**
-     * Creates new form POSSystem with user authentication.
-     *
-     * @param username the logged-in username
-     * @param role     the user's role (ADMIN or STAFF)
-     */
+    private static final Map<String, List<String>> CATEGORY_ITEMS = new LinkedHashMap<>();
+    static {
+        CATEGORY_ITEMS.put("Espresso & Coffee", Arrays.asList(
+            "Americano", "Latte", "Cappuccino", "Salted Cream Latte", "Spanish Latte",
+            "Dark Mocha", "White Mocha", "Caramel Macchiato", "Brewed Coffee"));
+        CATEGORY_ITEMS.put("Specialty Drinks", Arrays.asList(
+            "Vietnamese Coffee", "Ube Espresso", "Manila Latte",
+            "Pumpkin Spice Latte", "Spiced Cookie Latte"));
+        CATEGORY_ITEMS.put("Tea Latte", Arrays.asList(
+            "Matcha Latte", "Chocolate Matcha", "Matcha Espresso",
+            "Hojicha Latte", "Chai Latte"));
+        CATEGORY_ITEMS.put("Non-Coffee", Arrays.asList(
+            "Chocolate Latte", "Strawberry Latte", "Mango Latte",
+            "Dragon Fruit Coconut Latte", "Ube Latte"));
+        CATEGORY_ITEMS.put("House Favorites", Arrays.asList(
+            "Mango Latte", "Strawberry Latte", "Salted Cream Latte", "Spanish Latte"));
+        CATEGORY_ITEMS.put("Fruit Tea", Arrays.asList(
+            "Strawberry Green Tea", "Mango Green Tea", "Peach Green Tea",
+            "Passion Fruit Green Tea"));
+        CATEGORY_ITEMS.put("Herbal Tea", Arrays.asList(
+            "Peppermint", "Chamomile", "Earl Grey", "Cinnamon"));
+        CATEGORY_ITEMS.put("Sandwiches", Arrays.asList(
+            "Signature Ham & Cheese", "Classic Grilled Cheese", "Homestyle Pesto & Cheese"));
+        CATEGORY_ITEMS.put("Pandesal Pairs", Arrays.asList(
+            "Ham & Cheese", "Cheesy Pesto", "Spam & Cheese"));
+        CATEGORY_ITEMS.put("Pastries", Arrays.asList(
+            "Chocolate Crinkles", "Chocolate Cookies", "Brownies", "Banana Bread",
+            "Chocolate Tiramisu", "Matcha Tiramisu", "Creamy Spinach", "Blueberry Cheesecake"));
+    }
+
+    private static final Map<String, Double> HOUSE_FAVORITES_PRICES = Map.of(
+        "Mango Latte", 210.0,
+        "Strawberry Latte", 200.0,
+        "Salted Cream Latte", 190.0,
+        "Spanish Latte", 180.0
+    );
+
+    private static class OrderEntry {
+        String name;
+        String variant;
+        int quantity;
+        double unitPrice;
+        OrderEntry(String name, String variant, int quantity, double unitPrice) {
+            this.name = name;
+            this.variant = variant;
+            this.quantity = quantity;
+            this.unitPrice = unitPrice;
+        }
+        String displayName() {
+            return variant.isEmpty() ? name : name + " (" + variant + ")";
+        }
+        double lineTotal() {
+            return quantity * unitPrice;
+        }
+    }
+
+    private final List<OrderEntry> orderEntries = new ArrayList<>();
+    private int orderCount = 0;
+    private String activeCategory = "Espresso & Coffee";
+
+    // Custom panels for ordering tab
+    private JPanel sidebarPanel;
+    private JPanel centerPanel;
+    private JPanel productGridPanel;
+    private JTextField searchField;
+    private JPanel orderPanel;
+    private JPanel receiptPanel;
+
     public POSSystem(String username, UserDataManager.Role role) {
         this.currentUserRole = role;
         this.currentUsername = username;
         initComponents();
         setTitle("Better Mondays Coffeee Cafe Management System - " + username);
-        setMinimumSize(new java.awt.Dimension(1100, 700));
+        setMinimumSize(new java.awt.Dimension(1280, 720));
         setResizable(true);
         setLocationRelativeTo(null);
         try {
@@ -73,9 +153,11 @@ public class POSSystem extends javax.swing.JFrame {
         monitoring.loadLowStockIngredients();
 
         AppTheme.applyToFrame(this);
+        styleSearchField();
 
-        // Apply role-based access control
         applyRoleBasedAccessControl();
+
+        showCategory("Espresso & Coffee");
     }
 
     private void applyInventoryStatusColorRenderer() {
@@ -83,8 +165,7 @@ public class POSSystem extends javax.swing.JFrame {
             @Override
             public java.awt.Component getTableCellRendererComponent(javax.swing.JTable table, Object value,
                     boolean isSelected, boolean hasFocus, int row, int column) {
-                java.awt.Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row,
-                        column);
+                java.awt.Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
                 if (isSelected) {
                     return c;
                 }
@@ -101,26 +182,13 @@ public class POSSystem extends javax.swing.JFrame {
         });
     }
 
-    /**
-     * Legacy constructor for backward compatibility (uses default STAFF role).
-     * 
-     * @deprecated Use POSSystem(String username, UserDataManager.Role role)
-     *             instead.
-     */
     @Deprecated
     public POSSystem() {
         this("unknown", UserDataManager.Role.STAFF);
     }
 
-    /**
-     * Apply role-based access control to the UI.
-     * ADMIN: Can access all tabs (Ordering, Inventory, Monitoring)
-     * STAFF: Can only access Ordering tab
-     */
     private void applyRoleBasedAccessControl() {
         if (currentUserRole == UserDataManager.Role.STAFF) {
-            // Remove or disable Inventory and Monitoring tabs for STAFF users
-            // Find tab indices
             int inventoryTabIndex = -1;
             int monitoringTabIndex = -1;
 
@@ -133,21 +201,18 @@ public class POSSystem extends javax.swing.JFrame {
                 }
             }
 
-            // Remove tabs in reverse order to maintain correct indices
             if (monitoringTabIndex > -1) {
                 jTabbedPaneI.removeTabAt(monitoringTabIndex);
             }
             if (inventoryTabIndex > -1) {
                 jTabbedPaneI.removeTabAt(inventoryTabIndex);
             }
-            // Remove Menu Maintenance tab for staff
             for (int i = 0; i < jTabbedPaneI.getTabCount(); i++) {
                 if ("Menu Maintenance".equals(jTabbedPaneI.getTitleAt(i))) {
                     jTabbedPaneI.removeTabAt(i);
                     break;
                 }
             }
-            // Product registration is admin-only
             for (int i = 0; i < jTabbedPaneI.getTabCount(); i++) {
                 if ("Register Product".equals(jTabbedPaneI.getTitleAt(i))) {
                     jTabbedPaneI.removeTabAt(i);
@@ -157,712 +222,633 @@ public class POSSystem extends javax.swing.JFrame {
         }
     }
 
-    /**
-     * This method is called from within the constructor to initialize the form.
-     * WARNING: Do NOT modify this code. The content of this method is always
-     * regenerated by the Form Editor.
-     */
-    // <editor-fold defaultstate="collapsed" desc="Generated
-    // Code">//GEN-BEGIN:initComponents
-    private void initComponents() {
+    // ─── Category display ───────────────────────────────────────
+    private void showCategory(String category) {
+        activeCategory = category;
+        for (java.awt.Component c : sidebarPanel.getComponents()) {
+            if (c instanceof JButton b) {
+                boolean active = category.equals(b.getText());
+                b.setBackground(active ? new Color(50, 157, 111) : new Color(36, 55, 83));
+                b.setForeground(active ? Color.WHITE : new Color(245, 248, 252));
+            }
+        }
+        rebuildProductGrid(category, searchField.getText());
+    }
 
+    private void rebuildProductGrid(String category, String search) {
+        productGridPanel.removeAll();
+        List<String> itemNames = CATEGORY_ITEMS.getOrDefault(category, List.of());
+
+        List<MenuItem> items = itemNames.stream()
+            .map(name -> Menu.getInstance().getMenuItem(name))
+            .filter(item -> item != null)
+            .collect(Collectors.toList());
+
+        String searchTerm = search.trim();
+        if ("Search a product".equals(searchTerm)) {
+            searchTerm = "";
+        }
+        if (!searchTerm.isEmpty()) {
+            String finalSearch = searchTerm.toLowerCase();
+            items = items.stream()
+                .filter(item -> item.getName().toLowerCase().contains(finalSearch))
+                .collect(Collectors.toList());
+        }
+
+        if (items.isEmpty()) {
+            JLabel emptyLabel = new JLabel("No items found", SwingConstants.CENTER);
+            emptyLabel.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+            emptyLabel.setForeground(new Color(197, 209, 224));
+            productGridPanel.add(emptyLabel);
+        } else {
+            for (MenuItem item : items) {
+                productGridPanel.add(createProductCard(item, category));
+            }
+        }
+
+        productGridPanel.revalidate();
+        productGridPanel.repaint();
+    }
+
+    private JPanel createProductCard(MenuItem item, String category) {
+        JPanel card = new JPanel(new BorderLayout(0, 3));
+        card.setBackground(new Color(36, 55, 83));
+        card.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(60, 85, 120), 1),
+            BorderFactory.createEmptyBorder(6, 5, 5, 5)));
+
+        JLabel imgLabel = new JLabel("", SwingConstants.CENTER);
+        imgLabel.setPreferredSize(new Dimension(56, 44));
+        imgLabel.setOpaque(true);
+        imgLabel.setBackground(new Color(49, 73, 105));
+        card.add(imgLabel, BorderLayout.NORTH);
+
+        double displayPrice = pickDisplayPrice(item, category);
+        JLabel nameLabel = new JLabel(
+            "<html><div style='text-align:center;'><b style='color:#F5F8FC;font-size:12px;'>" + item.getName()
+            + "</b><br><span style='color:#32C075;font-size:11px;'>\u20B1" + String.format("%.2f", displayPrice) + "</span></div></html>",
+            SwingConstants.CENTER);
+        nameLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        card.add(nameLabel, BorderLayout.CENTER);
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 3, 0));
+        btnPanel.setOpaque(false);
+        addButtonsForCategory(btnPanel, item, category);
+        card.add(btnPanel, BorderLayout.SOUTH);
+        card.setPreferredSize(new Dimension(150, 134));
+        return card;
+    }
+
+    private double pickDisplayPrice(MenuItem item, String category) {
+        switch (category) {
+            case "Specialty Drinks":
+                return item.getIcedRegularPrice();
+            case "House Favorites":
+                return HOUSE_FAVORITES_PRICES.getOrDefault(item.getName(), 0.0);
+            default:
+                return item.getIcedRegularPrice() > 0 ? item.getIcedRegularPrice()
+                     : item.getHotPrice() > 0 ? item.getHotPrice()
+                     : item.getIcedLargePrice();
+        }
+    }
+
+    private void addButtonsForCategory(JPanel panel, MenuItem item, String category) {
+        switch (category) {
+            case "Espresso & Coffee":
+                addHotBtn(panel, item);
+                addIcedRegularBtn(panel, item);
+                addIcedLargeBtn(panel, item);
+                break;
+            case "Specialty Drinks":
+                addItemBtn(panel, "Regular Iced", item.getIcedRegularPrice(), "Regular Iced", item.getName());
+                break;
+            case "Tea Latte":
+                addHotBtn(panel, item);
+                addIcedRegularBtn(panel, item, "Iced Regular");
+                break;
+            case "Non-Coffee":
+                if ("Chocolate Latte".equals(item.getName())) {
+                    addHotBtn(panel, item);
+                }
+                addIcedRegularBtn(panel, item);
+                addIcedLargeBtn(panel, item);
+                break;
+            case "House Favorites":
+                double hfPrice = HOUSE_FAVORITES_PRICES.getOrDefault(item.getName(), 0.0);
+                addSingleBtn(panel, "Add to cart", hfPrice, item.getName());
+                break;
+            case "Fruit Tea":
+                addIcedRegularBtn(panel, item);
+                addIcedLargeBtn(panel, item);
+                break;
+            case "Herbal Tea":
+                addHotBtn(panel, item);
+                break;
+            default:
+                addSingleBtn(panel, "Add to cart", item.getHotPrice(), item.getName());
+                break;
+        }
+    }
+
+    private void addHotBtn(JPanel panel, MenuItem item) {
+        if (item.getHotPrice() > 0) {
+            JButton btn = new JButton("Hot");
+            styleProdBtn(btn);
+            btn.addActionListener(e -> addOrderItem(item.getName(), "Hot", item.getHotPrice()));
+            panel.add(btn);
+        }
+    }
+
+    private void addIcedRegularBtn(JPanel panel, MenuItem item) {
+        addIcedRegularBtn(panel, item, "Regular");
+    }
+
+    private void addIcedRegularBtn(JPanel panel, MenuItem item, String label) {
+        if (item.getIcedRegularPrice() > 0) {
+            JButton btn = new JButton(label);
+            styleProdBtn(btn);
+            btn.addActionListener(e -> addOrderItem(item.getName(), "Regular Iced", item.getIcedRegularPrice()));
+            panel.add(btn);
+        }
+    }
+
+    private void addIcedLargeBtn(JPanel panel, MenuItem item) {
+        if (item.getIcedLargePrice() > 0) {
+            JButton btn = new JButton("Large");
+            styleProdBtn(btn);
+            btn.addActionListener(e -> addOrderItem(item.getName(), "Large Iced", item.getIcedLargePrice()));
+            panel.add(btn);
+        }
+    }
+
+    private void addSingleBtn(JPanel panel, String text, double price, String itemName) {
+        if (price <= 0) return;
+        JButton btn = new JButton(text);
+        styleProdBtn(btn);
+        btn.addActionListener(e -> addOrderItem(itemName, "", price));
+        panel.add(btn);
+    }
+
+    private void addItemBtn(JPanel panel, String text, double price, String variant, String itemName) {
+        if (price <= 0) return;
+        JButton btn = new JButton(text);
+        styleProdBtn(btn);
+        btn.addActionListener(e -> addOrderItem(itemName, variant, price));
+        panel.add(btn);
+    }
+
+    private void styleProdBtn(JButton btn) {
+        btn.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+        btn.setBackground(new Color(50, 157, 111));
+        btn.setForeground(Color.WHITE);
+        btn.setFocusPainted(false);
+        btn.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
+        btn.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+    }
+
+    private void styleSearchField() {
+        searchField.setBackground(new Color(36, 55, 83));
+        searchField.setForeground(new Color(197, 209, 224));
+        searchField.setCaretColor(new Color(197, 209, 224));
+        searchField.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        searchField.setBorder(BorderFactory.createCompoundBorder(
+            new LineBorder(new Color(60, 85, 120), 1, true),
+            BorderFactory.createEmptyBorder(6, 10, 6, 10)));
+    }
+
+    private void addOrderItem(String name, String variant, double price) {
+        if (name == null || name.isEmpty()) return;
+        for (OrderEntry entry : orderEntries) {
+            if (entry.name.equals(name) && entry.variant.equals(variant)) {
+                entry.quantity++;
+                refreshOrderDisplay();
+                return;
+            }
+        }
+        orderEntries.add(new OrderEntry(name, variant, 1, price));
+        refreshOrderDisplay();
+    }
+
+    private void refreshOrderDisplay() {
+        orderPanel.removeAll();
+        JPanel itemsPanel = new JPanel();
+        itemsPanel.setLayout(new BoxLayout(itemsPanel, BoxLayout.Y_AXIS));
+        itemsPanel.setBackground(new Color(28, 43, 63));
+        itemsPanel.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
+
+        for (OrderEntry entry : orderEntries) {
+            itemsPanel.add(createOrderRow(entry));
+            itemsPanel.add(Box.createVerticalStrut(4));
+        }
+
+        orderPanel.add(new JScrollPane(itemsPanel), BorderLayout.CENTER);
+        orderPanel.revalidate();
+        orderPanel.repaint();
+        updateReceipt();
+    }
+
+    private JPanel createOrderRow(OrderEntry entry) {
+        JPanel row = new JPanel(new BorderLayout(6, 0));
+        row.setBackground(new Color(36, 55, 83));
+        row.setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 6));
+
+        JLabel nameLabel = new JLabel(entry.displayName());
+        nameLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        nameLabel.setForeground(new Color(245, 248, 252));
+        row.add(nameLabel, BorderLayout.CENTER);
+
+        JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 3, 0));
+        rightPanel.setOpaque(false);
+
+        JButton minusBtn = new JButton("-");
+        minusBtn.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        minusBtn.setBackground(new Color(60, 85, 120));
+        minusBtn.setForeground(Color.WHITE);
+        minusBtn.setFocusPainted(false);
+        minusBtn.setMargin(new Insets(0, 4, 0, 4));
+        minusBtn.addActionListener(e -> {
+            if (entry.quantity > 1) {
+                entry.quantity--;
+            } else {
+                orderEntries.remove(entry);
+            }
+            refreshOrderDisplay();
+        });
+        rightPanel.add(minusBtn);
+
+        JLabel qtyLabel = new JLabel(String.valueOf(entry.quantity));
+        qtyLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        qtyLabel.setForeground(new Color(245, 248, 252));
+        rightPanel.add(qtyLabel);
+
+        JButton plusBtn = new JButton("+");
+        plusBtn.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        plusBtn.setBackground(new Color(60, 85, 120));
+        plusBtn.setForeground(Color.WHITE);
+        plusBtn.setFocusPainted(false);
+        plusBtn.setMargin(new Insets(0, 4, 0, 4));
+        plusBtn.addActionListener(e -> {
+            entry.quantity++;
+            refreshOrderDisplay();
+        });
+        rightPanel.add(plusBtn);
+
+        row.add(rightPanel, BorderLayout.EAST);
+        row.setMaximumSize(new Dimension(9999, 32));
+        return row;
+    }
+
+    private void updateReceipt() {
+        receiptPanel.removeAll();
+        receiptPanel.setLayout(new BoxLayout(receiptPanel, BoxLayout.Y_AXIS));
+        receiptPanel.setBackground(new Color(28, 43, 63));
+        receiptPanel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+
+        double totalInclusive = 0;
+        for (OrderEntry entry : orderEntries) {
+            totalInclusive += entry.lineTotal();
+        }
+        double subTotalExVat = totalInclusive / 1.12;
+        double vat = totalInclusive - subTotalExVat;
+
+        JLabel orderNumLabel = new JLabel("Order #" + (orderCount + 1));
+        orderNumLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        orderNumLabel.setForeground(new Color(245, 248, 252));
+        orderNumLabel.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
+        receiptPanel.add(orderNumLabel);
+
+        JButton clearBtn = new JButton("Clear All");
+        clearBtn.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+        clearBtn.setBackground(new Color(180, 60, 60));
+        clearBtn.setForeground(Color.WHITE);
+        clearBtn.setFocusPainted(false);
+        clearBtn.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
+        clearBtn.addActionListener(e -> {
+            orderEntries.clear();
+            refreshOrderDisplay();
+        });
+        receiptPanel.add(clearBtn);
+        receiptPanel.add(Box.createVerticalStrut(10));
+
+        receiptPanel.add(new JScrollPane(orderPanel, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER));
+        receiptPanel.add(Box.createVerticalStrut(8));
+
+        JLabel line = new JLabel("─────────────────────");
+        line.setForeground(new Color(100, 130, 160));
+        line.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
+        receiptPanel.add(line);
+
+        receiptPanel.add(makeReceiptRow("Subtotal:", String.format("\u20B1%.2f", subTotalExVat)));
+        receiptPanel.add(makeReceiptRow("Tax (12%):", String.format("\u20B1%.2f", vat)));
+        receiptPanel.add(makeReceiptRow("Total:", String.format("\u20B1%.2f", totalInclusive)));
+
+        receiptPanel.add(Box.createVerticalStrut(6));
+        receiptPanel.add(makeReceiptRow("Cash:", ""));
+
+        JTextField cashField = new JTextField(10);
+        cashField.setHorizontalAlignment(JTextField.RIGHT);
+        cashField.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        cashField.setBackground(new Color(36, 55, 83));
+        cashField.setForeground(new Color(197, 209, 224));
+        cashField.setCaretColor(new Color(197, 209, 224));
+        cashField.setBorder(new LineBorder(new Color(60, 85, 120), 1, true));
+        cashField.setMaximumSize(new Dimension(120, 26));
+        cashField.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
+        receiptPanel.add(cashField);
+
+        receiptPanel.add(Box.createVerticalStrut(2));
+        receiptPanel.add(makeReceiptRow("Change:", "\u20B10.00"));
+
+        receiptPanel.add(Box.createVerticalStrut(10));
+
+        final double fSubTotalExVat = subTotalExVat;
+        final double fVat = vat;
+        final double fTotal = totalInclusive;
+
+        JButton printBtn = new JButton("Print Bills");
+        printBtn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        printBtn.setBackground(new Color(50, 157, 111));
+        printBtn.setForeground(Color.WHITE);
+        printBtn.setFocusPainted(false);
+        printBtn.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
+        printBtn.setMaximumSize(new Dimension(200, 35));
+        printBtn.addActionListener(e -> {
+            String cashStr = cashField.getText().trim();
+            if (cashStr.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Please enter cash amount.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            try {
+                double cash = Double.parseDouble(cashStr);
+                if (cash < fTotal) {
+                    JOptionPane.showMessageDialog(this, "Insufficient cash.", "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                double change = cash - fTotal;
+                showReceipt(fSubTotalExVat, fVat, fTotal, cash, change);
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "Invalid cash amount.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+        receiptPanel.add(printBtn);
+
+        receiptPanel.revalidate();
+        receiptPanel.repaint();
+    }
+
+    private JPanel makeReceiptRow(String label, String value) {
+        JPanel row = new JPanel(new BorderLayout());
+        row.setOpaque(false);
+        JLabel lbl = new JLabel(label);
+        lbl.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        lbl.setForeground(new Color(197, 209, 224));
+        row.add(lbl, BorderLayout.WEST);
+        JLabel val = new JLabel(value);
+        val.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        val.setForeground(new Color(245, 248, 252));
+        row.add(val, BorderLayout.EAST);
+        return row;
+    }
+
+    private void showReceipt(double subTotal, double vat, double total, double cash, double change) {
+        String lineSep = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+        String receipt = " ☕ Better Mondays Cafe ☕\n"
+               + " 123 Main St., Manila\n"
+               + " VAT REG TIN: 123-456-789\n"
+               + lineSep
+               + "Date: " + new SimpleDateFormat("MM/dd/yyyy HH:mm").format(new Date()) + "\n"
+               + "Txn #: TXN" + String.format("%06d", ++transactionCounter) + "\n"
+               + lineSep
+               + String.format("%-15s %3s %8s\n", "ITEM", "QTY", "AMOUNT")
+               + "───────────────────────────────\n";
+
+        for (OrderEntry entry : orderEntries) {
+            receipt += String.format("%-15s %3d %8.2f\n",
+                    truncate(entry.displayName(), 15), entry.quantity, entry.lineTotal());
+        }
+
+        receipt += "───────────────────────────────\n"
+                 + String.format("%-23s \u20B1%7.2f\n", "Subtotal (excl VAT):", subTotal)
+                 + String.format("%-23s \u20B1%7.2f\n", "VAT (12%):", vat)
+                 + String.format("%-23s \u20B1%7.2f\n", "TOTAL (incl VAT):", total)
+                 + String.format("%-23s \u20B1%7.2f\n", "Cash:", cash)
+                 + String.format("%-23s \u20B1%7.2f\n", "Change:", change)
+                 + lineSep
+                 + " Thank you! Come again!\n"
+                 + " *** Have a nice day ***\n";
+
+        JOptionPane.showMessageDialog(this, receipt,
+                "✅ RECEIPT - TXN" + String.format("%06d", transactionCounter),
+                JOptionPane.INFORMATION_MESSAGE);
+
+        // Deduct ingredients
+        Inventory inv = Inventory.getInstance();
+        Menu menu = Menu.getInstance();
+        for (OrderEntry entry : orderEntries) {
+            MenuItem menuItem = menu.getMenuItem(entry.name);
+            if (menuItem != null) {
+                for (Map.Entry<String, Double> e : menuItem.getIngredients().entrySet()) {
+                    inv.deductIngredient(e.getKey(), e.getValue());
+                }
+            }
+        }
+
+        List<SalesRecord> salesList = new ArrayList<>();
+        for (OrderEntry entry : orderEntries) {
+            salesList.add(new SalesRecord(entry.displayName(), entry.quantity, entry.unitPrice, entry.lineTotal()));
+        }
+
+        if (orderController == null) {
+            orderController = new OrderController(new SQLiteSalesRepository());
+        }
+
+        String transactionRef = "TXN" + String.format("%06d", transactionCounter);
+        try {
+            orderController.persistCompletedTransaction(transactionRef, salesList, subTotal, cash, change);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this,
+                    "Unable to save sales to database: " + e.getMessage(),
+                    "Database", JOptionPane.WARNING_MESSAGE);
+        }
+
+        monitoring.addMultipleSales(salesList);
+        orderCount++;
+        orderEntries.clear();
+        refreshOrderDisplay();
+        loadInventoryTable();
+        monitoring.loadLowStockIngredients();
+    }
+
+    // ─── initComponents (replaces GUI builder code) ─────────────
+    private void initComponents() {
         jTabbedPaneI = new javax.swing.JTabbedPane();
         jPanelPOS = new javax.swing.JPanel();
         jLabel1 = new javax.swing.JLabel();
-        jScrollPane2 = new javax.swing.JScrollPane();
-        jPanel4 = new javax.swing.JPanel();
-        coffeemenu = new javax.swing.JButton();
-        noncoffeemenu = new javax.swing.JButton();
-        fruitteamenu = new javax.swing.JButton();
-        herbalteamenu = new javax.swing.JButton();
-        menu2 = new javax.swing.JButton();
-        menu3 = new javax.swing.JButton();
-        menu6 = new javax.swing.JButton();
-        menu1 = new javax.swing.JButton();
-        menu5 = new javax.swing.JButton();
-        menu8 = new javax.swing.JButton();
-        menu4 = new javax.swing.JButton();
-        menu7 = new javax.swing.JButton();
-        menu9 = new javax.swing.JButton();
-        menu10 = new javax.swing.JButton();
-        menu11 = new javax.swing.JButton();
-        menu12 = new javax.swing.JButton();
-        backbtn = new javax.swing.JButton();
-        jPanelSummary = new javax.swing.JPanel();
-        jLabel6 = new javax.swing.JLabel();
-        JLabelTax = new javax.swing.JLabel();
-        jLabelSubTotal = new javax.swing.JLabel();
-        jLabelTotal = new javax.swing.JLabel();
-        jTextFieldTax = new javax.swing.JTextField();
-        jTextFieldSubTotal = new javax.swing.JTextField();
-        jTextFieldTotal = new javax.swing.JTextField();
-        pay = new javax.swing.JButton();
-        exit = new javax.swing.JButton();
-        resetorder = new javax.swing.JButton();
-        cashpayment = new javax.swing.JTextField();
-        jTextFieldChange = new javax.swing.JTextField();
-        jLabelTotal1 = new javax.swing.JLabel();
-        jLabelTotal2 = new javax.swing.JLabel();
-        jScrollPane1 = new javax.swing.JScrollPane();
-        jTable1 = new javax.swing.JTable();
-        removeitem = new javax.swing.JButton();
-        jPanelInventory = new javax.swing.JPanel();
-        jLabel2 = new javax.swing.JLabel();
-        jScrollPane3 = new javax.swing.JScrollPane();
-        inventoryTable = new javax.swing.JTable();
-        InventoryEdit = new javax.swing.JButton();
-        InventoryRemove = new javax.swing.JButton();
-        InventoryAdd = new javax.swing.JButton();
-        jPanelMonitoring = new javax.swing.JPanel();
-        jLabel3 = new javax.swing.JLabel();
-        jScrollPane4 = new javax.swing.JScrollPane();
-        jTableSales = new javax.swing.JTable();
-        jScrollPane5 = new javax.swing.JScrollPane();
-        jTableMonitoring = new javax.swing.JTable();
-        jLabel4 = new javax.swing.JLabel();
-        jLabel5 = new javax.swing.JLabel();
 
-        setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
-        setTitle("Better Mondays Coffeee Cafe Management System");
-        setBackground(new java.awt.Color(29, 44, 63));
-        setIconImage(new javax.swing.ImageIcon(getClass().getResource("/images/logo.png")).getImage());
+        // ═══════════════════════════════════════════════════════════
+        //  ORDERING TAB
+        // ═══════════════════════════════════════════════════════════
+        jPanelPOS.setBackground(new Color(28, 43, 63));
+        jPanelPOS.setLayout(new BorderLayout());
 
-        jTabbedPaneI.setBackground(new java.awt.Color(28, 43, 63));
+        JLabel titleLabel = new JLabel("Ordering");
+        titleLabel.setFont(new Font("Segoe UI", Font.PLAIN, 36));
+        titleLabel.setForeground(new Color(255, 255, 255));
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(8, 12, 0, 0));
+
+        // ─── Category pills (horizontal nav) ───────────────────
+        sidebarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 4));
+        sidebarPanel.setBackground(new Color(23, 36, 54));
+        sidebarPanel.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+
+        String[] categories = {
+            "Espresso & Coffee", "Specialty Drinks", "Tea Latte", "Non-Coffee",
+            "House Favorites", "Fruit Tea", "Herbal Tea",
+            "Sandwiches", "Pandesal Pairs", "Pastries"
+        };
+
+        for (String cat : categories) {
+            JButton btn = new JButton(cat);
+            btn.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+            btn.setBackground(new Color(36, 55, 83));
+            btn.setForeground(new Color(245, 248, 252));
+            btn.setFocusPainted(false);
+            btn.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(new Color(60, 85, 120), 1, true),
+                BorderFactory.createEmptyBorder(4, 12, 4, 12)));
+            btn.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+            btn.addActionListener(e -> showCategory(btn.getText()));
+            sidebarPanel.add(btn);
+        }
+
+        // ─── Center panel (pills + search + product grid) ──────
+        centerPanel = new JPanel(new BorderLayout(0, 6));
+        centerPanel.setBackground(new Color(28, 43, 63));
+        centerPanel.setBorder(BorderFactory.createEmptyBorder(6, 8, 8, 8));
+
+        JPanel centerTopPanel = new JPanel(new BorderLayout(4, 0));
+        centerTopPanel.setOpaque(false);
+
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        searchPanel.setOpaque(false);
+
+        JLabel searchIcon = new JLabel("\uD83D\uDD0D");
+        searchIcon.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        searchIcon.setForeground(new Color(100, 130, 160));
+        searchPanel.add(searchIcon);
+
+        searchField = new JTextField("Search a product", 20);
+        searchField.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        searchField.setBackground(new Color(36, 55, 83));
+        searchField.setForeground(new Color(100, 130, 160));
+        searchField.setCaretColor(new Color(197, 209, 224));
+        searchField.setBorder(BorderFactory.createCompoundBorder(
+            new LineBorder(new Color(60, 85, 120), 1, true),
+            BorderFactory.createEmptyBorder(6, 10, 6, 10)));
+        searchField.setPreferredSize(new Dimension(250, 32));
+        searchField.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override
+            public void focusGained(java.awt.event.FocusEvent e) {
+                if ("Search a product".equals(searchField.getText())) {
+                    searchField.setText("");
+                    searchField.setForeground(new Color(197, 209, 224));
+                }
+            }
+            @Override
+            public void focusLost(java.awt.event.FocusEvent e) {
+                if (searchField.getText().isEmpty()) {
+                    searchField.setText("Search a product");
+                    searchField.setForeground(new Color(100, 130, 160));
+                }
+            }
+        });
+        searchField.addKeyListener(new java.awt.event.KeyAdapter() {
+            @Override
+            public void keyReleased(java.awt.event.KeyEvent e) {
+                rebuildProductGrid(activeCategory, searchField.getText());
+            }
+        });
+        searchPanel.add(searchField);
+        centerTopPanel.add(sidebarPanel, BorderLayout.NORTH);
+        centerTopPanel.add(searchPanel, BorderLayout.SOUTH);
+        centerPanel.add(centerTopPanel, BorderLayout.NORTH);
+
+        productGridPanel = new JPanel(new GridLayout(0, 4, 8, 8));
+        productGridPanel.setBackground(new Color(28, 43, 63));
+        centerPanel.add(new JScrollPane(productGridPanel), BorderLayout.CENTER);
+
+        // ─── Right sidebar (order summary) ─────────────────────
+        orderPanel = new JPanel(new BorderLayout());
+        orderPanel.setBackground(new Color(28, 43, 63));
+
+        receiptPanel = new JPanel();
+        receiptPanel.setLayout(new BoxLayout(receiptPanel, BoxLayout.Y_AXIS));
+        receiptPanel.setBackground(new Color(28, 43, 63));
+        receiptPanel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+
+        JScrollPane receiptScroll = new JScrollPane(receiptPanel);
+        receiptScroll.setBorder(null);
+        receiptScroll.setPreferredSize(new Dimension(320, 0));
+
+        // Assemble ordering panel
+        JPanel topBar = new JPanel(new BorderLayout());
+        topBar.setOpaque(false);
+        topBar.add(titleLabel, BorderLayout.WEST);
+
+        JPanel body = new JPanel(new BorderLayout());
+        body.setOpaque(false);
+        body.add(centerPanel, BorderLayout.CENTER);
+        body.add(receiptScroll, BorderLayout.EAST);
+
+        JPanel orderingPanel = new JPanel(new BorderLayout());
+        orderingPanel.setBackground(new Color(28, 43, 63));
+        orderingPanel.add(topBar, BorderLayout.NORTH);
+        orderingPanel.add(body, BorderLayout.CENTER);
+
+        jTabbedPaneI.addTab("Ordering", orderingPanel);
+        jTabbedPaneI.setBackgroundAt(0, new Color(28, 43, 63));
+
+        // Add other tabs
+        jTabbedPaneI.addTab("Search", new SearchModule());
+        jTabbedPaneI.setBackground(new Color(28, 43, 63));
         jTabbedPaneI.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 102, 51)));
         jTabbedPaneI.setForeground(new java.awt.Color(255, 255, 255));
         jTabbedPaneI.setTabPlacement(javax.swing.JTabbedPane.LEFT);
         jTabbedPaneI.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
         jTabbedPaneI.setFocusable(false);
 
-        jPanelPOS.setBackground(new java.awt.Color(28, 43, 63));
-        jPanelPOS.setForeground(new java.awt.Color(255, 255, 255));
-
-        jLabel1.setFont(new java.awt.Font("Segoe UI", 0, 36)); // NOI18N
-        jLabel1.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel1.setText("Ordering");
-
-        jScrollPane2.setHorizontalScrollBarPolicy(javax.swing.ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-        jScrollPane2.setVerticalScrollBarPolicy(javax.swing.ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
-
-        jPanel4.setBackground(new java.awt.Color(45, 69, 102));
-        jPanel4.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0)));
-
-        coffeemenu.setBackground(new java.awt.Color(35, 71, 106));
-        coffeemenu.setForeground(new java.awt.Color(255, 255, 255));
-        coffeemenu.setText("Coffee");
-        coffeemenu.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-        coffeemenu.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                coffeeActionPerformed(evt);
-            }
-        });
-
-        noncoffeemenu.setBackground(new java.awt.Color(35, 71, 106));
-        noncoffeemenu.setForeground(new java.awt.Color(255, 255, 255));
-        noncoffeemenu.setText("Non-Coffee");
-        noncoffeemenu.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-        noncoffeemenu.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                noncoffeeActionPerformed(evt);
-            }
-        });
-
-        fruitteamenu.setBackground(new java.awt.Color(35, 71, 106));
-        fruitteamenu.setForeground(new java.awt.Color(255, 255, 255));
-        fruitteamenu.setText("Fruit Tea");
-        fruitteamenu.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-        fruitteamenu.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                fruitteaActionPerformed(evt);
-            }
-        });
-
-        herbalteamenu.setBackground(new java.awt.Color(35, 71, 106));
-        herbalteamenu.setForeground(new java.awt.Color(255, 255, 255));
-        herbalteamenu.setText("Herbal Tea");
-        herbalteamenu.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-        herbalteamenu.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                herbalteaActionPerformed(evt);
-            }
-        });
-
-        menu2.setVisible(false);
-        menu2.setBackground(new java.awt.Color(35, 71, 106));
-        menu2.setForeground(new java.awt.Color(255, 255, 255));
-        menu2.setEnabled(false);
-        menu2.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-        menu2.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                menu2coffeeActionPerformed(evt);
-            }
-        });
-
-        menu3.setVisible(false);
-        menu3.setBackground(new java.awt.Color(35, 71, 106));
-        menu3.setForeground(new java.awt.Color(255, 255, 255));
-        menu3.setEnabled(false);
-        menu3.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-        menu3.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                menu3coffeeActionPerformed(evt);
-            }
-        });
-
-        menu6.setVisible(false);
-        menu6.setBackground(new java.awt.Color(35, 71, 106));
-        menu6.setForeground(new java.awt.Color(255, 255, 255));
-        menu6.setEnabled(false);
-        menu6.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-        menu6.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                menu6coffeeActionPerformed(evt);
-            }
-        });
-
-        menu1.setVisible(false);
-        menu1.setBackground(new java.awt.Color(35, 71, 106));
-        menu1.setForeground(new java.awt.Color(255, 255, 255));
-        menu1.setEnabled(false);
-        menu1.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-        menu1.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                menu1coffeeActionPerformed(evt);
-            }
-        });
-
-        menu5.setVisible(false);
-        menu5.setBackground(new java.awt.Color(35, 71, 106));
-        menu5.setForeground(new java.awt.Color(255, 255, 255));
-        menu5.setEnabled(false);
-        menu5.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-        menu5.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                menu5coffeeActionPerformed(evt);
-            }
-        });
-
-        menu8.setVisible(false);
-        menu8.setBackground(new java.awt.Color(35, 71, 106));
-        menu8.setForeground(new java.awt.Color(255, 255, 255));
-        menu8.setEnabled(false);
-        menu8.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-        menu8.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                menu8coffeeActionPerformed(evt);
-            }
-        });
-
-        menu4.setVisible(false);
-        menu4.setBackground(new java.awt.Color(35, 71, 106));
-        menu4.setForeground(new java.awt.Color(255, 255, 255));
-        menu4.setEnabled(false);
-        menu4.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-        menu4.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                menu4coffeeActionPerformed(evt);
-            }
-        });
-
-        menu7.setVisible(false);
-        menu7.setBackground(new java.awt.Color(35, 71, 106));
-        menu7.setForeground(new java.awt.Color(255, 255, 255));
-        menu7.setEnabled(false);
-        menu7.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-        menu7.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                menu7coffeeActionPerformed(evt);
-            }
-        });
-
-        menu9.setVisible(false);
-        menu9.setBackground(new java.awt.Color(35, 71, 106));
-        menu9.setForeground(new java.awt.Color(255, 255, 255));
-        menu9.setEnabled(false);
-        menu9.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-        menu9.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                menu9coffeeActionPerformed(evt);
-            }
-        });
-
-        menu10.setVisible(false);
-        menu10.setBackground(new java.awt.Color(35, 71, 106));
-        menu10.setForeground(new java.awt.Color(255, 255, 255));
-        menu10.setEnabled(false);
-        menu10.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-        menu10.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                menu10coffeeActionPerformed(evt);
-            }
-        });
-
-        menu11.setVisible(false);
-        menu11.setBackground(new java.awt.Color(35, 71, 106));
-        menu11.setForeground(new java.awt.Color(255, 255, 255));
-        menu11.setEnabled(false);
-        menu11.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-        menu11.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                menu11coffeeActionPerformed(evt);
-            }
-        });
-
-        menu12.setVisible(false);
-        menu12.setBackground(new java.awt.Color(35, 71, 106));
-        menu12.setForeground(new java.awt.Color(255, 255, 255));
-        menu12.setEnabled(false);
-        menu12.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-        menu12.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                menu12coffeeActionPerformed(evt);
-            }
-        });
-
-        backbtn.setText("Back");
-        backbtn.setVisible(false);
-        backbtn.setEnabled(false);
-        backbtn.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                backbtnActionPerformed(evt);
-            }
-        });
-
-        javax.swing.GroupLayout jPanel4Layout = new javax.swing.GroupLayout(jPanel4);
-        jPanel4.setLayout(jPanel4Layout);
-        jPanel4Layout.setHorizontalGroup(
-                jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                        .addGroup(jPanel4Layout.createSequentialGroup()
-                                .addGap(29, 29, 29)
-                                .addComponent(coffeemenu, javax.swing.GroupLayout.PREFERRED_SIZE, 180,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(30, 30, 30)
-                                .addComponent(noncoffeemenu, javax.swing.GroupLayout.PREFERRED_SIZE, 180,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(30, 30, 30)
-                                .addComponent(fruitteamenu, javax.swing.GroupLayout.PREFERRED_SIZE, 170,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(30, 30, 30)
-                                .addComponent(herbalteamenu, javax.swing.GroupLayout.PREFERRED_SIZE, 180,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addGroup(jPanel4Layout.createSequentialGroup()
-                                .addGap(29, 29, 29)
-                                .addComponent(menu1, javax.swing.GroupLayout.PREFERRED_SIZE, 180,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(30, 30, 30)
-                                .addComponent(menu2, javax.swing.GroupLayout.PREFERRED_SIZE, 180,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(30, 30, 30)
-                                .addComponent(menu3, javax.swing.GroupLayout.PREFERRED_SIZE, 170,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(30, 30, 30)
-                                .addComponent(menu4, javax.swing.GroupLayout.PREFERRED_SIZE, 180,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addGroup(jPanel4Layout.createSequentialGroup()
-                                .addGap(29, 29, 29)
-                                .addComponent(menu5, javax.swing.GroupLayout.PREFERRED_SIZE, 180,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(30, 30, 30)
-                                .addComponent(menu6, javax.swing.GroupLayout.PREFERRED_SIZE, 180,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(30, 30, 30)
-                                .addComponent(menu7, javax.swing.GroupLayout.PREFERRED_SIZE, 170,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(30, 30, 30)
-                                .addComponent(menu8, javax.swing.GroupLayout.PREFERRED_SIZE, 180,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addGroup(jPanel4Layout.createSequentialGroup()
-                                .addGap(29, 29, 29)
-                                .addComponent(menu9, javax.swing.GroupLayout.PREFERRED_SIZE, 180,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(30, 30, 30)
-                                .addComponent(menu10, javax.swing.GroupLayout.PREFERRED_SIZE, 180,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(30, 30, 30)
-                                .addComponent(menu11, javax.swing.GroupLayout.PREFERRED_SIZE, 170,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(30, 30, 30)
-                                .addComponent(menu12, javax.swing.GroupLayout.PREFERRED_SIZE, 180,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addGroup(jPanel4Layout.createSequentialGroup()
-                                .addGap(749, 749, 749)
-                                .addComponent(backbtn, javax.swing.GroupLayout.PREFERRED_SIZE, 80,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE)));
-        jPanel4Layout.setVerticalGroup(
-                jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                        .addGroup(jPanel4Layout.createSequentialGroup()
-                                .addGap(19, 19, 19)
-                                .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                        .addComponent(coffeemenu, javax.swing.GroupLayout.PREFERRED_SIZE, 92,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(noncoffeemenu, javax.swing.GroupLayout.PREFERRED_SIZE, 92,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(fruitteamenu, javax.swing.GroupLayout.PREFERRED_SIZE, 92,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(herbalteamenu, javax.swing.GroupLayout.PREFERRED_SIZE, 92,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE))
-                                .addGap(18, 18, 18)
-                                .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                        .addComponent(menu1, javax.swing.GroupLayout.PREFERRED_SIZE, 92,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(menu2, javax.swing.GroupLayout.PREFERRED_SIZE, 92,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(menu3, javax.swing.GroupLayout.PREFERRED_SIZE, 92,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(menu4, javax.swing.GroupLayout.PREFERRED_SIZE, 92,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE))
-                                .addGap(18, 18, 18)
-                                .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                        .addComponent(menu5, javax.swing.GroupLayout.PREFERRED_SIZE, 92,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(menu6, javax.swing.GroupLayout.PREFERRED_SIZE, 92,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(menu7, javax.swing.GroupLayout.PREFERRED_SIZE, 92,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(menu8, javax.swing.GroupLayout.PREFERRED_SIZE, 92,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE))
-                                .addGap(18, 18, 18)
-                                .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                        .addComponent(menu9, javax.swing.GroupLayout.PREFERRED_SIZE, 92,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(menu10, javax.swing.GroupLayout.PREFERRED_SIZE, 92,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(menu11, javax.swing.GroupLayout.PREFERRED_SIZE, 92,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(menu12, javax.swing.GroupLayout.PREFERRED_SIZE, 92,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE))
-                                .addGap(18, 18, 18)
-                                .addComponent(backbtn, javax.swing.GroupLayout.PREFERRED_SIZE, 30,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE)));
-
-        jScrollPane2.setViewportView(jPanel4);
-
-        jPanelSummary.setBackground(new java.awt.Color(45, 69, 102));
-        jPanelSummary.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0)));
-        jPanelSummary.setForeground(new java.awt.Color(255, 255, 255));
-
-        jLabel6.setFont(new java.awt.Font("Verdana", 1, 12)); // NOI18N
-        jLabel6.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel6.setText(" Summary");
-
-        JLabelTax.setFont(new java.awt.Font("Verdana", 1, 12)); // NOI18N
-        JLabelTax.setForeground(new java.awt.Color(255, 255, 255));
-        JLabelTax.setText("Tax");
-
-        jLabelSubTotal.setFont(new java.awt.Font("Verdana", 1, 12)); // NOI18N
-        jLabelSubTotal.setForeground(new java.awt.Color(255, 255, 255));
-        jLabelSubTotal.setText("Sub.Total");
-
-        jLabelTotal.setFont(new java.awt.Font("Verdana", 1, 12)); // NOI18N
-        jLabelTotal.setForeground(new java.awt.Color(255, 255, 255));
-        jLabelTotal.setText("Total");
-
-        jTextFieldTax.setEditable(false);
-
-        jTextFieldSubTotal.setEditable(false);
-
-        jTextFieldTotal.setEditable(false);
-
-        pay.setFont(new java.awt.Font("Verdana", 1, 12)); // NOI18N
-        pay.setText("Pay");
-        pay.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                payActionPerformed(evt);
-            }
-        });
-
-        exit.setFont(new java.awt.Font("Verdana", 1, 12)); // NOI18N
-        exit.setText("Exit");
-        exit.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                exitActionPerformed(evt);
-            }
-        });
-
-        resetorder.setFont(new java.awt.Font("Verdana", 1, 12)); // NOI18N
-        resetorder.setText("Reset");
-        resetorder.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                resetorderActionPerformed(evt);
-            }
-        });
-
-        cashpayment.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                cashpaymentActionPerformed(evt);
-            }
-        });
-
-        jTextFieldChange.setEditable(false);
-
-        jLabelTotal1.setFont(new java.awt.Font("Verdana", 1, 12)); // NOI18N
-        jLabelTotal1.setForeground(new java.awt.Color(255, 255, 255));
-        jLabelTotal1.setText("Change");
-
-        jLabelTotal2.setFont(new java.awt.Font("Verdana", 1, 12)); // NOI18N
-        jLabelTotal2.setForeground(new java.awt.Color(255, 255, 255));
-        jLabelTotal2.setText("Cash");
-
-        javax.swing.GroupLayout jPanelSummaryLayout = new javax.swing.GroupLayout(jPanelSummary);
-        jPanelSummary.setLayout(jPanelSummaryLayout);
-        jPanelSummaryLayout.setHorizontalGroup(
-                jPanelSummaryLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                        .addGroup(jPanelSummaryLayout.createSequentialGroup()
-                                .addContainerGap()
-                                .addGroup(jPanelSummaryLayout
-                                        .createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                        .addGroup(jPanelSummaryLayout.createSequentialGroup()
-                                                .addGap(0, 0, Short.MAX_VALUE)
-                                                .addGroup(jPanelSummaryLayout
-                                                        .createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                                                        .addComponent(jLabel6, javax.swing.GroupLayout.PREFERRED_SIZE,
-                                                                72, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                                        .addGroup(jPanelSummaryLayout.createSequentialGroup()
-                                                                .addComponent(pay,
-                                                                        javax.swing.GroupLayout.PREFERRED_SIZE, 57,
-                                                                        javax.swing.GroupLayout.PREFERRED_SIZE)
-                                                                .addPreferredGap(
-                                                                        javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                                                .addComponent(resetorder,
-                                                                        javax.swing.GroupLayout.DEFAULT_SIZE,
-                                                                        javax.swing.GroupLayout.DEFAULT_SIZE,
-                                                                        Short.MAX_VALUE)))
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                                .addComponent(exit, javax.swing.GroupLayout.PREFERRED_SIZE, 50,
-                                                        javax.swing.GroupLayout.PREFERRED_SIZE)
-                                                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                                        .addGroup(jPanelSummaryLayout.createSequentialGroup()
-                                                .addGroup(jPanelSummaryLayout
-                                                        .createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                                        .addGroup(javax.swing.GroupLayout.Alignment.TRAILING,
-                                                                jPanelSummaryLayout.createSequentialGroup()
-                                                                        .addComponent(jLabelTotal1)
-                                                                        .addPreferredGap(
-                                                                                javax.swing.LayoutStyle.ComponentPlacement.RELATED,
-                                                                                javax.swing.GroupLayout.DEFAULT_SIZE,
-                                                                                Short.MAX_VALUE)
-                                                                        .addComponent(jTextFieldChange,
-                                                                                javax.swing.GroupLayout.PREFERRED_SIZE,
-                                                                                83,
-                                                                                javax.swing.GroupLayout.PREFERRED_SIZE))
-                                                        .addGroup(jPanelSummaryLayout.createSequentialGroup()
-                                                                .addGroup(jPanelSummaryLayout.createParallelGroup(
-                                                                        javax.swing.GroupLayout.Alignment.LEADING)
-                                                                        .addGroup(jPanelSummaryLayout
-                                                                                .createSequentialGroup()
-                                                                                .addGroup(jPanelSummaryLayout
-                                                                                        .createParallelGroup(
-                                                                                                javax.swing.GroupLayout.Alignment.LEADING)
-                                                                                        .addComponent(JLabelTax)
-                                                                                        .addComponent(jLabelSubTotal))
-                                                                                .addGap(140, 140, 140)
-                                                                                .addGroup(jPanelSummaryLayout
-                                                                                        .createParallelGroup(
-                                                                                                javax.swing.GroupLayout.Alignment.LEADING)
-                                                                                        .addComponent(
-                                                                                                jTextFieldSubTotal,
-                                                                                                javax.swing.GroupLayout.PREFERRED_SIZE,
-                                                                                                82,
-                                                                                                javax.swing.GroupLayout.PREFERRED_SIZE)
-                                                                                        .addComponent(jTextFieldTax,
-                                                                                                javax.swing.GroupLayout.PREFERRED_SIZE,
-                                                                                                82,
-                                                                                                javax.swing.GroupLayout.PREFERRED_SIZE)))
-                                                                        .addGroup(jPanelSummaryLayout
-                                                                                .createSequentialGroup()
-                                                                                .addGroup(jPanelSummaryLayout
-                                                                                        .createParallelGroup(
-                                                                                                javax.swing.GroupLayout.Alignment.LEADING)
-                                                                                        .addComponent(jLabelTotal2)
-                                                                                        .addComponent(jLabelTotal))
-                                                                                .addGap(169, 169, 169)
-                                                                                .addGroup(jPanelSummaryLayout
-                                                                                        .createParallelGroup(
-                                                                                                javax.swing.GroupLayout.Alignment.LEADING)
-                                                                                        .addComponent(jTextFieldTotal,
-                                                                                                javax.swing.GroupLayout.PREFERRED_SIZE,
-                                                                                                83,
-                                                                                                javax.swing.GroupLayout.PREFERRED_SIZE)
-                                                                                        .addComponent(cashpayment,
-                                                                                                javax.swing.GroupLayout.PREFERRED_SIZE,
-                                                                                                83,
-                                                                                                javax.swing.GroupLayout.PREFERRED_SIZE))))
-                                                                .addGap(0, 0, Short.MAX_VALUE)))
-                                                .addContainerGap()))));
-
-        jPanelSummaryLayout.linkSize(javax.swing.SwingConstants.HORIZONTAL,
-                new java.awt.Component[] { exit, pay, resetorder });
-
-        jPanelSummaryLayout.setVerticalGroup(
-                jPanelSummaryLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                        .addGroup(jPanelSummaryLayout.createSequentialGroup()
-                                .addContainerGap(10, Short.MAX_VALUE)
-                                .addComponent(jLabel6)
-                                .addGap(18, 18, 18)
-                                .addGroup(jPanelSummaryLayout
-                                        .createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                        .addComponent(JLabelTax)
-                                        .addComponent(jTextFieldTax, javax.swing.GroupLayout.PREFERRED_SIZE,
-                                                javax.swing.GroupLayout.DEFAULT_SIZE,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE))
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addGroup(jPanelSummaryLayout
-                                        .createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                        .addComponent(jLabelSubTotal)
-                                        .addComponent(jTextFieldSubTotal, javax.swing.GroupLayout.PREFERRED_SIZE,
-                                                javax.swing.GroupLayout.DEFAULT_SIZE,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE))
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addGroup(jPanelSummaryLayout
-                                        .createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                        .addComponent(jLabelTotal)
-                                        .addComponent(jTextFieldTotal, javax.swing.GroupLayout.PREFERRED_SIZE,
-                                                javax.swing.GroupLayout.DEFAULT_SIZE,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE))
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addGroup(jPanelSummaryLayout
-                                        .createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                        .addComponent(cashpayment, javax.swing.GroupLayout.PREFERRED_SIZE,
-                                                javax.swing.GroupLayout.DEFAULT_SIZE,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(jLabelTotal2))
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addGroup(jPanelSummaryLayout
-                                        .createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                        .addComponent(jTextFieldChange, javax.swing.GroupLayout.PREFERRED_SIZE,
-                                                javax.swing.GroupLayout.DEFAULT_SIZE,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(jLabelTotal1))
-                                .addGap(18, 18, 18)
-                                .addGroup(jPanelSummaryLayout
-                                        .createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                        .addComponent(exit)
-                                        .addComponent(resetorder)
-                                        .addComponent(pay))
-                                .addGap(35, 35, 35)));
-
-        jTable1.setBackground(new java.awt.Color(45, 69, 102));
-        jTable1.setFont(new java.awt.Font("Verdana", 1, 12)); // NOI18N
-        jTable1.setForeground(new java.awt.Color(255, 255, 255));
-        jTable1.setModel(new javax.swing.table.DefaultTableModel(
-                new Object[][] {
-
-                },
-                new String[] {
-                        "Product", "Quantity", "Price"
-                }) {
-            boolean[] canEdit = new boolean[] {
-                    false, false, false
-            };
-
-            public boolean isCellEditable(int rowIndex, int columnIndex) {
-                return canEdit[columnIndex];
-            }
-        });
-        jTable1.setSelectionForeground(new java.awt.Color(255, 255, 255));
-        jScrollPane1.setViewportView(jTable1);
-        if (jTable1.getColumnModel().getColumnCount() > 0) {
-            jTable1.getColumnModel().getColumn(0).setResizable(false);
-            jTable1.getColumnModel().getColumn(0).setPreferredWidth(200);
-            jTable1.getColumnModel().getColumn(1).setResizable(false);
-            jTable1.getColumnModel().getColumn(2).setResizable(false);
-        }
-
-        removeitem.setFont(new java.awt.Font("Verdana", 1, 12)); // NOI18N
-        removeitem.setText("Remove");
-        removeitem.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                removeitemActionPerformed(evt);
-            }
-        });
-
-        javax.swing.GroupLayout jPanelPOSLayout = new javax.swing.GroupLayout(jPanelPOS);
-        jPanelPOS.setLayout(jPanelPOSLayout);
-        jPanelPOSLayout.setHorizontalGroup(
-                jPanelPOSLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                        .addGroup(jPanelPOSLayout.createSequentialGroup()
-                                .addGap(16, 16, 16)
-                                .addGroup(jPanelPOSLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                        .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 881,
-                                                javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(jLabel1))
-                                .addGroup(jPanelPOSLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                        .addGroup(jPanelPOSLayout.createSequentialGroup()
-                                                .addGap(29, 29, 29)
-                                                .addGroup(jPanelPOSLayout
-                                                        .createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                                                        .addComponent(jScrollPane1,
-                                                                javax.swing.GroupLayout.PREFERRED_SIZE, 434,
-                                                                javax.swing.GroupLayout.PREFERRED_SIZE)
-                                                        .addComponent(removeitem)))
-                                        .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanelPOSLayout
-                                                .createSequentialGroup()
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                                .addComponent(jPanelSummary, javax.swing.GroupLayout.DEFAULT_SIZE,
-                                                        javax.swing.GroupLayout.DEFAULT_SIZE,
-                                                        javax.swing.GroupLayout.PREFERRED_SIZE)
-                                                .addGap(58, 58, 58)))));
-        jPanelPOSLayout.setVerticalGroup(
-                jPanelPOSLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                        .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanelPOSLayout.createSequentialGroup()
-                                .addGroup(jPanelPOSLayout
-                                        .createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                                        .addGroup(jPanelPOSLayout.createSequentialGroup()
-                                                .addGap(15, 15, 15)
-                                                .addComponent(jLabel1)
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                                .addComponent(jScrollPane2))
-                                        .addGroup(javax.swing.GroupLayout.Alignment.LEADING, jPanelPOSLayout
-                                                .createSequentialGroup()
-                                                .addGap(31, 31, 31)
-                                                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 443,
-                                                        Short.MAX_VALUE)
-                                                .addGap(18, 18, 18)
-                                                .addComponent(removeitem)
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                                .addComponent(jPanelSummary, javax.swing.GroupLayout.PREFERRED_SIZE,
-                                                        javax.swing.GroupLayout.DEFAULT_SIZE,
-                                                        javax.swing.GroupLayout.PREFERRED_SIZE)))
-                                .addGap(24, 24, 24)));
-
-        jTabbedPaneI.addTab("Ordering", jPanelPOS);
-
-        jTabbedPaneI.addTab("Search", new SearchModule());
-
+        // ═══════════════════════════════════════════════════════════
+        //  INVENTORY TAB
+        // ═══════════════════════════════════════════════════════════
+        jPanelInventory = new javax.swing.JPanel();
         jPanelInventory.setBackground(new java.awt.Color(28, 43, 63));
 
-        jLabel2.setFont(new java.awt.Font("Segoe UI", 0, 36)); // NOI18N
+        jLabel2 = new javax.swing.JLabel();
+        jLabel2.setFont(new java.awt.Font("Segoe UI", 0, 36));
         jLabel2.setForeground(new java.awt.Color(255, 255, 255));
         jLabel2.setText("Inventory");
 
+        jScrollPane3 = new javax.swing.JScrollPane();
+        inventoryTable = new javax.swing.JTable();
         inventoryTable.setModel(new javax.swing.table.DefaultTableModel(
-                new Object[][] {
-                        { null, null, null, null, null },
-                        { null, null, null, null, null },
-                        { null, null, null, null, null },
-                        { null, null, null, null, null }
-                },
-                new String[] {
-                        "Item Name", "Quantity", "Unit", "Low Stock Alert", "Status"
-                }) {
-            boolean[] canEdit = new boolean[] {
-                    false, false, false, false, false
-            };
-
+            new Object [][] {
+                {null, null, null, null, null},
+                {null, null, null, null, null},
+                {null, null, null, null, null},
+                {null, null, null, null, null}
+            },
+            new String [] {
+                "Item Name", "Quantity", "Unit", "Low Stock Alert", "Status"
+            }
+        ) {
+            boolean[] canEdit = new boolean[] { false, false, false, false, false };
             public boolean isCellEditable(int rowIndex, int columnIndex) {
                 return canEdit[columnIndex];
             }
         });
         jScrollPane3.setViewportView(inventoryTable);
-        if (inventoryTable.getColumnModel().getColumnCount() > 0) {
-            inventoryTable.getColumnModel().getColumn(0).setResizable(false);
-            inventoryTable.getColumnModel().getColumn(0).setPreferredWidth(135);
-            inventoryTable.getColumnModel().getColumn(1).setResizable(false);
-            inventoryTable.getColumnModel().getColumn(2).setResizable(false);
-            inventoryTable.getColumnModel().getColumn(3).setResizable(false);
-            inventoryTable.getColumnModel().getColumn(4).setResizable(false);
-        }
 
+        InventoryEdit = new javax.swing.JButton();
         InventoryEdit.setText("Edit");
         InventoryEdit.setFocusable(false);
         InventoryEdit.addActionListener(new java.awt.event.ActionListener() {
@@ -871,6 +857,7 @@ public class POSSystem extends javax.swing.JFrame {
             }
         });
 
+        InventoryRemove = new javax.swing.JButton();
         InventoryRemove.setText("Remove");
         InventoryRemove.setFocusable(false);
         InventoryRemove.addActionListener(new java.awt.event.ActionListener() {
@@ -879,6 +866,7 @@ public class POSSystem extends javax.swing.JFrame {
             }
         });
 
+        InventoryAdd = new javax.swing.JButton();
         InventoryAdd.setText("Add");
         InventoryAdd.setFocusable(false);
         InventoryAdd.addActionListener(new java.awt.event.ActionListener() {
@@ -890,217 +878,166 @@ public class POSSystem extends javax.swing.JFrame {
         javax.swing.GroupLayout jPanelInventoryLayout = new javax.swing.GroupLayout(jPanelInventory);
         jPanelInventory.setLayout(jPanelInventoryLayout);
         jPanelInventoryLayout.setHorizontalGroup(
-                jPanelInventoryLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                        .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanelInventoryLayout
-                                .createSequentialGroup()
-                                .addGroup(jPanelInventoryLayout
-                                        .createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                                        .addGroup(jPanelInventoryLayout.createSequentialGroup()
-                                                .addGap(25, 25, 25)
-                                                .addComponent(jLabel2)
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED,
-                                                        javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                                .addComponent(InventoryAdd)
-                                                .addGap(18, 18, 18)
-                                                .addComponent(InventoryEdit)
-                                                .addGap(18, 18, 18)
-                                                .addComponent(InventoryRemove))
-                                        .addGroup(jPanelInventoryLayout.createSequentialGroup()
-                                                .addContainerGap(106, Short.MAX_VALUE)
-                                                .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE,
-                                                        1178, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                                .addGap(107, 107, 107)));
+            jPanelInventoryLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanelInventoryLayout.createSequentialGroup()
+                .addGroup(jPanelInventoryLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                    .addGroup(jPanelInventoryLayout.createSequentialGroup()
+                        .addGap(25, 25, 25)
+                        .addComponent(jLabel2)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addComponent(InventoryAdd)
+                        .addGap(18, 18, 18)
+                        .addComponent(InventoryEdit)
+                        .addGap(18, 18, 18)
+                        .addComponent(InventoryRemove))
+                    .addGroup(jPanelInventoryLayout.createSequentialGroup()
+                        .addContainerGap(106, Short.MAX_VALUE)
+                        .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 1178, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                .addGap(107, 107, 107))
+        );
         jPanelInventoryLayout.setVerticalGroup(
-                jPanelInventoryLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                        .addGroup(jPanelInventoryLayout.createSequentialGroup()
-                                .addGroup(jPanelInventoryLayout
-                                        .createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                        .addGroup(jPanelInventoryLayout.createSequentialGroup()
-                                                .addGap(25, 25, 25)
-                                                .addComponent(jLabel2))
-                                        .addGroup(jPanelInventoryLayout.createSequentialGroup()
-                                                .addContainerGap(61, Short.MAX_VALUE)
-                                                .addGroup(jPanelInventoryLayout
-                                                        .createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                                        .addComponent(InventoryRemove)
-                                                        .addComponent(InventoryEdit)
-                                                        .addComponent(InventoryAdd))))
-                                .addGap(18, 18, 18)
-                                .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 655,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addContainerGap(50, Short.MAX_VALUE)));
-
+            jPanelInventoryLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanelInventoryLayout.createSequentialGroup()
+                .addGroup(jPanelInventoryLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanelInventoryLayout.createSequentialGroup()
+                        .addGap(25, 25, 25)
+                        .addComponent(jLabel2))
+                    .addGroup(jPanelInventoryLayout.createSequentialGroup()
+                        .addContainerGap(61, Short.MAX_VALUE)
+                        .addGroup(jPanelInventoryLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(InventoryRemove)
+                            .addComponent(InventoryEdit)
+                            .addComponent(InventoryAdd))))
+                .addGap(18, 18, 18)
+                .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 655, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(50, Short.MAX_VALUE))
+        );
         jTabbedPaneI.addTab("Inventory", jPanelInventory);
 
+        // ═══════════════════════════════════════════════════════════
+        //  MONITORING TAB
+        // ═══════════════════════════════════════════════════════════
+        jPanelMonitoring = new javax.swing.JPanel();
         jPanelMonitoring.setBackground(new java.awt.Color(28, 43, 63));
         jPanelMonitoring.setForeground(new java.awt.Color(255, 255, 255));
 
-        jLabel3.setFont(new java.awt.Font("Segoe UI", 0, 36)); // NOI18N
+        jLabel3 = new javax.swing.JLabel();
+        jLabel3.setFont(new java.awt.Font("Segoe UI", 0, 36));
         jLabel3.setForeground(new java.awt.Color(255, 255, 255));
         jLabel3.setText("Monitoring");
 
+        jTableSales = new javax.swing.JTable();
         jTableSales.setModel(new javax.swing.table.DefaultTableModel(
-                new Object[][] {
-                        { null, null, null, null },
-                        { null, null, null, null },
-                        { null, null, null, null },
-                        { null, null, null, null }
-                },
-                new String[] {
-                        "Item", "Variant", "Quantity", "Total Price"
-                }));
-        jScrollPane4.setViewportView(jTableSales);
+            new Object[][] { {null, null, null, null} },
+            new String[] { "Item", "Variant", "Quantity", "Total Price" }
+        ));
+        jScrollPane4 = new javax.swing.JScrollPane(jTableSales);
 
+        jTableMonitoring = new javax.swing.JTable();
         jTableMonitoring.setModel(new javax.swing.table.DefaultTableModel(
-                new Object[][] {
-                        { null, null, null, null, null },
-                        { null, null, null, null, null },
-                        { null, null, null, null, null },
-                        { null, null, null, null, null }
-                },
-                new String[] {
-                        "Ingredient", "Quantity", "Unit", "Alert Level", "Status"
-                }));
-        jScrollPane5.setViewportView(jTableMonitoring);
+            new Object[][] { {null, null, null, null, null} },
+            new String[] { "Ingredient", "Quantity", "Unit", "Alert Level", "Status" }
+        ));
+        jScrollPane5 = new javax.swing.JScrollPane(jTableMonitoring);
 
-        jLabel4.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
+        jLabel4 = new javax.swing.JLabel();
+        jLabel4.setFont(new java.awt.Font("Segoe UI", 0, 18));
         jLabel4.setForeground(new java.awt.Color(255, 255, 255));
         jLabel4.setText("Inventory Low Stock Alert");
 
-        jLabel5.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
+        jLabel5 = new javax.swing.JLabel();
+        jLabel5.setFont(new java.awt.Font("Segoe UI", 0, 18));
         jLabel5.setForeground(new java.awt.Color(255, 255, 255));
         jLabel5.setText("Sales");
 
         javax.swing.GroupLayout jPanelMonitoringLayout = new javax.swing.GroupLayout(jPanelMonitoring);
         jPanelMonitoring.setLayout(jPanelMonitoringLayout);
         jPanelMonitoringLayout.setHorizontalGroup(
-                jPanelMonitoringLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                        .addGroup(jPanelMonitoringLayout.createSequentialGroup()
-                                .addGap(24, 24, 24)
-                                .addGroup(jPanelMonitoringLayout
-                                        .createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                        .addGroup(jPanelMonitoringLayout.createSequentialGroup()
-                                                .addGroup(jPanelMonitoringLayout
-                                                        .createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                                        .addComponent(jLabel4)
-                                                        .addComponent(jScrollPane5,
-                                                                javax.swing.GroupLayout.PREFERRED_SIZE, 725,
-                                                                javax.swing.GroupLayout.PREFERRED_SIZE))
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 62,
-                                                        Short.MAX_VALUE)
-                                                .addGroup(jPanelMonitoringLayout
-                                                        .createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                                        .addComponent(jLabel5)
-                                                        .addComponent(jScrollPane4,
-                                                                javax.swing.GroupLayout.PREFERRED_SIZE, 532,
-                                                                javax.swing.GroupLayout.PREFERRED_SIZE))
-                                                .addGap(48, 48, 48))
-                                        .addGroup(jPanelMonitoringLayout.createSequentialGroup()
-                                                .addComponent(jLabel3)
-                                                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE,
-                                                        Short.MAX_VALUE)))));
+            jPanelMonitoringLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanelMonitoringLayout.createSequentialGroup()
+                .addGap(24, 24, 24)
+                .addGroup(jPanelMonitoringLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanelMonitoringLayout.createSequentialGroup()
+                        .addGroup(jPanelMonitoringLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jLabel4)
+                            .addComponent(jScrollPane5, javax.swing.GroupLayout.PREFERRED_SIZE, 725, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 62, Short.MAX_VALUE)
+                        .addGroup(jPanelMonitoringLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jLabel5)
+                            .addComponent(jScrollPane4, javax.swing.GroupLayout.PREFERRED_SIZE, 532, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addGap(48, 48, 48))
+                    .addGroup(jPanelMonitoringLayout.createSequentialGroup()
+                        .addComponent(jLabel3)
+                        .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))));
         jPanelMonitoringLayout.setVerticalGroup(
-                jPanelMonitoringLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                        .addGroup(jPanelMonitoringLayout.createSequentialGroup()
-                                .addGap(24, 24, 24)
-                                .addComponent(jLabel3)
-                                .addGap(18, 18, 18)
-                                .addGroup(jPanelMonitoringLayout
-                                        .createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                        .addComponent(jLabel4)
-                                        .addComponent(jLabel5))
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addGroup(jPanelMonitoringLayout
-                                        .createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                                        .addComponent(jScrollPane4, javax.swing.GroupLayout.DEFAULT_SIZE, 650,
-                                                Short.MAX_VALUE)
-                                        .addComponent(jScrollPane5))
-                                .addContainerGap(36, Short.MAX_VALUE)));
-
+            jPanelMonitoringLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanelMonitoringLayout.createSequentialGroup()
+                .addGap(24, 24, 24)
+                .addComponent(jLabel3)
+                .addGap(18, 18, 18)
+                .addGroup(jPanelMonitoringLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jLabel4)
+                    .addComponent(jLabel5))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(jPanelMonitoringLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                    .addComponent(jScrollPane4, javax.swing.GroupLayout.DEFAULT_SIZE, 650, Short.MAX_VALUE)
+                    .addComponent(jScrollPane5))
+                .addContainerGap(36, Short.MAX_VALUE)));
         jTabbedPaneI.addTab("Monitoring", jPanelMonitoring);
 
+        // Other tabs
         try {
             jTabbedPaneI.addTab("Menu Maintenance", new MenuMaintenancePanel());
-        } catch (Exception e) {
-            // If UI fails to initialize, do not block startup
-            System.err.println("MenuMaintenancePanel init failed: " + e.getMessage());
-        }
-
+        } catch (Exception e) { System.err.println("MenuMaintenancePanel init failed: " + e.getMessage()); }
         try {
             jTabbedPaneI.addTab("Register Product", new InventoryRegistrationPanel(new SQLiteInventoryRepository()));
-        } catch (Exception e) {
-            System.err.println("InventoryRegistrationPanel init failed: " + e.getMessage());
-        }
-
+        } catch (Exception e) { System.err.println("InventoryRegistrationPanel init failed: " + e.getMessage()); }
         try {
-            jTabbedPaneI.addTab("Staff", new StaffPanel(
-                    new SQLiteStaffShiftRepository(),
-                    new SQLiteUserRepository(),
-                    currentUsername,
-                    currentUserRole));
-        } catch (Exception e) {
-            System.err.println("StaffPanel init failed: " + e.getMessage());
-        }
-
+            jTabbedPaneI.addTab("Staff", new StaffPanel(new SQLiteStaffShiftRepository(), new SQLiteUserRepository(), currentUsername, currentUserRole));
+        } catch (Exception e) { System.err.println("StaffPanel init failed: " + e.getMessage()); }
         jTabbedPaneI.addTab("Inventory Guide", new InventoryGuidePanel());
-
         jTabbedPaneI.addTab("About", new AboutModule());
         jTabbedPaneI.addTab("Help", new HelpModule());
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
-        layout.setHorizontalGroup(
-                layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                        .addGroup(layout.createSequentialGroup()
-                                .addComponent(jTabbedPaneI, javax.swing.GroupLayout.PREFERRED_SIZE, 1482,
-                                        javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(0, 0, Short.MAX_VALUE)));
-        layout.setVerticalGroup(
-                layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                        .addComponent(jTabbedPaneI, javax.swing.GroupLayout.DEFAULT_SIZE,
-                                javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE));
+        layout.setHorizontalGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addComponent(jTabbedPaneI, javax.swing.GroupLayout.PREFERRED_SIZE, 1482, javax.swing.GroupLayout.PREFERRED_SIZE));
+        layout.setVerticalGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addComponent(jTabbedPaneI, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE));
 
         pack();
         setLocationRelativeTo(null);
-    }// </editor-fold>//GEN-END:initComponents
+    }
 
+    // ─── Old handler stubs for compatibility ────────────────────
     public void ItemCost() {
         double preTaxTotal = 0.0;
         for (int i = 0; i < jTable1.getRowCount(); i++) {
             double lineTotal = Double.parseDouble(jTable1.getValueAt(i, 2).toString());
             preTaxTotal += lineTotal / 1.12;
         }
-
         double vat = preTaxTotal * 0.12;
         double inclusiveTotal = preTaxTotal + vat;
-
-        jTextFieldSubTotal.setText(String.format("P %.2f", preTaxTotal));
-        jTextFieldTax.setText(String.format("P %.2f", vat));
-        jTextFieldTotal.setText(String.format("P %.2f", inclusiveTotal));
+        jTextFieldSubTotal.setText(String.format("\u20B1%.2f", preTaxTotal));
+        jTextFieldTax.setText(String.format("\u20B1%.2f", vat));
+        jTextFieldTotal.setText(String.format("\u20B1%.2f", inclusiveTotal));
     }
 
     public boolean Change() {
         try {
-            double cash = Double.parseDouble(cashpayment.getText().replace("P", "").trim());
-            double total = Double.parseDouble(jTextFieldTotal.getText().replace("P", "").trim());
-
+            double cash = Double.parseDouble(cashpayment.getText().replace("\u20B1", "").replace("P", "").trim());
+            double total = Double.parseDouble(jTextFieldTotal.getText().replace("\u20B1", "").replace("P", "").trim());
             if (cash < total) {
                 JOptionPane.showMessageDialog(this, "Insufficient cash.", "Error", JOptionPane.ERROR_MESSAGE);
                 return false;
             }
-
             double change = cash - total;
-            jTextFieldChange.setText(String.format("P %.2f", change));
-
+            jTextFieldChange.setText(String.format("\u20B1%.2f", change));
             JOptionPane.showMessageDialog(this,
-                    "Payment Successful!\n" +
-                            "Subtotal: " + jTextFieldSubTotal.getText() + "\n" +
-                            "VAT (12%): " + jTextFieldTax.getText() + "\n" +
-                            "Total: " + jTextFieldTotal.getText() + "\n" +
-                            "Cash: P " + String.format("%.2f", cash) + "\n" +
-                            "Change: P " + String.format("%.2f", change),
-                    "Success", JOptionPane.INFORMATION_MESSAGE);
-
+                "Payment Successful!\nSubtotal: " + jTextFieldSubTotal.getText() + "\nVAT (12%): " + jTextFieldTax.getText()
+                + "\nTotal: " + jTextFieldTotal.getText() + "\nCash: \u20B1" + String.format("%.2f", cash)
+                + "\nChange: \u20B1" + String.format("%.2f", change), "Success", JOptionPane.INFORMATION_MESSAGE);
             return true;
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Please Enter Cash Amount.", "Error", JOptionPane.ERROR_MESSAGE);
@@ -1111,24 +1048,19 @@ public class POSSystem extends javax.swing.JFrame {
     private void addItem(String productName, double price) {
         DefaultTableModel model = (DefaultTableModel) jTable1.getModel();
         boolean found = false;
-
         for (int i = 0; i < model.getRowCount(); i++) {
             if (model.getValueAt(i, 0).toString().equals(productName)) {
-
                 int qty = Integer.parseInt(model.getValueAt(i, 1).toString());
                 qty++;
                 model.setValueAt(qty, i, 1);
-
                 model.setValueAt(price * qty, i, 2);
                 found = true;
                 break;
             }
         }
-
         if (!found) {
-            model.addRow(new Object[] { productName, 1, price });
+            model.addRow(new Object[]{productName, 1, price});
         }
-
         ItemCost();
     }
 
@@ -1139,70 +1071,53 @@ public class POSSystem extends javax.swing.JFrame {
             inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
         }
         for (InventoryRowView row : inventoryController.buildInventoryRows()) {
-            model.addRow(new Object[] { row.getName(), row.getQuantity(), row.getUnit(), row.getAlertLevel(),
-                    row.getStatus() });
+            model.addRow(new Object[]{row.getName(), row.getQuantity(), row.getUnit(), row.getAlertLevel(), row.getStatus()});
         }
     }
 
     private void chooseHotOrIced(String rawProductName) {
         String productName = rawProductName;
-        Object[] options = { "Hot", "Regular Iced", "Large Iced" };
+        Object[] options = {"Hot", "Regular Iced", "Large Iced"};
         int choice = JOptionPane.showOptionDialog(this, "Choose variant for " + productName + ":", "Choose Variant",
-                JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
-
-        if (choice == JOptionPane.CLOSED_OPTION || choice < 0) {
-            return;
-        }
-
+            JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+        if (choice == JOptionPane.CLOSED_OPTION || choice < 0) return;
         String variant = options[choice].toString();
         String displayName = productName + " (" + variant + ")";
-
         double price = Menu.getInstance().getPrice(productName, variant);
-
-        if (price > 0) {
-            addItem(displayName, price);
-        }
+        if (price > 0) addItem(displayName, price);
     }
 
-    private void removeitemActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_removeitemActionPerformed
-        // TODO add your handling code here:
+    // ─── Event handlers ─────────────────────────────────────────
+    private void removeitemActionPerformed(java.awt.event.ActionEvent evt) {
         DefaultTableModel model = (DefaultTableModel) jTable1.getModel();
         int selectedRow = jTable1.getSelectedRow();
-
         if (selectedRow >= 0) {
             int qty = Integer.parseInt(model.getValueAt(selectedRow, 1).toString());
             if (qty > 1) {
                 qty--;
                 model.setValueAt(qty, selectedRow, 1);
-
                 double pricePerItem = Double.parseDouble(model.getValueAt(selectedRow, 2).toString()) / (qty + 1);
                 model.setValueAt(pricePerItem * qty, selectedRow, 2);
             } else {
                 model.removeRow(selectedRow);
             }
-
             ItemCost();
         } else {
             JOptionPane.showMessageDialog(this, "Please select a row to remove.", "Error", JOptionPane.ERROR_MESSAGE);
-
-        } // GEN-LAST:event_removeitemActionPerformed
+        }
     }
 
-    private void cashpaymentActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_cashpaymentActionPerformed
-        // TODO add your handling code here:
+    private void cashpaymentActionPerformed(java.awt.event.ActionEvent evt) {
         String EnterNumber = cashpayment.getText();
-
         if (EnterNumber == "") {
             cashpayment.setText(cashpayment.getText());
         } else {
             EnterNumber = cashpayment.getText() + cashpayment.getText();
             cashpayment.setText(EnterNumber);
         }
+    }
 
-    }// GEN-LAST:event_cashpaymentActionPerformed
-
-    private void resetorderActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_resetorderActionPerformed
-        // TODO add your handling code here:
+    private void resetorderActionPerformed(java.awt.event.ActionEvent evt) {
         DefaultTableModel model = (DefaultTableModel) jTable1.getModel();
         model.setRowCount(0);
         jTextFieldChange.setText("");
@@ -1210,17 +1125,13 @@ public class POSSystem extends javax.swing.JFrame {
         jTextFieldTotal.setText("");
         jTextFieldSubTotal.setText("");
         cashpayment.setText("");
-    }// GEN-LAST:event_resetorderActionPerformed
+    }
 
-    private void exitActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_exitActionPerformed
-        // TODO add your handling code here:
+    private void exitActionPerformed(java.awt.event.ActionEvent evt) {
         int option = JOptionPane.showConfirmDialog(this, "Do you want to exit?",
-                "Better Mondays Coffeee Cafe Management System", JOptionPane.YES_NO_OPTION,
-                JOptionPane.QUESTION_MESSAGE);
-        if (option == JOptionPane.YES_OPTION) {
-            System.exit(0);
-        }
-    }// GEN-LAST:event_exitActionPerformed
+            "Better Mondays Coffeee Cafe Management System", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+        if (option == JOptionPane.YES_OPTION) System.exit(0);
+    }
 
     private static int transactionCounter = 1000;
 
@@ -1228,13 +1139,9 @@ public class POSSystem extends javax.swing.JFrame {
         return s.length() > len ? s.substring(0, len - 3) + "..." : s;
     }
 
-    private void payActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_payActionPerformed
-        // TODO add your handling code here:
-
+    private void payActionPerformed(java.awt.event.ActionEvent evt) {
         boolean paymentSuccess = Change();
-        if (!paymentSuccess) {
-            return;
-        }
+        if (!paymentSuccess) return;
 
         DefaultTableModel orderModel = (DefaultTableModel) jTable1.getModel();
         Inventory inv = Inventory.getInstance();
@@ -1262,56 +1169,34 @@ public class POSSystem extends javax.swing.JFrame {
         }
         monitoring.addMultipleSales(salesList);
 
-        double cash = Double.parseDouble(cashpayment.getText().replace("P", "").trim());
-        double change = Double.parseDouble(jTextFieldChange.getText().replace("P", "").trim());
+        double cash = Double.parseDouble(cashpayment.getText().replace("\u20B1", "").replace("P", "").trim());
+        double change = Double.parseDouble(jTextFieldChange.getText().replace("\u20B1", "").replace("P", "").trim());
 
         String transactionRef = "TXN" + String.format("%06d", transactionCounter);
         try {
-            if (orderController == null) {
-                orderController = new OrderController(new SQLiteSalesRepository());
-            }
+            if (orderController == null) orderController = new OrderController(new SQLiteSalesRepository());
             orderController.persistCompletedTransaction(transactionRef, salesList, subTotal, cash, change);
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this,
-                    "Unable to save sales to database: " + e.getMessage(),
-                    "Database",
-                    JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Unable to save sales to database: " + e.getMessage(), "Database", JOptionPane.WARNING_MESSAGE);
         }
 
         String lineSep = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
-
-        String receipt = " ☕ Better Mondays Cafe ☕\n"
-                + " 123 Main St., Manila\n"
-                + " VAT REG TIN: 123-456-789\n"
-                + lineSep
-                + "Date: " + new SimpleDateFormat("MM/dd/yyyy HH:mm")
-                        .format(new Date())
-                + "\n"
-                + "Txn #: TXN" + String.format("%06d", ++transactionCounter) + "\n"
-                + lineSep
-                + String.format("%-15s %3s %8s\n", "ITEM", "QTY", "AMOUNT")
-                + "───────────────────────────────\n";
-
+        String receiptStr = " ☕ Better Mondays Cafe ☕\n 123 Main St., Manila\n VAT REG TIN: 123-456-789\n" + lineSep
+            + "Date: " + new SimpleDateFormat("MM/dd/yyyy HH:mm").format(new Date()) + "\n"
+            + "Txn #: TXN" + String.format("%06d", ++transactionCounter) + "\n" + lineSep
+            + String.format("%-15s %3s %8s\n", "ITEM", "QTY", "AMOUNT") + "───────────────────────────────\n";
         for (SalesRecord s : salesList) {
-            receipt += String.format("%-15s %3d %8.2f\n",
-                    truncate(s.getProductName(), 15),
-                    s.getQuantity(),
-                    s.getTotal());
+            receiptStr += String.format("%-15s %3d %8.2f\n", truncate(s.getProductName(), 15), s.getQuantity(), s.getTotal());
         }
+        receiptStr += "───────────────────────────────\n"
+            + String.format("%-23s %8.2f\n", "Subtotal (excl VAT):", subTotal / 1.12)
+            + String.format("%-23s %8.2f\n", "VAT (12%):", subTotal * 0.12 / 1.12)
+            + String.format("%-23s %8.2f\n", "TOTAL (incl VAT):", subTotal)
+            + String.format("%-23s %8.2f\n", "Cash:", cash)
+            + String.format("%-23s %8.2f\n", "Change:", change) + lineSep
+            + " Thank you! Come again!\n *** Have a nice day ***\n";
 
-        receipt += "───────────────────────────────\n"
-                + String.format("%-23s %8.2f\n", "Subtotal (excl VAT):", subTotal / 1.12)
-                + String.format("%-23s %8.2f\n", "VAT (12%):", subTotal * 0.12 / 1.12)
-                + String.format("%-23s %8.2f\n", "TOTAL (incl VAT):", subTotal)
-                + String.format("%-23s %8.2f\n", "Cash:", cash)
-                + String.format("%-23s %8.2f\n", "Change:", change)
-                + lineSep
-                + " Thank you! Come again!\n"
-                + " *** Have a nice day ***\n";
-
-        JOptionPane.showMessageDialog(this, receipt,
-                "✅ RECEIPT - TXN" + String.format("%06d", transactionCounter),
-                JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(this, receiptStr, "✅ RECEIPT - TXN" + String.format("%06d", transactionCounter), JOptionPane.INFORMATION_MESSAGE);
 
         orderModel.setRowCount(0);
         jTextFieldChange.setText("");
@@ -1322,401 +1207,81 @@ public class POSSystem extends javax.swing.JFrame {
 
         loadInventoryTable();
         monitoring.loadLowStockIngredients();
-    }// GEN-LAST:event_payActionPerformed
+    }
 
-    private void InventoryEditActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_InventoryEditActionPerformed
-        // TODO add your handling code here:
+    private void InventoryEditActionPerformed(java.awt.event.ActionEvent evt) {
         int selectedRow = inventoryTable.getSelectedRow();
         if (selectedRow == -1) {
             JOptionPane.showMessageDialog(this, "Please select an item to edit.");
             return;
         }
-
         Inventory inventory = Inventory.getInstance();
         String currentName = inventoryTable.getValueAt(selectedRow, 0).toString();
         InventoryItem item = inventory.getItem(currentName);
-
         if (item == null) {
             JOptionPane.showMessageDialog(this, "Error: Item not found in inventory.");
             return;
         }
-
         try {
             String newName = JOptionPane.showInputDialog(this, "Enter new name:", item.getName());
-            if (newName == null || newName.trim().isEmpty()) {
-                return;
-            }
+            if (newName == null || newName.trim().isEmpty()) return;
             newName = newName.trim();
-
             String quantityStr = JOptionPane.showInputDialog(this, "Enter new quantity:", item.getQuantity());
             String unit = JOptionPane.showInputDialog(this, "Enter new unit:", item.getUnit());
             String alertStr = JOptionPane.showInputDialog(this, "Enter new alert level:", item.getAlertLevel());
-
-            if (inventoryController == null) {
-                inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
-            }
+            if (inventoryController == null) inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
             inventoryController.updateItem(currentName.trim(), newName, quantityStr, unit, alertStr);
-
             loadInventoryTable();
             monitoring.loadLowStockIngredients();
             JOptionPane.showMessageDialog(this, "Item updated successfully!");
         } catch (NumberFormatException e) {
             JOptionPane.showMessageDialog(this, "Invalid number entered.");
         }
-    }// GEN-LAST:event_InventoryEditActionPerformed
+    }
 
-    private void InventoryRemoveActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_InventoryRemoveActionPerformed
-        // TODO add your handling code here:
+    private void InventoryRemoveActionPerformed(java.awt.event.ActionEvent evt) {
         int selectedRow = inventoryTable.getSelectedRow();
         if (selectedRow == -1) {
             JOptionPane.showMessageDialog(this, "Please select an item to remove.");
             return;
         }
-
         String name = inventoryTable.getValueAt(selectedRow, 0).toString().trim();
-        int confirm = JOptionPane.showConfirmDialog(this, "Remove " + name + " from inventory?", "Confirm",
-                JOptionPane.YES_NO_OPTION);
-
+        int confirm = JOptionPane.showConfirmDialog(this, "Remove " + name + " from inventory?", "Confirm", JOptionPane.YES_NO_OPTION);
         if (confirm == JOptionPane.YES_OPTION) {
-            if (inventoryController == null) {
-                inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
-            }
+            if (inventoryController == null) inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
             inventoryController.removeItem(name);
             loadInventoryTable();
         }
-    }// GEN-LAST:event_InventoryRemoveActionPerformed
+    }
 
-    private void backbtnActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_backbtnActionPerformed
-        // TODO add your handling code here:
-        coffeemenu.setVisible(true);
-        noncoffeemenu.setVisible(true);
-        fruitteamenu.setVisible(true);
-        herbalteamenu.setVisible(true);
-
-        menu1.setVisible(false);
-        menu2.setVisible(false);
-        menu3.setVisible(false);
-        menu4.setVisible(false);
-        menu5.setVisible(false);
-        menu6.setVisible(false);
-        menu7.setVisible(false);
-        menu8.setVisible(false);
-        menu9.setVisible(false);
-        menu10.setVisible(false);
-        menu11.setVisible(false);
-        menu12.setVisible(false);
-
-        menu1.setEnabled(false);
-        menu2.setEnabled(false);
-        menu3.setEnabled(false);
-        menu4.setEnabled(false);
-        menu5.setEnabled(false);
-        menu6.setEnabled(false);
-        menu7.setEnabled(false);
-        menu8.setEnabled(false);
-        menu9.setEnabled(false);
-        menu10.setEnabled(false);
-        menu11.setEnabled(false);
-        menu12.setEnabled(false);
-
-        menu1.setText("");
-        menu2.setText("");
-        menu3.setText("");
-        menu4.setText("");
-        menu5.setText("");
-        menu6.setText("");
-        menu7.setText("");
-        menu8.setText("");
-        menu9.setText("");
-        menu10.setText("");
-        menu11.setText("");
-        menu12.setText("");
-        backbtn.setVisible(false);
-    }// GEN-LAST:event_backbtnActionPerformed
-
-    private void menu12coffeeActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_menu12coffeeActionPerformed
-        // TODO add your handling code here:
-        JButton button = (JButton) evt.getSource();
-        chooseHotOrIced(button.getText());
-    }// GEN-LAST:event_menu12coffeeActionPerformed
-
-    private void menu11coffeeActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_menu11coffeeActionPerformed
-        // TODO add your handling code here:
-        JButton button = (JButton) evt.getSource();
-        chooseHotOrIced(button.getText());
-    }// GEN-LAST:event_menu11coffeeActionPerformed
-
-    private void menu10coffeeActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_menu10coffeeActionPerformed
-        // TODO add your handling code here:
-        JButton button = (JButton) evt.getSource();
-        chooseHotOrIced(button.getText());
-    }// GEN-LAST:event_menu10coffeeActionPerformed
-
-    private void menu9coffeeActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_menu9coffeeActionPerformed
-        // TODO add your handling code here:
-        JButton button = (JButton) evt.getSource();
-        chooseHotOrIced(button.getText());
-    }// GEN-LAST:event_menu9coffeeActionPerformed
-
-    private void menu7coffeeActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_menu7coffeeActionPerformed
-        // TODO add your handling code here:
-        JButton button = (JButton) evt.getSource();
-        chooseHotOrIced(button.getText());
-    }// GEN-LAST:event_menu7coffeeActionPerformed
-
-    private void menu4coffeeActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_menu4coffeeActionPerformed
-        // TODO add your handling code here:
-        JButton button = (JButton) evt.getSource();
-        chooseHotOrIced(button.getText());
-    }// GEN-LAST:event_menu4coffeeActionPerformed
-
-    private void menu8coffeeActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_menu8coffeeActionPerformed
-        // TODO add your handling code here:
-        JButton button = (JButton) evt.getSource();
-        chooseHotOrIced(button.getText());
-    }// GEN-LAST:event_menu8coffeeActionPerformed
-
-    private void menu5coffeeActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_menu5coffeeActionPerformed
-        // TODO add your handling code here:
-        JButton button = (JButton) evt.getSource();
-        chooseHotOrIced(button.getText());
-    }// GEN-LAST:event_menu5coffeeActionPerformed
-
-    private void menu1coffeeActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_menu1coffeeActionPerformed
-        // TODO add your handling code here:
-        JButton button = (JButton) evt.getSource();
-        chooseHotOrIced(button.getText());
-    }// GEN-LAST:event_menu1coffeeActionPerformed
-
-    private void menu6coffeeActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_menu6coffeeActionPerformed
-        // TODO add your handling code here:
-        JButton button = (JButton) evt.getSource();
-        chooseHotOrIced(button.getText());
-    }// GEN-LAST:event_menu6coffeeActionPerformed
-
-    private void menu3coffeeActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_menu3coffeeActionPerformed
-        // TODO add your handling code here:
-        JButton button = (JButton) evt.getSource();
-        chooseHotOrIced(button.getText());
-    }// GEN-LAST:event_menu3coffeeActionPerformed
-
-    private void menu2coffeeActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_menu2coffeeActionPerformed
-        // TODO add your handling code here:
-        JButton button = (JButton) evt.getSource();
-        chooseHotOrIced(button.getText());
-    }// GEN-LAST:event_menu2coffeeActionPerformed
-
-    private void herbalteaActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_herbalteaActionPerformed
-        // TODO add your handling code here:
-        backbtn.setVisible(true);
-        backbtn.setEnabled(true);
-
-        coffeemenu.setVisible(false);
-        noncoffeemenu.setVisible(false);
-        fruitteamenu.setVisible(false);
-        herbalteamenu.setVisible(false);
-
-        menu1.setVisible(true);
-        menu2.setVisible(true);
-        menu3.setVisible(true);
-        menu4.setVisible(true);
-
-        menu1.setEnabled(true);
-        menu2.setEnabled(true);
-        menu3.setEnabled(true);
-        menu4.setEnabled(true);
-
-        menu1.setText("Peppermint");
-        menu2.setText("Chamomile");
-        menu3.setText("Early Grey");
-        menu4.setText("Cinnamon");
-    }// GEN-LAST:event_herbalteaActionPerformed
-
-    private void fruitteaActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_fruitteaActionPerformed
-        // TODO add your handling code here:
-        backbtn.setVisible(true);
-        backbtn.setEnabled(true);
-
-        coffeemenu.setVisible(false);
-        noncoffeemenu.setVisible(false);
-        fruitteamenu.setVisible(false);
-        herbalteamenu.setVisible(false);
-
-        menu1.setVisible(true);
-        menu2.setVisible(true);
-        menu3.setVisible(true);
-        menu4.setVisible(true);
-
-        menu1.setEnabled(true);
-        menu2.setEnabled(true);
-        menu3.setEnabled(true);
-        menu4.setEnabled(true);
-
-        menu1.setText("Strawberry Green Tea");
-        menu2.setText("Mango Green Tea");
-        menu3.setText("Peach Green Tea");
-        menu4.setText("Passion Fruit Green Tea");
-    }// GEN-LAST:event_fruitteaActionPerformed
-
-    private void noncoffeeActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_noncoffeeActionPerformed
-        // TODO add your handling code here:
-        backbtn.setVisible(true);
-        backbtn.setEnabled(true);
-
-        coffeemenu.setVisible(false);
-        noncoffeemenu.setVisible(false);
-        fruitteamenu.setVisible(false);
-        herbalteamenu.setVisible(false);
-
-        menu1.setVisible(true);
-        menu2.setVisible(true);
-        menu3.setVisible(true);
-        menu4.setVisible(true);
-        menu5.setVisible(true);
-        menu6.setVisible(true);
-
-        menu1.setEnabled(true);
-        menu2.setEnabled(true);
-        menu3.setEnabled(true);
-        menu4.setEnabled(true);
-        menu5.setEnabled(true);
-        menu6.setEnabled(true);
-
-        menu1.setText("Chocolate Latte");
-        menu2.setText("Matcha Latte");
-        menu3.setText("Chocolate Matcha");
-        menu4.setText("Strawberry Latte");
-        menu5.setText("Mango Latte");
-        menu6.setText("Ube Latte");
-    }// GEN-LAST:event_noncoffeeActionPerformed
-
-    private void coffeeActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_coffeeActionPerformed
-        // TODO add your handling code here:
-        backbtn.setVisible(true);
-        backbtn.setEnabled(true);
-
-        coffeemenu.setVisible(false);
-        noncoffeemenu.setVisible(false);
-        fruitteamenu.setVisible(false);
-        herbalteamenu.setVisible(false);
-
-        menu1.setVisible(true);
-        menu2.setVisible(true);
-        menu3.setVisible(true);
-        menu4.setVisible(true);
-        menu5.setVisible(true);
-        menu6.setVisible(true);
-        menu7.setVisible(true);
-        menu8.setVisible(true);
-        menu9.setVisible(true);
-        menu10.setVisible(true);
-        menu11.setVisible(true);
-        menu12.setVisible(true);
-
-        menu1.setEnabled(true);
-        menu2.setEnabled(true);
-        menu3.setEnabled(true);
-        menu4.setEnabled(true);
-        menu5.setEnabled(true);
-        menu6.setEnabled(true);
-        menu7.setEnabled(true);
-        menu8.setEnabled(true);
-        menu9.setEnabled(true);
-        menu10.setEnabled(true);
-        menu11.setEnabled(true);
-        menu12.setEnabled(true);
-
-        menu1.setText("Americano");
-        menu2.setText("Latte");
-        menu3.setText("Cappuccino");
-        menu4.setText("Salted Cream Latte");
-        menu5.setText("Dark Mocha");
-        menu6.setText("White Mocha");
-        menu7.setText("Caramel Macchiato");
-        menu8.setText("Spanish Latte");
-        menu9.setText("Vietnamese Coffee");
-        menu10.setText("Ube Espresso");
-        menu11.setText("Matcha Espresso");
-        menu12.setText("Brewed Coffee");
-    }// GEN-LAST:event_coffeeActionPerformed
-
-    private void InventoryAddActionPerformed(java.awt.event.ActionEvent evt) {// GEN-FIRST:event_InventoryAddActionPerformed
-        // TODO add your handling code here:
+    private void InventoryAddActionPerformed(java.awt.event.ActionEvent evt) {
         try {
             String name = JOptionPane.showInputDialog(this, "Enter item name:");
             if (name == null || name.trim().isEmpty()) {
                 JOptionPane.showMessageDialog(this, "Item name cannot be empty.");
                 return;
             }
-
             String quantityStr = JOptionPane.showInputDialog(this, "Enter quantity:");
-            if (quantityStr == null || quantityStr.trim().isEmpty())
-                return;
-
+            if (quantityStr == null || quantityStr.trim().isEmpty()) return;
             String unit = JOptionPane.showInputDialog(this, "Enter unit (e.g., kg, pcs):");
-            if (unit == null || unit.trim().isEmpty())
-                return;
-
+            if (unit == null || unit.trim().isEmpty()) return;
             String alertStr = JOptionPane.showInputDialog(this, "Enter alert level:");
-            if (alertStr == null || alertStr.trim().isEmpty())
-                return;
-
-            if (inventoryController == null) {
-                inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
-            }
+            if (alertStr == null || alertStr.trim().isEmpty()) return;
+            if (inventoryController == null) inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
             inventoryController.addItem(name, quantityStr, unit, alertStr);
-
             loadInventoryTable();
             monitoring.loadLowStockIngredients();
             JOptionPane.showMessageDialog(this, "Item added successfully!");
         } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this,
-                    "Invalid number entered. Please enter valid numeric values for quantity and alert level.");
+            JOptionPane.showMessageDialog(this, "Invalid number entered. Please enter valid numeric values for quantity and alert level.");
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "An unexpected error occurred: " + e.getMessage());
         }
-
-    }// GEN-LAST:event_InventoryAddActionPerformed
-
-    /**
-     * @param args the command line arguments
-     */
-    public static void main(String args[]) {
-
-        // <editor-fold defaultstate="collapsed" desc=" Look and feel setting code
-        // (optional) ">
-        /*
-         * If Nimbus (introduced in Java SE 6) is not available, stay with the default
-         * look and feel.
-         * For details see
-         * http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html
-         */
-        try {
-            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
-                if ("Nimbus".equals(info.getName())) {
-                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
-                    break;
-                }
-            }
-        } catch (ClassNotFoundException ex) {
-            java.util.logging.Logger.getLogger(POSSystem.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (InstantiationException ex) {
-            java.util.logging.Logger.getLogger(POSSystem.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (IllegalAccessException ex) {
-            java.util.logging.Logger.getLogger(POSSystem.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (javax.swing.UnsupportedLookAndFeelException ex) {
-            java.util.logging.Logger.getLogger(POSSystem.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        }
-        // </editor-fold>
-
-        java.awt.EventQueue.invokeLater(new Runnable() {
-            public void run() {
-                new POSSystem().setVisible(true);
-            }
-        });
     }
 
-    // Variables declaration - do not modify//GEN-BEGIN:variables
+    // ═════════════════════════════════════════════════════════════
+    // Variables declaration
+    // ═════════════════════════════════════════════════════════════
     private javax.swing.JButton InventoryAdd;
     private javax.swing.JButton InventoryEdit;
     private javax.swing.JButton InventoryRemove;
@@ -1772,5 +1337,4 @@ public class POSSystem extends javax.swing.JFrame {
     private javax.swing.JButton pay;
     private javax.swing.JButton removeitem;
     private javax.swing.JButton resetorder;
-    // End of variables declaration//GEN-END:variables
 }

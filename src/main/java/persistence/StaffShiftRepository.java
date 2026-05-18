@@ -10,4 +10,8 @@ public interface StaffShiftRepository {
     void endShift(String username, String notes) throws Exception;
 
     List<StaffShift> findShifts(String username) throws Exception;
+
+    List<StaffShift> findAllShifts() throws Exception;
+
+    void updateShift(int id, String startedAt, String endedAt, String notes) throws Exception;
 }

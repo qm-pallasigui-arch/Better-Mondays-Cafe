@@ -75,4 +75,36 @@ public class SQLiteStaffShiftRepository implements StaffShiftRepository {
         }
         return shifts;
     }
+
+    @Override
+    public List<StaffShift> findAllShifts() throws Exception {
+        List<StaffShift> shifts = new ArrayList<>();
+        try (Connection connection = AppDatabase.openConnection();
+                PreparedStatement stmt = connection.prepareStatement(
+                        "SELECT id, username, started_at, ended_at, notes FROM staff_shifts ORDER BY id DESC");
+                ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                shifts.add(new StaffShift(
+                        rs.getLong("id"),
+                        rs.getString("username"),
+                        rs.getString("started_at"),
+                        rs.getString("ended_at"),
+                        rs.getString("notes")));
+            }
+        }
+        return shifts;
+    }
+
+    @Override
+    public void updateShift(int id, String startedAt, String endedAt, String notes) throws Exception {
+        try (Connection connection = AppDatabase.openConnection();
+                PreparedStatement stmt = connection.prepareStatement(
+                        "UPDATE staff_shifts SET started_at = ?, ended_at = ?, notes = ? WHERE id = ?")) {
+            stmt.setString(1, startedAt.isBlank() ? null : startedAt);
+            stmt.setString(2, endedAt.isBlank() ? null : endedAt);
+            stmt.setString(3, notes);
+            stmt.setInt(4, id);
+            stmt.executeUpdate();
+        }
+    }
 }

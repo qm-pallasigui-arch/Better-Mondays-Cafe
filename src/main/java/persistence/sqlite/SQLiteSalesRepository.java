@@ -15,9 +15,9 @@ public class SQLiteSalesRepository implements SalesRepository {
     public List<SalesRecord> findAll() throws Exception {
         List<SalesRecord> records = new ArrayList<>();
         try (Connection connection = AppDatabase.openConnection();
-             PreparedStatement statement = connection.prepareStatement(
-                     "SELECT product_name, quantity, price, total FROM sales_records ORDER BY id DESC");
-             ResultSet resultSet = statement.executeQuery()) {
+                PreparedStatement statement = connection.prepareStatement(
+                        "SELECT product_name, quantity, price, total FROM sales_records ORDER BY id DESC");
+                ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
                 records.add(new SalesRecord(
                         resultSet.getString("product_name"),
@@ -30,13 +30,23 @@ public class SQLiteSalesRepository implements SalesRepository {
     }
 
     @Override
-    public void saveAll(String transactionRef, List<SalesRecord> records, double subtotal, double tax, double total, double cash, double changeAmount) throws Exception {
+    public void saveAll(String transactionRef, List<SalesRecord> records, double subtotal, double tax, double total,
+            double cash, double changeAmount) throws Exception {
         try (Connection connection = AppDatabase.openConnection()) {
             connection.setAutoCommit(false);
             try {
                 long transactionId;
+
+                // ✅ FIXED: ON CONFLICT DO UPDATE prevents the SQLITE_CONSTRAINT_UNIQUE crash
+                // when saveAll() is called more than once with the same transaction_ref.
                 try (PreparedStatement transaction = connection.prepareStatement(
-                        "INSERT INTO sales_transactions(transaction_ref, subtotal, tax, total, cash, change_amount) VALUES (?, ?, ?, ?, ?, ?)",
+                        "INSERT INTO sales_transactions(transaction_ref, subtotal, tax, total, cash, change_amount) VALUES (?, ?, ?, ?, ?, ?) "
+                                + "ON CONFLICT(transaction_ref) DO UPDATE SET "
+                                + "  subtotal      = excluded.subtotal, "
+                                + "  tax           = excluded.tax, "
+                                + "  total         = excluded.total, "
+                                + "  cash          = excluded.cash, "
+                                + "  change_amount = excluded.change_amount",
                         PreparedStatement.RETURN_GENERATED_KEYS)) {
                     transaction.setString(1, transactionRef);
                     transaction.setDouble(2, subtotal);
@@ -55,8 +65,8 @@ public class SQLiteSalesRepository implements SalesRepository {
 
                 try (PreparedStatement itemStatement = connection.prepareStatement(
                         "INSERT INTO sales_transaction_items(transaction_id, product_name, quantity, price, total) VALUES (?, ?, ?, ?, ?)");
-                     PreparedStatement recordStatement = connection.prepareStatement(
-                             "INSERT INTO sales_records(product_name, quantity, price, total) VALUES (?, ?, ?, ?)")) {
+                        PreparedStatement recordStatement = connection.prepareStatement(
+                                "INSERT INTO sales_records(product_name, quantity, price, total) VALUES (?, ?, ?, ?)")) {
                     for (SalesRecord record : records) {
                         itemStatement.setLong(1, transactionId);
                         itemStatement.setString(2, record.getProductName());
@@ -90,10 +100,12 @@ public class SQLiteSalesRepository implements SalesRepository {
             connection.setAutoCommit(false);
             try {
                 long transactionId;
-                try (PreparedStatement find = connection.prepareStatement("SELECT id FROM sales_transactions WHERE transaction_ref = ?")) {
+                try (PreparedStatement find = connection.prepareStatement(
+                        "SELECT id FROM sales_transactions WHERE transaction_ref = ?")) {
                     find.setString(1, transactionRef);
                     try (ResultSet rs = find.executeQuery()) {
-                        if (!rs.next()) throw new IllegalStateException("Transaction not found: " + transactionRef);
+                        if (!rs.next())
+                            throw new IllegalStateException("Transaction not found: " + transactionRef);
                         transactionId = rs.getLong("id");
                     }
                 }

@@ -1,11 +1,19 @@
 package loginregister;
 
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import persistence.sqlite.SQLiteUserRepository;
 
 public class UserDataManager {
+    private static final SQLiteUserRepository USER_REPOSITORY;
 
-    private static final String FILE_PATH = "users.txt";
+    static {
+        try {
+            USER_REPOSITORY = new SQLiteUserRepository();
+        } catch (Exception e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
 
     /**
      * Role enumeration: ADMIN has full access, STAFF has limited access
@@ -23,11 +31,13 @@ public class UserDataManager {
      * @param role the user role (ADMIN or STAFF)
      * @throws IOException if file write fails
      */
-    public static void saveUser(String username, String password, Role role) throws IOException {
-        String hashedPassword = PasswordHasher.hashPassword(password);
-        String data = username + "," + hashedPassword + "," + role.name() + "\n";
-        try (FileOutputStream fos = new FileOutputStream(FILE_PATH, true)) {
-            fos.write(data.getBytes());
+    public static void saveUser(String username, String password, Role role) throws java.io.IOException {
+        try {
+            USER_REPOSITORY.saveUser(username, password, role);
+        } catch (java.io.IOException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new java.io.IOException("Unable to save user", e);
         }
     }
 
@@ -39,24 +49,11 @@ public class UserDataManager {
      * @return true if credentials are valid, false otherwise
      */
     public static boolean verifyCredentials(String username, String password) {
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(
-                new java.io.FileReader(FILE_PATH))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String[] parts = line.split(",", 3); // Limit split to 3 parts: username, hash, role
-                if (parts.length >= 2) {
-                    String fileUser = parts[0].trim();
-                    String fileHash = parts[1].trim();
-
-                    if (fileUser.equals(username)) {
-                        return PasswordHasher.verifyPassword(password, fileHash);
-                    }
-                }
-            }
-        } catch (java.io.IOException e) {
+        try {
+            return USER_REPOSITORY.verifyCredentials(username, password);
+        } catch (Exception e) {
             return false;
         }
-        return false;
     }
 
     /**
@@ -66,27 +63,28 @@ public class UserDataManager {
      * @return the Role (ADMIN or STAFF), or null if user not found
      */
     public static Role getUserRole(String username) {
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(
-                new java.io.FileReader(FILE_PATH))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String[] parts = line.split(",", 3);
-                if (parts.length >= 3) {
-                    String fileUser = parts[0].trim();
-                    String roleStr = parts[2].trim();
-
-                    if (fileUser.equals(username)) {
-                        try {
-                            return Role.valueOf(roleStr);
-                        } catch (IllegalArgumentException e) {
-                            return Role.STAFF; // Default to STAFF if role is invalid
-                        }
-                    }
-                }
-            }
-        } catch (java.io.IOException e) {
+        try {
+            Role role = USER_REPOSITORY.getUserRole(username);
+            return role != null ? role : Role.STAFF;
+        } catch (Exception e) {
             return null;
         }
-        return null;
+    }
+
+    public static List<UserAccount> listUsers() {
+        try {
+            return USER_REPOSITORY.listUsers();
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
+    }
+
+    public static boolean updateUserRole(String username, Role role) {
+        try {
+            USER_REPOSITORY.updateUserRole(username, role);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

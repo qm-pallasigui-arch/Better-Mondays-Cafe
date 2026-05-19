@@ -1,0 +1,4 @@
+Reports Help
+- Use Search to query menu, inventory, and sales.
+- Export sales to CSV from maintenance/report tools.
+- Use date filters to narrow results.

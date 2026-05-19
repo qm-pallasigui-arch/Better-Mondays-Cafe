@@ -1,0 +1,5 @@
+Ordering Quick Start
+- Select a category.
+- Choose a product variant.
+- Review the cart.
+- Pay and print the receipt.

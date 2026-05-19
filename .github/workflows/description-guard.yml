@@ -1,0 +1,52 @@
+name: Description Guard
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate-pr-description:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure PR description exists
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const body = (pr.body || '').trim();
+            const minLength = 30;
+            const looksMissing = body.length < minLength || /^(n\/?a|none|tbd|same as title)$/i.test(body);
+
+            if (!looksMissing) {
+              core.info('PR description is present.');
+              return;
+            }
+
+            const template = [
+              '## Summary',
+              'Describe the purpose of this PR.',
+              '',
+              '## Changes',
+              '- List key code/behavior changes.',
+              '',
+              '## Testing',
+              '- Describe how this was tested.'
+            ].join('\n');
+
+            const autoBody = [
+              '⚠️ This description was auto-filled because the PR description was missing or too short.',
+              '',
+              template
+            ].join('\n');
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              body: autoBody
+            });

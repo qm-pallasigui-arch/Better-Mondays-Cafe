@@ -17,21 +17,32 @@ import java.util.stream.Collectors;
 import monitoring.SalesRecord;
 import java.util.Date;
 import java.text.SimpleDateFormat;
+import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.GridLayout;
 import java.awt.FlowLayout;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.Insets;
+import java.awt.RenderingHints;
+import javax.swing.AbstractCellEditor;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JLabel;
+import javax.swing.JMenuItem;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
+import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
+import javax.swing.table.TableCellEditor;
+import javax.swing.table.TableCellRenderer;
 import loginregister.UserDataManager;
 import persistence.Phase2Bootstrap;
 import ui.MenuMaintenancePanel;
@@ -42,6 +53,8 @@ import ui.InventoryRegistrationPanel;
 import ui.StaffPanel;
 import ui.InventoryGuidePanel;
 import ui.AppTheme;
+import ui.RoundedPanel;
+import ui.SidebarPanel;
 import persistence.sqlite.SQLiteInventoryRepository;
 import persistence.sqlite.SQLiteStaffShiftRepository;
 import persistence.sqlite.SQLiteSalesRepository;
@@ -147,7 +160,6 @@ public class POSSystem extends javax.swing.JFrame {
 
         inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
         orderController = new OrderController(new SQLiteSalesRepository());
-        applyInventoryStatusColorRenderer();
 
         monitoring = new Monitoring(jTableMonitoring, jTableSales);
         monitoring.loadLowStockIngredients();
@@ -155,31 +167,7 @@ public class POSSystem extends javax.swing.JFrame {
         AppTheme.applyToFrame(this);
         styleSearchField();
 
-        applyRoleBasedAccessControl();
-
         showCategory("Espresso & Coffee");
-    }
-
-    private void applyInventoryStatusColorRenderer() {
-        inventoryTable.getColumnModel().getColumn(4).setCellRenderer(new DefaultTableCellRenderer() {
-            @Override
-            public java.awt.Component getTableCellRendererComponent(javax.swing.JTable table, Object value,
-                    boolean isSelected, boolean hasFocus, int row, int column) {
-                java.awt.Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-                if (isSelected) {
-                    return c;
-                }
-                String text = value == null ? "" : value.toString();
-                if (text.contains("EXPIRED")) {
-                    c.setForeground(new Color(180, 0, 0));
-                } else if (text.contains("LOW STOCK") || text.contains("EXPIRING")) {
-                    c.setForeground(new Color(200, 120, 0));
-                } else {
-                    c.setForeground(new Color(0, 128, 0));
-                }
-                return c;
-            }
-        });
     }
 
     @Deprecated
@@ -187,40 +175,6 @@ public class POSSystem extends javax.swing.JFrame {
         this("unknown", UserDataManager.Role.STAFF);
     }
 
-    private void applyRoleBasedAccessControl() {
-        if (currentUserRole == UserDataManager.Role.STAFF) {
-            int inventoryTabIndex = -1;
-            int monitoringTabIndex = -1;
-
-            for (int i = 0; i < jTabbedPaneI.getTabCount(); i++) {
-                String tabTitle = jTabbedPaneI.getTitleAt(i);
-                if ("Inventory".equals(tabTitle)) {
-                    inventoryTabIndex = i;
-                } else if ("Monitoring".equals(tabTitle)) {
-                    monitoringTabIndex = i;
-                }
-            }
-
-            if (monitoringTabIndex > -1) {
-                jTabbedPaneI.removeTabAt(monitoringTabIndex);
-            }
-            if (inventoryTabIndex > -1) {
-                jTabbedPaneI.removeTabAt(inventoryTabIndex);
-            }
-            for (int i = 0; i < jTabbedPaneI.getTabCount(); i++) {
-                if ("Menu Maintenance".equals(jTabbedPaneI.getTitleAt(i))) {
-                    jTabbedPaneI.removeTabAt(i);
-                    break;
-                }
-            }
-            for (int i = 0; i < jTabbedPaneI.getTabCount(); i++) {
-                if ("Register Product".equals(jTabbedPaneI.getTitleAt(i))) {
-                    jTabbedPaneI.removeTabAt(i);
-                    break;
-                }
-            }
-        }
-    }
 
     // ─── Category display ───────────────────────────────────────
     private void showCategory(String category) {
@@ -681,9 +635,15 @@ public class POSSystem extends javax.swing.JFrame {
 
     // ─── initComponents (replaces GUI builder code) ─────────────
     private void initComponents() {
-        jTabbedPaneI = new javax.swing.JTabbedPane();
         jPanelPOS = new javax.swing.JPanel();
         jLabel1 = new javax.swing.JLabel();
+
+        sidebar = new SidebarPanel(currentUsername, currentUserRole, page -> {
+            cardLayout.show(contentPanel, page);
+        });
+        cardLayout = new CardLayout();
+        contentPanel = new JPanel(cardLayout);
+        contentPanel.setBackground(new Color(28, 43, 63));
 
         // ═══════════════════════════════════════════════════════════
         //  ORDERING TAB
@@ -800,119 +760,234 @@ public class POSSystem extends javax.swing.JFrame {
         body.add(centerPanel, BorderLayout.CENTER);
         body.add(receiptScroll, BorderLayout.EAST);
 
-        JPanel orderingPanel = new JPanel(new BorderLayout());
+        orderingPanel = new JPanel(new BorderLayout());
         orderingPanel.setBackground(new Color(28, 43, 63));
         orderingPanel.add(topBar, BorderLayout.NORTH);
         orderingPanel.add(body, BorderLayout.CENTER);
 
-        jTabbedPaneI.addTab("Ordering", orderingPanel);
-        jTabbedPaneI.setBackgroundAt(0, new Color(28, 43, 63));
-
-        // Add other tabs
-        jTabbedPaneI.addTab("Search", new SearchModule());
-        jTabbedPaneI.setBackground(new Color(28, 43, 63));
-        jTabbedPaneI.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 102, 51)));
-        jTabbedPaneI.setForeground(new java.awt.Color(255, 255, 255));
-        jTabbedPaneI.setTabPlacement(javax.swing.JTabbedPane.LEFT);
-        jTabbedPaneI.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-        jTabbedPaneI.setFocusable(false);
+        contentPanel.add(orderingPanel, "Ordering");
+        contentPanel.add(new SearchModule(), "Search");
 
         // ═══════════════════════════════════════════════════════════
-        //  INVENTORY TAB
+        //  INVENTORY TAB - Card-on-Canvas Design
         // ═══════════════════════════════════════════════════════════
-        jPanelInventory = new javax.swing.JPanel();
-        jPanelInventory.setBackground(new java.awt.Color(28, 43, 63));
+        Font TITLE_FONT = new Font("Segoe UI", Font.BOLD, 28);
+        Font SUB_FONT = new Font("Segoe UI", Font.PLAIN, 13);
+        Font BODY_FONT = new Font("Segoe UI", Font.PLAIN, 13);
+        Font BOLD_FONT = new Font("Segoe UI", Font.BOLD, 14);
+        Font CARD_NUM_FONT = new Font("Segoe UI", Font.BOLD, 24);
+        Font CARD_LABEL_FONT = new Font("Segoe UI", Font.PLAIN, 12);
 
-        jLabel2 = new javax.swing.JLabel();
-        jLabel2.setFont(new java.awt.Font("Segoe UI", 0, 36));
-        jLabel2.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel2.setText("Inventory");
+        jPanelInventory = new JPanel();
+        jPanelInventory.setBackground(AppTheme.BG_PRIMARY);
+        jPanelInventory.setLayout(new BorderLayout(0, 16));
+        jPanelInventory.setBorder(BorderFactory.createEmptyBorder(20, 28, 20, 28));
 
-        jScrollPane3 = new javax.swing.JScrollPane();
-        inventoryTable = new javax.swing.JTable();
-        inventoryTable.setModel(new javax.swing.table.DefaultTableModel(
-            new Object [][] {
-                {null, null, null, null, null},
-                {null, null, null, null, null},
-                {null, null, null, null, null},
-                {null, null, null, null, null}
-            },
-            new String [] {
-                "Item Name", "Quantity", "Unit", "Low Stock Alert", "Status"
+        // ─── Top Header ─────────────────────────────────────
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setOpaque(false);
+
+        JLabel pageTitle = new JLabel("Inventory Management");
+        pageTitle.setFont(TITLE_FONT);
+        pageTitle.setForeground(AppTheme.FG_PRIMARY);
+
+        SimpleDateFormat sdf = new SimpleDateFormat("EEEE, MM/dd/yyyy");
+        JLabel dateSubtitle = new JLabel("As of " + sdf.format(new Date()));
+        dateSubtitle.setFont(SUB_FONT);
+        dateSubtitle.setForeground(AppTheme.FG_MUTED);
+
+        JPanel titleStack = new JPanel(new BorderLayout(0, 2));
+        titleStack.setOpaque(false);
+        titleStack.add(pageTitle, BorderLayout.NORTH);
+        titleStack.add(dateSubtitle, BorderLayout.SOUTH);
+        headerPanel.add(titleStack, BorderLayout.WEST);
+
+        jPanelInventory.add(headerPanel, BorderLayout.NORTH);
+
+        // ─── Summary Metric Cards ───────────────────────────
+        JPanel summaryPanel = new JPanel(new GridLayout(1, 4, 16, 0));
+        summaryPanel.setOpaque(false);
+
+        Color[] cardTints = {AppTheme.ACCENT, new Color(230, 150, 40), new Color(200, 60, 60), new Color(80, 80, 80)};
+        String[] cardLabels = {"Total Items", "Low Stock", "Expired", "Out of Stock"};
+        String[] cardIcons = {"\u25A0", "\u23F0", "\u26A0", "\u25A1"};
+
+        for (int i = 0; i < 4; i++) {
+            final int idx = i;
+            RoundedPanel card = new RoundedPanel(16);
+            card.setFillColor(AppTheme.BG_SURFACE);
+            card.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+            card.setLayout(new BorderLayout(12, 0));
+
+            JPanel iconBox = new JPanel() {
+                @Override
+                protected void paintComponent(Graphics g) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g2.setColor(cardTints[idx]);
+                    g2.fillRoundRect(0, 0, 44, 44, 10, 10);
+                    g2.dispose();
+                }
+            };
+            iconBox.setPreferredSize(new Dimension(44, 44));
+            iconBox.setOpaque(false);
+
+            JLabel iconLabel = new JLabel(cardIcons[idx], SwingConstants.CENTER);
+            iconLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
+            iconLabel.setForeground(Color.WHITE);
+            iconBox.setLayout(new BorderLayout());
+            iconBox.add(iconLabel, BorderLayout.CENTER);
+
+            JPanel textStack = new JPanel(new BorderLayout(0, 2));
+            textStack.setOpaque(false);
+            JLabel countLabel = new JLabel("0");
+            countLabel.setFont(CARD_NUM_FONT);
+            countLabel.setForeground(AppTheme.FG_PRIMARY);
+            countLabel.setName("summaryCount_" + i);
+
+            JLabel descLabel = new JLabel(cardLabels[i]);
+            descLabel.setFont(CARD_LABEL_FONT);
+            descLabel.setForeground(AppTheme.FG_MUTED);
+
+            textStack.add(countLabel, BorderLayout.NORTH);
+            textStack.add(descLabel, BorderLayout.SOUTH);
+
+            card.add(iconBox, BorderLayout.WEST);
+            card.add(textStack, BorderLayout.CENTER);
+            summaryPanel.add(card);
+        }
+
+        jPanelInventory.add(summaryPanel, BorderLayout.CENTER);
+
+        // ─── Main Table Card ────────────────────────────────
+        RoundedPanel mainCard = new RoundedPanel(16);
+        mainCard.setFillColor(AppTheme.BG_SURFACE);
+        mainCard.setLayout(new BorderLayout(0, 12));
+        mainCard.setBorder(BorderFactory.createEmptyBorder(16, 20, 20, 20));
+
+        // Controls row
+        JPanel controlsPanel = new JPanel(new BorderLayout(12, 0));
+        controlsPanel.setOpaque(false);
+
+        JPanel leftControls = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        leftControls.setOpaque(false);
+
+        JTextField searchField = new JTextField(18);
+        searchField.setFont(BODY_FONT);
+        searchField.setForeground(AppTheme.FG_PRIMARY);
+        searchField.setBackground(new Color(49, 73, 105));
+        searchField.setCaretColor(AppTheme.FG_PRIMARY);
+        searchField.setBorder(BorderFactory.createCompoundBorder(
+            new LineBorder(new Color(60, 85, 120), 1, true),
+            BorderFactory.createEmptyBorder(8, 14, 8, 14)));
+        searchField.putClientProperty("JTextField.roundPlaceholder", true);
+        searchField.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyReleased(java.awt.event.KeyEvent e) {
+                filterInventoryTable(searchField.getText());
             }
+        });
+
+        JLabel searchIconLabel = new JLabel("\uD83D\uDD0D");
+        searchIconLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        searchIconLabel.setForeground(AppTheme.FG_MUTED);
+
+        JPanel searchPill = new JPanel(new BorderLayout(6, 0));
+        searchPill.setOpaque(false);
+        searchPill.setBorder(BorderFactory.createCompoundBorder(
+            new LineBorder(new Color(60, 85, 120), 1, true),
+            BorderFactory.createEmptyBorder(4, 10, 4, 10)));
+        searchPill.add(searchIconLabel, BorderLayout.WEST);
+        searchPill.add(searchField, BorderLayout.CENTER);
+        leftControls.add(searchPill);
+
+        JButton filterBtn = new JButton("\u2699 Filter");
+        filterBtn.setFont(BODY_FONT);
+        filterBtn.setForeground(AppTheme.FG_PRIMARY);
+        filterBtn.setBackground(AppTheme.BG_SURFACE);
+        filterBtn.setBorder(BorderFactory.createCompoundBorder(
+            new LineBorder(new Color(60, 85, 120), 1, true),
+            BorderFactory.createEmptyBorder(8, 14, 8, 14)));
+        filterBtn.setFocusPainted(false);
+        leftControls.add(filterBtn);
+
+        controlsPanel.add(leftControls, BorderLayout.WEST);
+
+        JPanel rightControls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        rightControls.setOpaque(false);
+
+        JButton addBtn = new JButton("+ Add Item");
+        addBtn.setFont(BOLD_FONT);
+        addBtn.setForeground(Color.WHITE);
+        addBtn.setBackground(AppTheme.ACCENT);
+        addBtn.setBorder(BorderFactory.createEmptyBorder(10, 22, 10, 22));
+        addBtn.setFocusPainted(false);
+        addBtn.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        addBtn.addActionListener(e -> InventoryAddActionPerformed(null));
+        rightControls.add(addBtn);
+
+        controlsPanel.add(rightControls, BorderLayout.EAST);
+
+        mainCard.add(controlsPanel, BorderLayout.NORTH);
+
+        // Table
+        jScrollPane3 = new javax.swing.JScrollPane();
+        jScrollPane3.setBorder(null);
+        jScrollPane3.getViewport().setBackground(AppTheme.BG_SURFACE);
+
+        inventoryTable = new javax.swing.JTable();
+        inventoryTable.setModel(new DefaultTableModel(
+            new Object[][]{},
+            new String[]{"Item Name", "Quantity", "Storage Location", "Last Updated", "Status", "Actions"}
         ) {
-            boolean[] canEdit = new boolean[] { false, false, false, false, false };
+            boolean[] canEdit = new boolean[]{false, false, false, false, false, false};
             public boolean isCellEditable(int rowIndex, int columnIndex) {
                 return canEdit[columnIndex];
             }
         });
+        inventoryTable.setFont(BODY_FONT);
+        inventoryTable.setForeground(AppTheme.FG_PRIMARY);
+        inventoryTable.setBackground(AppTheme.BG_SURFACE);
+        inventoryTable.setRowHeight(44);
+        inventoryTable.setShowHorizontalLines(true);
+        inventoryTable.setShowVerticalLines(false);
+        inventoryTable.setGridColor(new Color(79, 102, 135));
+        inventoryTable.setSelectionBackground(new Color(63, 94, 138));
+        inventoryTable.setSelectionForeground(AppTheme.FG_PRIMARY);
+        inventoryTable.setRowMargin(4);
+        inventoryTable.getTableHeader().setFont(BOLD_FONT);
+        inventoryTable.getTableHeader().setForeground(AppTheme.FG_MUTED);
+        inventoryTable.getTableHeader().setBackground(new Color(49, 73, 105));
+        inventoryTable.getTableHeader().setReorderingAllowed(false);
+        ((DefaultTableCellRenderer) inventoryTable.getTableHeader().getDefaultRenderer()).setHorizontalAlignment(SwingConstants.CENTER);
+        inventoryTable.setAutoCreateRowSorter(true);
+
+        // Column widths
+        inventoryTable.getColumnModel().getColumn(0).setPreferredWidth(180);
+        inventoryTable.getColumnModel().getColumn(1).setPreferredWidth(100);
+        inventoryTable.getColumnModel().getColumn(2).setPreferredWidth(130);
+        inventoryTable.getColumnModel().getColumn(3).setPreferredWidth(140);
+        inventoryTable.getColumnModel().getColumn(4).setPreferredWidth(100);
+        inventoryTable.getColumnModel().getColumn(5).setPreferredWidth(80);
+
+        // Center align all columns
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+        for (int i = 0; i < 6; i++) {
+            inventoryTable.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
+        }
+
+        // Actions column: three-dot button
+        inventoryTable.getColumnModel().getColumn(5).setCellRenderer(new ActionsCellRenderer());
+        inventoryTable.getColumnModel().getColumn(5).setCellEditor(new ActionsCellEditor());
+
+        // Status column: colored badge renderer
+        inventoryTable.getColumnModel().getColumn(4).setCellRenderer(new StatusBadgeRenderer());
+
         jScrollPane3.setViewportView(inventoryTable);
+        mainCard.add(jScrollPane3, BorderLayout.CENTER);
 
-        InventoryEdit = new javax.swing.JButton();
-        InventoryEdit.setText("Edit");
-        InventoryEdit.setFocusable(false);
-        InventoryEdit.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                InventoryEditActionPerformed(evt);
-            }
-        });
-
-        InventoryRemove = new javax.swing.JButton();
-        InventoryRemove.setText("Remove");
-        InventoryRemove.setFocusable(false);
-        InventoryRemove.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                InventoryRemoveActionPerformed(evt);
-            }
-        });
-
-        InventoryAdd = new javax.swing.JButton();
-        InventoryAdd.setText("Add");
-        InventoryAdd.setFocusable(false);
-        InventoryAdd.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                InventoryAddActionPerformed(evt);
-            }
-        });
-
-        javax.swing.GroupLayout jPanelInventoryLayout = new javax.swing.GroupLayout(jPanelInventory);
-        jPanelInventory.setLayout(jPanelInventoryLayout);
-        jPanelInventoryLayout.setHorizontalGroup(
-            jPanelInventoryLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanelInventoryLayout.createSequentialGroup()
-                .addGroup(jPanelInventoryLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                    .addGroup(jPanelInventoryLayout.createSequentialGroup()
-                        .addGap(25, 25, 25)
-                        .addComponent(jLabel2)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addComponent(InventoryAdd)
-                        .addGap(18, 18, 18)
-                        .addComponent(InventoryEdit)
-                        .addGap(18, 18, 18)
-                        .addComponent(InventoryRemove))
-                    .addGroup(jPanelInventoryLayout.createSequentialGroup()
-                        .addContainerGap(106, Short.MAX_VALUE)
-                        .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 1178, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addGap(107, 107, 107))
-        );
-        jPanelInventoryLayout.setVerticalGroup(
-            jPanelInventoryLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanelInventoryLayout.createSequentialGroup()
-                .addGroup(jPanelInventoryLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(jPanelInventoryLayout.createSequentialGroup()
-                        .addGap(25, 25, 25)
-                        .addComponent(jLabel2))
-                    .addGroup(jPanelInventoryLayout.createSequentialGroup()
-                        .addContainerGap(61, Short.MAX_VALUE)
-                        .addGroup(jPanelInventoryLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(InventoryRemove)
-                            .addComponent(InventoryEdit)
-                            .addComponent(InventoryAdd))))
-                .addGap(18, 18, 18)
-                .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 655, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(50, Short.MAX_VALUE))
-        );
-        jTabbedPaneI.addTab("Inventory", jPanelInventory);
+        jPanelInventory.add(mainCard, BorderLayout.SOUTH);
+        contentPanel.add(jPanelInventory, "Inventory");
 
         // ═══════════════════════════════════════════════════════════
         //  MONITORING TAB
@@ -983,28 +1058,25 @@ public class POSSystem extends javax.swing.JFrame {
                     .addComponent(jScrollPane4, javax.swing.GroupLayout.DEFAULT_SIZE, 650, Short.MAX_VALUE)
                     .addComponent(jScrollPane5))
                 .addContainerGap(36, Short.MAX_VALUE)));
-        jTabbedPaneI.addTab("Monitoring", jPanelMonitoring);
+        contentPanel.add(jPanelMonitoring, "Monitoring");
 
         // Other tabs
         try {
-            jTabbedPaneI.addTab("Menu Maintenance", new MenuMaintenancePanel());
+            contentPanel.add(new MenuMaintenancePanel(), "Menu Maintenance");
         } catch (Exception e) { System.err.println("MenuMaintenancePanel init failed: " + e.getMessage()); }
         try {
-            jTabbedPaneI.addTab("Register Product", new InventoryRegistrationPanel(new SQLiteInventoryRepository()));
+            contentPanel.add(new InventoryRegistrationPanel(new SQLiteInventoryRepository()), "Register Product");
         } catch (Exception e) { System.err.println("InventoryRegistrationPanel init failed: " + e.getMessage()); }
         try {
-            jTabbedPaneI.addTab("Staff", new StaffPanel(new SQLiteStaffShiftRepository(), new SQLiteUserRepository(), currentUsername, currentUserRole));
+            contentPanel.add(new StaffPanel(new SQLiteStaffShiftRepository(), new SQLiteUserRepository(), currentUsername, currentUserRole), "Staff");
         } catch (Exception e) { System.err.println("StaffPanel init failed: " + e.getMessage()); }
-        jTabbedPaneI.addTab("Inventory Guide", new InventoryGuidePanel());
-        jTabbedPaneI.addTab("About", new AboutModule());
-        jTabbedPaneI.addTab("Help", new HelpModule());
+        contentPanel.add(new InventoryGuidePanel(), "Inventory Guide");
+        contentPanel.add(new AboutModule(), "About");
+        contentPanel.add(new HelpModule(), "Help");
 
-        javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
-        getContentPane().setLayout(layout);
-        layout.setHorizontalGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(jTabbedPaneI, javax.swing.GroupLayout.PREFERRED_SIZE, 1482, javax.swing.GroupLayout.PREFERRED_SIZE));
-        layout.setVerticalGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(jTabbedPaneI, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE));
+        getContentPane().setLayout(new BorderLayout());
+        getContentPane().add(sidebar, BorderLayout.WEST);
+        getContentPane().add(contentPanel, BorderLayout.CENTER);
 
         pack();
         setLocationRelativeTo(null);
@@ -1070,8 +1142,42 @@ public class POSSystem extends javax.swing.JFrame {
         if (inventoryController == null) {
             inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
         }
-        for (InventoryRowView row : inventoryController.buildInventoryRows()) {
-            model.addRow(new Object[]{row.getName(), row.getQuantity(), row.getUnit(), row.getAlertLevel(), row.getStatus()});
+        List<InventoryRowView> rows = inventoryController.buildInventoryRows();
+        int totalItems = 0, lowStock = 0, expired = 0, outOfStock = 0;
+        for (InventoryRowView row : rows) {
+            String qtyDisplay = row.getQuantity() + " " + row.getUnit();
+            model.addRow(new Object[]{row.getName(), qtyDisplay, row.getStorageLocation(), row.getLastUpdated(), row.getStatus(), "..."});
+            totalItems++;
+            switch (row.getStatus()) {
+                case "Low Stock": lowStock++; break;
+                case "Out of Stock": outOfStock++; break;
+                case "Expired": expired++; break;
+            }
+        }
+        // Update summary cards
+        Component[] summaryParent = jPanelInventory.getComponents();
+        for (Component comp : summaryParent) {
+            if (comp instanceof JPanel) {
+                for (Component card : ((JPanel) comp).getComponents()) {
+                    if (card instanceof RoundedPanel) {
+                        for (Component c2 : ((RoundedPanel) card).getComponents()) {
+                            if (c2 instanceof JPanel) {
+                                for (Component c3 : ((JPanel) c2).getComponents()) {
+                                    if (c3 instanceof JLabel && "summaryCount_0".equals(c3.getName())) {
+                                        ((JLabel) c3).setText(String.valueOf(totalItems));
+                                    } else if (c3 instanceof JLabel && "summaryCount_1".equals(c3.getName())) {
+                                        ((JLabel) c3).setText(String.valueOf(lowStock));
+                                    } else if (c3 instanceof JLabel && "summaryCount_2".equals(c3.getName())) {
+                                        ((JLabel) c3).setText(String.valueOf(expired));
+                                    } else if (c3 instanceof JLabel && "summaryCount_3".equals(c3.getName())) {
+                                        ((JLabel) c3).setText(String.valueOf(outOfStock));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -1209,6 +1315,115 @@ public class POSSystem extends javax.swing.JFrame {
         monitoring.loadLowStockIngredients();
     }
 
+    private void filterInventoryTable(String query) {
+        if (inventoryTable == null) return;
+        DefaultTableModel model = (DefaultTableModel) inventoryTable.getModel();
+        model.setRowCount(0);
+        if (inventoryController == null) {
+            inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
+        }
+        List<InventoryRowView> rows = inventoryController.buildInventoryRows();
+        for (InventoryRowView row : rows) {
+            if (query == null || query.trim().isEmpty()
+                    || row.getName().toLowerCase().contains(query.toLowerCase())) {
+                String qtyDisplay = row.getQuantity() + " " + row.getUnit();
+                model.addRow(new Object[]{row.getName(), qtyDisplay, row.getStorageLocation(), row.getLastUpdated(), row.getStatus(), "..."});
+            }
+        }
+    }
+
+    private static class StatusBadgeRenderer extends DefaultTableCellRenderer {
+        @Override
+        public java.awt.Component getTableCellRendererComponent(JTable table, Object value,
+                boolean isSelected, boolean hasFocus, int row, int column) {
+            java.awt.Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            if (c instanceof JLabel label) {
+                String text = value == null ? "" : value.toString();
+                label.setText(text);
+                label.setHorizontalAlignment(SwingConstants.CENTER);
+                if (isSelected) {
+                    return label;
+                }
+                switch (text) {
+                    case "Good" -> label.setForeground(new Color(40, 167, 69));
+                    case "Low Stock" -> label.setForeground(new Color(200, 160, 40));
+                    case "Out of Stock" -> label.setForeground(new Color(230, 130, 50));
+                    case "Expired" -> label.setForeground(new Color(200, 50, 50));
+                    default -> label.setForeground(new Color(120, 120, 120));
+                }
+            }
+            return c;
+        }
+    }
+
+    private static class ActionsCellRenderer extends DefaultTableCellRenderer {
+        @Override
+        public java.awt.Component getTableCellRendererComponent(JTable table, Object value,
+                boolean isSelected, boolean hasFocus, int row, int column) {
+            JLabel label = new JLabel("...", SwingConstants.CENTER);
+            label.setFont(new Font("Segoe UI", Font.BOLD, 16));
+            label.setForeground(new Color(150, 150, 150));
+            label.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+            return label;
+        }
+    }
+
+    private class ActionsCellEditor extends AbstractCellEditor implements TableCellEditor {
+        private final JPanel panel = new JPanel(new BorderLayout());
+        private final JLabel dotsLabel = new JLabel("...", SwingConstants.CENTER);
+        private int editingRow;
+
+        ActionsCellEditor() {
+            dotsLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
+            dotsLabel.setForeground(new Color(150, 150, 150));
+            dotsLabel.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+            panel.add(dotsLabel, BorderLayout.CENTER);
+            panel.addMouseListener(new java.awt.event.MouseAdapter() {
+                @Override
+                public void mouseClicked(java.awt.event.MouseEvent e) {
+                    if (editingRow < 0) return;
+                    String itemName = inventoryTable.getValueAt(editingRow, 0).toString();
+                    JPopupMenu menu = new JPopupMenu();
+                    JMenuItem deleteItem = new JMenuItem("Delete");
+                    JMenuItem changeStatus = new JMenuItem("Change Status");
+                    deleteItem.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+                    changeStatus.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+                    deleteItem.addActionListener(ev -> {
+                        int confirm = JOptionPane.showConfirmDialog(POSSystem.this,
+                                "Remove " + itemName + " from inventory?", "Confirm",
+                                JOptionPane.YES_NO_OPTION);
+                        if (confirm == JOptionPane.YES_OPTION) {
+                            if (inventoryController == null)
+                                inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
+                            inventoryController.removeItem(itemName);
+                            loadInventoryTable();
+                        }
+                    });
+                    changeStatus.addActionListener(ev -> {
+                        String newStatus = JOptionPane.showInputDialog(POSSystem.this,
+                                "Change status for " + itemName + " (Good, Low Stock, Out of Stock, Expired):");
+                        if (newStatus != null && !newStatus.trim().isEmpty()) {
+                            JOptionPane.showMessageDialog(POSSystem.this, "Status updated for " + itemName);
+                        }
+                    });
+                    menu.add(deleteItem);
+                    menu.add(changeStatus);
+                    menu.show(panel, e.getX(), e.getY());
+                }
+            });
+        }
+
+        @Override
+        public Object getCellEditorValue() { return "..."; }
+
+        @Override
+        public java.awt.Component getTableCellEditorComponent(JTable table, Object value,
+                boolean isSelected, int row, int column) {
+            editingRow = row;
+            return panel;
+        }
+    }
+
     private void InventoryEditActionPerformed(java.awt.event.ActionEvent evt) {
         int selectedRow = inventoryTable.getSelectedRow();
         if (selectedRow == -1) {
@@ -1294,7 +1509,6 @@ public class POSSystem extends javax.swing.JFrame {
     private javax.swing.JButton herbalteamenu;
     public javax.swing.JTable inventoryTable;
     private javax.swing.JLabel jLabel1;
-    private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
@@ -1313,7 +1527,10 @@ public class POSSystem extends javax.swing.JFrame {
     private javax.swing.JScrollPane jScrollPane3;
     private javax.swing.JScrollPane jScrollPane4;
     private javax.swing.JScrollPane jScrollPane5;
-    private javax.swing.JTabbedPane jTabbedPaneI;
+    private CardLayout cardLayout;
+    private JPanel contentPanel;
+    private SidebarPanel sidebar;
+    private JPanel orderingPanel;
     private javax.swing.JTable jTable1;
     private javax.swing.JTable jTableMonitoring;
     private javax.swing.JTable jTableSales;

@@ -1,5 +1,0 @@
-controller\OrderControllerTest$FakeSalesRepository.class
-inventory\analytics\EoqCalculatorTest.class
-controller\OrderControllerTest.class
-inventory\analytics\AbcClassifierTest.class
-inventory\validation\InventoryBatchValidatorTest.class

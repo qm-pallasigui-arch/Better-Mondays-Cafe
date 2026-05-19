@@ -51,8 +51,17 @@ public final class SchemaInitializer {
                                         + "name TEXT NOT NULL UNIQUE, "
                                         + "quantity REAL NOT NULL, "
                                         + "unit TEXT NOT NULL, "
-                                        + "alert_level REAL NOT NULL"
+                                        + "alert_level REAL NOT NULL, "
+                                        + "storage_location TEXT NOT NULL DEFAULT '', "
+                                        + "last_updated TEXT NOT NULL DEFAULT ''"
                                         + ")");
+                        // Migration: add columns to existing databases that predate them
+                        for (String col : new String[]{"storage_location", "last_updated"}) {
+                            try {
+                                statement.execute("ALTER TABLE inventory_items ADD COLUMN " + col
+                                        + " TEXT NOT NULL DEFAULT ''");
+                            } catch (java.sql.SQLException ignored) {}
+                        }
                         // Batches allow tracking SKU, expiry dates and per-batch quantities for FEFO
                         // logic
                         statement.execute("CREATE TABLE IF NOT EXISTS inventory_batches ("

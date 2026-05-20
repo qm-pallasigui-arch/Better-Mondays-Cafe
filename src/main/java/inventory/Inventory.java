@@ -64,6 +64,82 @@ public class Inventory {
         inventoryItems.put("Chamomile Tea Bag", new InventoryItem("Chamomile Tea Bag", 51, "pcs", 50));
         inventoryItems.put("Earl Grey Tea Bag", new InventoryItem("Earl Grey Tea Bag", 51, "pcs", 50));
         inventoryItems.put("Cinnamon Tea Bag", new InventoryItem("Cinnamon Tea Bag", 51, "pcs", 50));
+
+        // Espresso & Coffee
+        inventoryItems.put("Fine Ground Coffee Beans", new InventoryItem("Fine Ground Coffee Beans", 500, "g", 200));
+        inventoryItems.put("Ground Coffee Beans", new InventoryItem("Ground Coffee Beans", 500, "g", 200));
+        inventoryItems.put("Heavy Cream", new InventoryItem("Heavy Cream", 500, "mL", 200));
+        inventoryItems.put("Sea Salt", new InventoryItem("Sea Salt", 200, "g", 100));
+        inventoryItems.put("Vanilla Syrup", new InventoryItem("Vanilla Syrup", 500, "mL", 200));
+
+        // Specialty Drinks
+        inventoryItems.put("Cookie Butter Spread", new InventoryItem("Cookie Butter Spread", 500, "g", 200));
+        inventoryItems.put("Crushed Biscoff Cookie Crumbs", new InventoryItem("Crushed Biscoff Cookie Crumbs", 500, "g", 200));
+        inventoryItems.put("Dark Roast Coffee Grounds", new InventoryItem("Dark Roast Coffee Grounds", 500, "g", 200));
+        inventoryItems.put("Evaporated Milk", new InventoryItem("Evaporated Milk", 500, "mL", 200));
+        inventoryItems.put("Pumpkin Pie Spice Powder", new InventoryItem("Pumpkin Pie Spice Powder", 200, "g", 100));
+        inventoryItems.put("Pumpkin Spice Sauce", new InventoryItem("Pumpkin Spice Sauce", 500, "mL", 200));
+
+        // Tea Latte
+        inventoryItems.put("Chai Tea Spice Concentrate", new InventoryItem("Chai Tea Spice Concentrate", 500, "mL", 200));
+        inventoryItems.put("Hojicha Powder", new InventoryItem("Hojicha Powder", 200, "g", 100));
+        inventoryItems.put("Honey", new InventoryItem("Honey", 500, "mL", 200));
+        inventoryItems.put("Simple Syrup", new InventoryItem("Simple Syrup", 500, "mL", 200));
+
+        // Non-Coffee
+        inventoryItems.put("Coconut Milk", new InventoryItem("Coconut Milk", 500, "mL", 200));
+        inventoryItems.put("Dragon Fruit Puree", new InventoryItem("Dragon Fruit Puree", 500, "mL", 200));
+        inventoryItems.put("Mango Puree", new InventoryItem("Mango Puree", 500, "mL", 200));
+        inventoryItems.put("Strawberry Puree", new InventoryItem("Strawberry Puree", 500, "mL", 200));
+
+        // Fruit Tea
+        inventoryItems.put("Jasmine Green Tea Leaves", new InventoryItem("Jasmine Green Tea Leaves", 500, "g", 200));
+        inventoryItems.put("Sugar Syrup", new InventoryItem("Sugar Syrup", 500, "mL", 200));
+
+        // Herbal Tea
+        inventoryItems.put("Cinnamon Herbal Blend", new InventoryItem("Cinnamon Herbal Blend", 200, "g", 100));
+        inventoryItems.put("Cinnamon Stick", new InventoryItem("Cinnamon Stick", 50, "pcs", 20));
+        inventoryItems.put("Dried Chamomile Flowers", new InventoryItem("Dried Chamomile Flowers", 200, "g", 100));
+        inventoryItems.put("Dried Peppermint Leaves", new InventoryItem("Dried Peppermint Leaves", 200, "g", 100));
+        inventoryItems.put("Earl Grey Tea Leaves", new InventoryItem("Earl Grey Tea Leaves", 200, "g", 100));
+
+        // Sandwiches
+        inventoryItems.put("Basil Pesto Sauce", new InventoryItem("Basil Pesto Sauce", 500, "mL", 200));
+        inventoryItems.put("Bread Slices", new InventoryItem("Bread Slices", 50, "pcs", 20));
+        inventoryItems.put("Butter", new InventoryItem("Butter", 500, "g", 200));
+        inventoryItems.put("Cheddar Cheese", new InventoryItem("Cheddar Cheese", 500, "g", 200));
+        inventoryItems.put("Cheddar-Mozzarella Blend", new InventoryItem("Cheddar-Mozzarella Blend", 500, "g", 200));
+        inventoryItems.put("Mayonnaise", new InventoryItem("Mayonnaise", 500, "g", 200));
+        inventoryItems.put("Mozzarella Cheese", new InventoryItem("Mozzarella Cheese", 500, "g", 200));
+        inventoryItems.put("Premium Ham Slice", new InventoryItem("Premium Ham Slice", 50, "pcs", 20));
+
+        // Pandesal Pairs
+        inventoryItems.put("Pandesal Rolls", new InventoryItem("Pandesal Rolls", 50, "pcs", 20));
+        inventoryItems.put("Quick-Melt Cheese", new InventoryItem("Quick-Melt Cheese", 500, "g", 200));
+        inventoryItems.put("Sliced Ham", new InventoryItem("Sliced Ham", 50, "pcs", 20));
+        inventoryItems.put("Spam Slices", new InventoryItem("Spam Slices", 50, "pcs", 20));
+
+        // Pastries
+        inventoryItems.put("Blueberry Compote Topping", new InventoryItem("Blueberry Compote Topping", 500, "g", 200));
+        inventoryItems.put("Brown Sugar", new InventoryItem("Brown Sugar", 500, "g", 200));
+        inventoryItems.put("White Sugar", new InventoryItem("White Sugar", 500, "g", 200));
+        inventoryItems.put("Chocolate Chips", new InventoryItem("Chocolate Chips", 500, "g", 200));
+        inventoryItems.put("Chocolate Milk Bath", new InventoryItem("Chocolate Milk Bath", 500, "mL", 200));
+        inventoryItems.put("Chopped Spinach", new InventoryItem("Chopped Spinach", 500, "g", 200));
+        inventoryItems.put("Cocoa Powder", new InventoryItem("Cocoa Powder", 500, "g", 200));
+        inventoryItems.put("Cream Cheese & Heavy Cream Mix", new InventoryItem("Cream Cheese & Heavy Cream Mix", 500, "g", 200));
+        inventoryItems.put("Egg", new InventoryItem("Egg", 50, "pcs", 20));
+        inventoryItems.put("Flour", new InventoryItem("Flour", 500, "g", 200));
+        inventoryItems.put("Graham Cracker Crust Base", new InventoryItem("Graham Cracker Crust Base", 500, "g", 200));
+        inventoryItems.put("Ladyfinger Biscuits", new InventoryItem("Ladyfinger Biscuits", 50, "pcs", 20));
+        inventoryItems.put("Mashed Banana", new InventoryItem("Mashed Banana", 500, "g", 200));
+        inventoryItems.put("Mascarpone & Heavy Cream Mixture", new InventoryItem("Mascarpone & Heavy Cream Mixture", 500, "g", 200));
+        inventoryItems.put("Matcha Tea Bath", new InventoryItem("Matcha Tea Bath", 500, "mL", 200));
+        inventoryItems.put("Parmesan & Garlic Seasoning", new InventoryItem("Parmesan & Garlic Seasoning", 200, "g", 100));
+        inventoryItems.put("Powdered Sugar Coating", new InventoryItem("Powdered Sugar Coating", 500, "g", 200));
+        inventoryItems.put("Puff Pastry Dough Sheet", new InventoryItem("Puff Pastry Dough Sheet", 50, "pcs", 20));
+        inventoryItems.put("Sugar", new InventoryItem("Sugar", 500, "g", 200));
+        inventoryItems.put("Vegetable Oil", new InventoryItem("Vegetable Oil", 500, "mL", 200));
     }
 
     private void persistAll() {

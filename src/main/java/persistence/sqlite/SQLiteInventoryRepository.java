@@ -18,14 +18,16 @@ public class SQLiteInventoryRepository implements InventoryRepository {
         List<InventoryItem> items = new ArrayList<>();
         try (Connection connection = AppDatabase.openConnection();
              PreparedStatement statement = connection.prepareStatement(
-                     "SELECT name, quantity, unit, alert_level FROM inventory_items ORDER BY name");
+                      "SELECT name, quantity, unit, alert_level, storage_location, last_updated FROM inventory_items ORDER BY name");
              ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
                 items.add(new InventoryItem(
                         resultSet.getString("name"),
                         resultSet.getDouble("quantity"),
                         resultSet.getString("unit"),
-                        resultSet.getDouble("alert_level")));
+                        resultSet.getDouble("alert_level"),
+                        resultSet.getString("storage_location"),
+                        resultSet.getString("last_updated")));
             }
         }
         return items;
@@ -35,7 +37,7 @@ public class SQLiteInventoryRepository implements InventoryRepository {
     public Optional<InventoryItem> findByName(String name) throws Exception {
         try (Connection connection = AppDatabase.openConnection();
              PreparedStatement statement = connection.prepareStatement(
-                     "SELECT name, quantity, unit, alert_level FROM inventory_items WHERE name = ?")) {
+                     "SELECT name, quantity, unit, alert_level, storage_location, last_updated FROM inventory_items WHERE name = ?")) {
             statement.setString(1, name);
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (!resultSet.next()) {
@@ -45,7 +47,9 @@ public class SQLiteInventoryRepository implements InventoryRepository {
                         resultSet.getString("name"),
                         resultSet.getDouble("quantity"),
                         resultSet.getString("unit"),
-                        resultSet.getDouble("alert_level")));
+                        resultSet.getDouble("alert_level"),
+                        resultSet.getString("storage_location"),
+                        resultSet.getString("last_updated")));
             }
         }
     }
@@ -54,12 +58,14 @@ public class SQLiteInventoryRepository implements InventoryRepository {
     public void save(InventoryItem item) throws Exception {
         try (Connection connection = AppDatabase.openConnection();
              PreparedStatement statement = connection.prepareStatement(
-                     "INSERT INTO inventory_items(name, quantity, unit, alert_level) VALUES (?, ?, ?, ?) "
-                     + "ON CONFLICT(name) DO UPDATE SET quantity = excluded.quantity, unit = excluded.unit, alert_level = excluded.alert_level")) {
+                     "INSERT INTO inventory_items(name, quantity, unit, alert_level, storage_location, last_updated) VALUES (?, ?, ?, ?, ?, ?) "
+                     + "ON CONFLICT(name) DO UPDATE SET quantity = excluded.quantity, unit = excluded.unit, alert_level = excluded.alert_level, storage_location = excluded.storage_location, last_updated = excluded.last_updated")) {
             statement.setString(1, item.getName());
             statement.setDouble(2, item.getQuantity());
             statement.setString(3, item.getUnit());
             statement.setDouble(4, item.getAlertLevel());
+            statement.setString(5, item.getStorageLocation());
+            statement.setString(6, item.getLastUpdated());
             statement.executeUpdate();
         }
     }
@@ -106,7 +112,7 @@ public class SQLiteInventoryRepository implements InventoryRepository {
                         if (!rs.next()) {
                             // create base inventory item with quantity 0
                             try (PreparedStatement create = connection.prepareStatement(
-                                    "INSERT INTO inventory_items(name, quantity, unit, alert_level) VALUES (?, 0, '', 0)", PreparedStatement.RETURN_GENERATED_KEYS)) {
+                                    "INSERT INTO inventory_items(name, quantity, unit, alert_level, storage_location, last_updated) VALUES (?, 0, '', 0, '', '')", PreparedStatement.RETURN_GENERATED_KEYS)) {
                                 create.setString(1, itemName);
                                 create.executeUpdate();
                                 try (ResultSet keys = create.getGeneratedKeys()) {

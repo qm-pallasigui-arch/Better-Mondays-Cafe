@@ -25,45 +25,42 @@ public class InventoryController {
     public List<InventoryRowView> buildInventoryRows() {
         List<InventoryRowView> rows = new ArrayList<>();
         Map<String, InventoryItem> items = inventory.getAllItems();
-        Map<String, String> abc = policyService.classifyAbc(items);
 
         for (InventoryItem item : items.values()) {
-            String status = item.isLowStock() ? "LOW STOCK" : "OK";
-            try {
-                List<InventoryBatch> batches = repository.findBatchesForItem(item.getName());
-                boolean expired = false;
-                boolean expiringSoon = false;
-                for (InventoryBatch b : batches) {
-                    String exp = b.getExpiryDate();
-                    if (exp == null || exp.isBlank()) {
-                        continue;
-                    }
-                    LocalDate d = LocalDate.parse(exp);
-                    if (d.isBefore(LocalDate.now())) {
-                        expired = true;
-                    } else if (!d.isAfter(LocalDate.now().plusDays(7))) {
-                        expiringSoon = true;
-                    }
-                }
-                if (expired) {
-                    status = appendStatus(status, "EXPIRED");
-                } else if (expiringSoon) {
-                    status = appendStatus(status, "EXPIRING<7D");
-                }
-            } catch (Exception ignored) {
-                // keep status without FEFO metadata if repository lookup fails
+            String status;
+            if (item.isOutOfStock()) {
+                status = "Out of Stock";
+            } else if (item.isLowStock()) {
+                status = "Low Stock";
+            } else {
+                status = "Good";
             }
 
-            double eoq = policyService.computeRecommendedEoq(item);
-            status = appendStatus(status, "ABC=" + abc.getOrDefault(item.getName(), "C"));
-            status = appendStatus(status, "EOQ~" + String.format("%.0f", eoq));
+            try {
+                List<InventoryBatch> batches = repository.findBatchesForItem(item.getName());
+                boolean anyExpired = false;
+                for (InventoryBatch b : batches) {
+                    String exp = b.getExpiryDate();
+                    if (exp == null || exp.isBlank()) continue;
+                    LocalDate d = LocalDate.parse(exp);
+                    if (d.isBefore(LocalDate.now())) {
+                        anyExpired = true;
+                        break;
+                    }
+                }
+                if (anyExpired) {
+                    status = "Expired";
+                }
+            } catch (Exception ignored) {}
 
             rows.add(new InventoryRowView(
                     item.getName(),
                     item.getQuantity(),
                     item.getUnit(),
                     item.getAlertLevel(),
-                    status
+                    status,
+                    item.getStorageLocation(),
+                    item.getLastUpdated()
             ));
         }
         return rows;

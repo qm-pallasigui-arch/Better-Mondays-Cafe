@@ -17,6 +17,12 @@ public class Register extends javax.swing.JFrame {
         setMinimumSize(new java.awt.Dimension(700, 520));
         setResizable(true);
         AppTheme.applyToFrame(this);
+        javax.swing.JOptionPane.showMessageDialog(this,
+                "User self-registration is disabled. Please contact an admin.",
+                "Signup Disabled",
+                javax.swing.JOptionPane.INFORMATION_MESSAGE);
+        new Login().setVisible(true);
+        dispose();
     }
 
     /**

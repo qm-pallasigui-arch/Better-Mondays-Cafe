@@ -16,6 +16,10 @@ public class FruitTeaItem extends MenuItem {
 
     @Override
     public Map<String, Double> getIngredients() {
+        // If ingredients were loaded/edited from persistence, prefer those values.
+        if (!ingredients.isEmpty()) {
+            return super.getIngredients();
+        }
         Map<String, Double> ingredients = new HashMap<>();
 
         

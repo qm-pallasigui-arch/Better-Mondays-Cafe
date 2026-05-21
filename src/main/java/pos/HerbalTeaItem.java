@@ -15,6 +15,10 @@ public class HerbalTeaItem extends MenuItem {
     }
 
     public Map<String, Double> getIngredients() {
+        // If ingredients were loaded/edited from persistence, prefer those values.
+        if (!ingredients.isEmpty()) {
+            return super.getIngredients();
+        }
         Map<String, Double> ingredients = new HashMap<>();
 
         ingredients.put("Cup", 1.0);

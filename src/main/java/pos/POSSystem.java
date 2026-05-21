@@ -41,8 +41,8 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
+import loginregister.Login;
 import javax.swing.table.TableCellEditor;
-import javax.swing.table.TableCellRenderer;
 import loginregister.UserDataManager;
 import persistence.Phase2Bootstrap;
 import ui.MenuMaintenancePanel;
@@ -173,6 +173,19 @@ public class POSSystem extends javax.swing.JFrame {
     @Deprecated
     public POSSystem() {
         this("unknown", UserDataManager.Role.STAFF);
+    }
+
+    private void logoutAndReturnToLogin() {
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Log out of the current session?",
+                "Logout",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE);
+        if (confirm != JOptionPane.YES_OPTION) {
+            return;
+        }
+        java.awt.EventQueue.invokeLater(() -> new Login().setVisible(true));
+        dispose();
     }
 
 
@@ -640,7 +653,7 @@ public class POSSystem extends javax.swing.JFrame {
 
         sidebar = new SidebarPanel(currentUsername, currentUserRole, page -> {
             cardLayout.show(contentPanel, page);
-        });
+        }, this::logoutAndReturnToLogin);
         cardLayout = new CardLayout();
         contentPanel = new JPanel(cardLayout);
         contentPanel.setBackground(new Color(28, 43, 63));
@@ -1258,8 +1271,9 @@ public class POSSystem extends javax.swing.JFrame {
             String baseName = itemName.split(" \\(")[0].trim();
             MenuItem menuItem = menu.getMenuItem(baseName);
             if (menuItem != null) {
+                int qty = Integer.parseInt(orderModel.getValueAt(i, 1).toString());
                 for (Map.Entry<String, Double> e : menuItem.getIngredients().entrySet()) {
-                    inv.deductIngredient(e.getKey(), e.getValue());
+                    inv.deductIngredient(e.getKey(), e.getValue() * qty);
                 }
             }
         }

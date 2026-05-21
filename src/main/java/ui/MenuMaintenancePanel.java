@@ -2,18 +2,26 @@ package ui;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableModel;
 import persistence.MenuRepository;
 import persistence.sqlite.SQLiteMenuRepository;
+import pos.Menu;
 import pos.MenuItem;
 
 public class MenuMaintenancePanel extends JPanel {
@@ -21,6 +29,9 @@ public class MenuMaintenancePanel extends JPanel {
     private final MenuRepository repo;
     private final DefaultTableModel model;
     private final JTable table;
+    private final JComboBox<String> categoryFilter;
+    private final JTextField searchField;
+    private java.util.List<MenuItem> cachedItems = new ArrayList<>();
 
     public MenuMaintenancePanel() throws Exception {
         super(new BorderLayout());
@@ -35,6 +46,17 @@ public class MenuMaintenancePanel extends JPanel {
 
         table = new JTable(model);
         table.setPreferredScrollableViewportSize(new Dimension(700, 300));
+        table.setFillsViewportHeight(true);
+        table.setRowHeight(26);
+        table.setAutoCreateRowSorter(true);
+
+        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
+        categoryFilter = new JComboBox<>(new String[]{"All", "Coffee", "Non-Coffee", "Fruit Tea", "Herbal Tea", "Food"});
+        searchField = new JTextField(24);
+        filterPanel.add(new JLabel("Category"));
+        filterPanel.add(categoryFilter);
+        filterPanel.add(new JLabel("Search"));
+        filterPanel.add(searchField);
 
         JPanel buttons = new JPanel();
         JButton add = new JButton("Add");
@@ -44,26 +66,58 @@ public class MenuMaintenancePanel extends JPanel {
         add.addActionListener((ActionEvent e) -> onAdd());
         edit.addActionListener((ActionEvent e) -> onEdit());
         delete.addActionListener((ActionEvent e) -> onDelete());
+        categoryFilter.addActionListener((ActionEvent e) -> applyFilters());
+        searchField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) { applyFilters(); }
+            @Override
+            public void removeUpdate(DocumentEvent e) { applyFilters(); }
+            @Override
+            public void changedUpdate(DocumentEvent e) { applyFilters(); }
+        });
 
         buttons.add(add);
         buttons.add(edit);
         buttons.add(delete);
 
+        add(filterPanel, BorderLayout.NORTH);
         add(new JScrollPane(table), BorderLayout.CENTER);
         add(buttons, BorderLayout.SOUTH);
 
         reload();
+        AppTheme.applyToComponent(this);
     }
 
     private void reload() {
         try {
-            model.setRowCount(0);
-            for (MenuItem item : repo.findAll()) {
-                model.addRow(new Object[] { item.getName(), item.getCategory(), item.getHotPrice(),
-                        item.getIcedRegularPrice(), item.getIcedLargePrice() });
-            }
+            cachedItems = repo.findAll();
+            applyFilters();
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Unable to load menu: " + e.getMessage());
+        }
+    }
+
+    private void applyFilters() {
+        model.setRowCount(0);
+        String selectedCategory = categoryFilter.getSelectedItem() == null ? "All" : categoryFilter.getSelectedItem().toString();
+        String q = searchField.getText() == null ? "" : searchField.getText().trim().toLowerCase();
+
+        for (MenuItem item : cachedItems) {
+            boolean categoryMatch = "All".equalsIgnoreCase(selectedCategory)
+                    || normalizeCategory(item.getCategory()).equalsIgnoreCase(normalizeCategory(selectedCategory));
+            boolean searchMatch = q.isEmpty()
+                    || item.getName().toLowerCase().contains(q)
+                    || item.getCategory().toLowerCase().contains(q);
+
+            if (categoryMatch && searchMatch) {
+                model.addRow(new Object[]{
+                        item.getName(),
+                        item.getCategory(),
+                        item.getHotPrice(),
+                        item.getIcedRegularPrice(),
+                        item.getIcedLargePrice()
+                });
+            }
         }
     }
 
@@ -72,16 +126,24 @@ public class MenuMaintenancePanel extends JPanel {
             String name = JOptionPane.showInputDialog(this, "Name:");
             if (name == null || name.trim().isEmpty())
                 return;
-            String category = JOptionPane.showInputDialog(this, "Category (Coffee/NonCoffee/FruitTea/HerbalTea):");
+            String[] categories = {"Coffee", "Non-Coffee", "Fruit Tea", "Herbal Tea", "Food"};
+            String category = (String) JOptionPane.showInputDialog(
+                    this,
+                    "Category:",
+                    "Category",
+                    JOptionPane.QUESTION_MESSAGE,
+                    null,
+                    categories,
+                    categories[0]);
             if (category == null)
                 return;
             double hot = Double.parseDouble(JOptionPane.showInputDialog(this, "Hot price:"));
             double reg = Double.parseDouble(JOptionPane.showInputDialog(this, "Iced regular price:"));
             double large = Double.parseDouble(JOptionPane.showInputDialog(this, "Iced large price:"));
-            MenuItem item = createMenuItem(category.trim(), name.trim(), hot, reg, large);
+            MenuItem item = createMenuItem(normalizeCategory(category.trim()), name.trim(), hot, reg, large);
             String ing = JOptionPane.showInputDialog(this, "Ingredients (name:qty,name:qty):");
             parseAndSetIngredients(item, ing);
-            repo.save(item);
+            Menu.getInstance().saveItem(item);
             reload();
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Error adding item: " + ex.getMessage());
@@ -105,7 +167,15 @@ public class MenuMaintenancePanel extends JPanel {
             String newName = JOptionPane.showInputDialog(this, "Name:", item.getName());
             if (newName == null)
                 return;
-            String newCat = JOptionPane.showInputDialog(this, "Category:", item.getCategory());
+                String[] categories = {"Coffee", "Non-Coffee", "Fruit Tea", "Herbal Tea", "Food"};
+                String newCat = (String) JOptionPane.showInputDialog(
+                    this,
+                    "Category:",
+                    "Category",
+                    JOptionPane.QUESTION_MESSAGE,
+                    null,
+                    categories,
+                    normalizeCategory(item.getCategory()));
             if (newCat == null)
                 return;
             double hot = Double.parseDouble(JOptionPane.showInputDialog(this, "Hot price:", item.getHotPrice()));
@@ -113,11 +183,15 @@ public class MenuMaintenancePanel extends JPanel {
                     .parseDouble(JOptionPane.showInputDialog(this, "Iced regular price:", item.getIcedRegularPrice()));
             double large = Double
                     .parseDouble(JOptionPane.showInputDialog(this, "Iced large price:", item.getIcedLargePrice()));
-            MenuItem edited = createMenuItem(newCat.trim(), newName.trim(), hot, reg, large);
+                MenuItem edited = createMenuItem(normalizeCategory(newCat.trim()), newName.trim(), hot, reg, large);
             String ing = JOptionPane.showInputDialog(this, "Ingredients (name:qty,name:qty):",
                     ingredientsToCsv(item.getIngredients()));
             parseAndSetIngredients(edited, ing);
-            repo.save(edited);
+                // Keep in-memory ordering data and DB in sync
+                if (!name.equals(newName.trim())) {
+                Menu.getInstance().removeItem(name);
+                }
+                Menu.getInstance().saveItem(edited);
             reload();
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Error editing item: " + ex.getMessage());
@@ -135,7 +209,7 @@ public class MenuMaintenancePanel extends JPanel {
         if (confirm != JOptionPane.YES_OPTION)
             return;
         try {
-            repo.delete(name);
+            Menu.getInstance().removeItem(name);
             reload();
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Delete failed: " + e.getMessage());
@@ -145,10 +219,22 @@ public class MenuMaintenancePanel extends JPanel {
     private MenuItem createMenuItem(String category, String name, double hot, double reg, double large) {
         return switch (category) {
             case "Coffee" -> new pos.CoffeeItem(name, hot, reg, large);
-            case "NonCoffee", "Non-Coffee" -> new pos.NonCoffeeItem(name, hot, reg, large);
-            case "FruitTea" -> new pos.FruitTeaItem(name, hot, reg, large);
-            case "HerbalTea" -> new pos.HerbalTeaItem(name, hot, reg, large);
+            case "Non-Coffee" -> new pos.NonCoffeeItem(name, hot, reg, large);
+            case "Fruit Tea" -> new pos.FruitTeaItem(name, hot, reg, large);
+            case "Herbal Tea" -> new pos.HerbalTeaItem(name, hot, reg, large);
+            case "Food" -> new pos.FoodItem(name, "Food", hot > 0 ? hot : (reg > 0 ? reg : large));
             default -> new pos.CoffeeItem(name, hot, reg, large);
+        };
+    }
+
+    private String normalizeCategory(String category) {
+        if (category == null) return "Coffee";
+        String c = category.trim();
+        return switch (c) {
+            case "NonCoffee" -> "Non-Coffee";
+            case "FruitTea" -> "Fruit Tea";
+            case "HerbalTea" -> "Herbal Tea";
+            default -> c;
         };
     }
 

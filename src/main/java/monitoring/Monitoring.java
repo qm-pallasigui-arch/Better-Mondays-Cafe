@@ -50,9 +50,11 @@ public class Monitoring {
         monitoringModel.setRowCount(0);
         try {
             SQLiteInventoryRepository repository = new SQLiteInventoryRepository();
+            boolean foundAlert = false;
             for (InventoryItem item : repository.findAll()) {
-                if (item.isLowStock()) {
-                    String status = "⚠️ Low Stock";
+                if (item.isLowStock() || item.isOutOfStock()) {
+                    foundAlert = true;
+                    String status = item.isOutOfStock() ? "⛔ Out of Stock" : "⚠️ Low Stock";
                     monitoringModel.addRow(new Object[]{
                         item.getName(),
                         item.getQuantity(),
@@ -62,11 +64,16 @@ public class Monitoring {
                     });
                 }
             }
+            if (!foundAlert) {
+                monitoringModel.addRow(new Object[]{"No alerts", "-", "-", "-", "All inventory above alert level"});
+            }
         } catch (Exception e) {
             Inventory inventory = Inventory.getInstance();
+            boolean foundAlert = false;
             for (InventoryItem item : inventory.getAllItems().values()) {
-                if (item.isLowStock()) {
-                    String status = "⚠️ Low Stock";
+                if (item.isLowStock() || item.isOutOfStock()) {
+                    foundAlert = true;
+                    String status = item.isOutOfStock() ? "⛔ Out of Stock" : "⚠️ Low Stock";
                     monitoringModel.addRow(new Object[]{
                         item.getName(),
                         item.getQuantity(),
@@ -75,6 +82,9 @@ public class Monitoring {
                         status
                     });
                 }
+            }
+            if (!foundAlert) {
+                monitoringModel.addRow(new Object[]{"No alerts", "-", "-", "-", "All inventory above alert level"});
             }
         }
     }

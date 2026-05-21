@@ -32,26 +32,36 @@ public class SidebarPanel extends JPanel {
         void onNavigate(String pageName);
     }
 
+    public interface LogoutListener {
+        void onLogout();
+    }
+
     private static final int EXPANDED_WIDTH = 228;
     private static final int COLLAPSED_WIDTH = 60;
     private static final int NAV_HEIGHT = 40;
 
     private final NavigationListener listener;
+    private final LogoutListener logoutListener;
     private final boolean isAdmin;
     private final String username;
     private boolean collapsed = false;
-    private String activePage = "Ordering";
 
     private final List<NavItem> navItems = new ArrayList<>();
     private JLabel brandingText;
     private JButton collapseBtn;
+    private JButton logoutBtn;
     private final JPanel navPanel;
     private final JPanel headerPanel;
 
     public SidebarPanel(String username, Role role, NavigationListener listener) {
+        this(username, role, listener, null);
+    }
+
+    public SidebarPanel(String username, Role role, NavigationListener listener, LogoutListener logoutListener) {
         this.username = username;
         this.isAdmin = role == Role.ADMIN;
         this.listener = listener;
+        this.logoutListener = logoutListener;
 
         setLayout(new BorderLayout(0, 0));
         setBackground(AppTheme.BG_PRIMARY);
@@ -76,7 +86,6 @@ public class SidebarPanel extends JPanel {
     }
 
     public void setActivePage(String page) {
-        activePage = page;
         for (NavItem ni : navItems) {
             ni.setActive(ni.pageName.equals(page));
         }
@@ -96,6 +105,11 @@ public class SidebarPanel extends JPanel {
         }
         brandingText.setVisible(!collapsed);
         collapseBtn.setText(collapsed ? "\u25B6" : "\u25C0");
+        if (logoutBtn != null) {
+            logoutBtn.setText(collapsed ? "\u21AA" : "Logout");
+            logoutBtn.setPreferredSize(collapsed ? new Dimension(34, 24) : new Dimension(70, 24));
+            logoutBtn.setToolTipText(collapsed ? "Logout" : null);
+        }
         revalidate();
         repaint();
     }
@@ -129,8 +143,26 @@ public class SidebarPanel extends JPanel {
         collapseBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         collapseBtn.addActionListener(e -> toggleCollapse());
 
+        logoutBtn = new JButton("Logout");
+        logoutBtn.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        logoutBtn.setForeground(Color.WHITE);
+        logoutBtn.setBackground(new Color(180, 60, 60));
+        logoutBtn.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 10));
+        logoutBtn.setFocusPainted(false);
+        logoutBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        logoutBtn.addActionListener(e -> {
+            if (logoutListener != null) {
+                logoutListener.onLogout();
+            }
+        });
+
+        JPanel controls = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
+        controls.setOpaque(false);
+        controls.add(logoutBtn);
+        controls.add(collapseBtn);
+
         p.add(brand, BorderLayout.CENTER);
-        p.add(collapseBtn, BorderLayout.EAST);
+        p.add(controls, BorderLayout.EAST);
         return p;
     }
 

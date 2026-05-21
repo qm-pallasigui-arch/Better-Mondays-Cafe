@@ -1,5 +1,0 @@
-1. Login to the app.
-2. Use Ordering to build a cart.
-3. Pay and print the receipt.
-4. Admins can open Inventory, Monitoring, Search, Menu Maintenance, Register Product, Inventory Guide, and Staff admin tools.
-5. In Staff tab (admin view), edit user roles between ADMIN and STAFF.

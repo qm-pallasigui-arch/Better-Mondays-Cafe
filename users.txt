@@ -1,1 +1,2 @@
-
+admin,admin123,ADMIN
+staff,staff123,STAFF

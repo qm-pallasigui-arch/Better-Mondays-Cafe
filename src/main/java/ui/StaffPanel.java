@@ -120,6 +120,7 @@ public class StaffPanel extends JPanel {
         JPanel shiftPanel = new JPanel(new BorderLayout(5, 5));
         shiftPanel.setBorder(BorderFactory.createTitledBorder("My Shift History"));
         shiftTable.setModel(shiftModel);
+        AppTheme.applyTableDefaults(shiftTable);
         shiftTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         shiftPanel.add(new JScrollPane(shiftTable), BorderLayout.CENTER);
 
@@ -153,15 +154,14 @@ public class StaffPanel extends JPanel {
         panel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
         // --- Toolbar ---
-        JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
-        toolbar.add(new JLabel("Search username:"));
-        toolbar.add(shiftSearchField);
-        toolbar.add(new JLabel("Status:"));
-        toolbar.add(shiftStatusFilter);
+        FilterRow toolbar = new FilterRow();
+        toolbar.addLabeled("Search username:", shiftSearchField);
+        toolbar.addLabeled("Status:", shiftStatusFilter);
         toolbar.add(refreshAllShiftsBtn);
 
         // --- Table ---
         allShiftsTable.setModel(allShiftsModel);
+        AppTheme.applyTableDefaults(allShiftsTable);
         allShiftsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         allShiftsTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
         allShiftsSorter = new TableRowSorter<>(allShiftsModel);
@@ -187,9 +187,8 @@ public class StaffPanel extends JPanel {
         panel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
         // Search bar
-        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        searchPanel.add(new JLabel("Search:"));
-        searchPanel.add(userSearchField);
+        FilterRow searchPanel = new FilterRow();
+        searchPanel.addLabeled("Search:", userSearchField);
 
         // Action buttons
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -203,6 +202,7 @@ public class StaffPanel extends JPanel {
 
         // Users table with sorter for live search
         usersTable.setModel(usersModel);
+        AppTheme.applyTableDefaults(usersTable);
         usersTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         usersSorter = new TableRowSorter<>(usersModel);
         usersTable.setRowSorter(usersSorter);

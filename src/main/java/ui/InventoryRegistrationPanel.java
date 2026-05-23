@@ -143,7 +143,7 @@ public class InventoryRegistrationPanel extends JPanel {
         wrapper.add(titleRow, BorderLayout.NORTH);
 
         // Form card
-        JPanel card = new RoundedPanel(12, BG_CARD);
+        JPanel card = new CardPanel(12, BG_CARD);
         card.setBorder(new EmptyBorder(16, 18, 16, 18));
         card.setLayout(new GridBagLayout());
 
@@ -196,7 +196,7 @@ public class InventoryRegistrationPanel extends JPanel {
         JPanel wrap = new JPanel(new BorderLayout(0, 4));
         wrap.setOpaque(false);
         wrap.add(fieldLabel(labelText), BorderLayout.NORTH);
-        styleInput(field);
+        AppTheme.styleSearchField(field);
         wrap.add(field, BorderLayout.CENTER);
         g.gridx = col;
         g.weightx = weight;
@@ -255,7 +255,7 @@ public class InventoryRegistrationPanel extends JPanel {
         table.getColumnModel().getColumn(6).setCellEditor(deleteEditor);
 
         JScrollPane scroll = new JScrollPane(table);
-        scroll.setBorder(new RoundedBorder(12, BORDER_SUBTLE));
+        scroll.setBorder(AppTheme.inputBorderRegular());
         scroll.getViewport().setBackground(BG_CARD);
 
         JPanel wrap = new JPanel(new BorderLayout());
@@ -594,17 +594,14 @@ public class InventoryRegistrationPanel extends JPanel {
         f.setBackground(BG_INPUT);
         f.setCaretColor(ACCENT);
         f.setPreferredSize(new Dimension(f.getPreferredSize().width, 34));
-        f.setBorder(BorderFactory.createCompoundBorder(
-                new RoundedBorder(6, BORDER_SUBTLE), new EmptyBorder(6, 10, 6, 10)));
+        f.setBorder(AppTheme.inputBorderRegular());
         f.addFocusListener(new FocusAdapter() {
             public void focusGained(FocusEvent e) {
-                f.setBorder(BorderFactory.createCompoundBorder(
-                        new RoundedBorder(6, BORDER_FOCUS), new EmptyBorder(6, 10, 6, 10)));
+                f.setBorder(AppTheme.focusInputBorder(BORDER_FOCUS));
             }
 
             public void focusLost(FocusEvent e) {
-                f.setBorder(BorderFactory.createCompoundBorder(
-                        new RoundedBorder(6, BORDER_SUBTLE), new EmptyBorder(6, 10, 6, 10)));
+                f.setBorder(AppTheme.inputBorderRegular());
             }
         });
     }

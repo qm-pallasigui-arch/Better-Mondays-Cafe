@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.Font;
+import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
@@ -13,6 +14,9 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.SwingConstants;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.border.LineBorder;
 
 /** Shared palette and typography for visual consistency across screens. */
 public final class AppTheme {
@@ -43,6 +47,63 @@ public final class AppTheme {
             return;
         }
         applyRecursive(component);
+    }
+
+    /** Apply consistent styling to a search text field (fonts, colors, border). */
+    public static void styleSearchField(JTextField tf) {
+        if (tf == null) return;
+        tf.setFont(BODY);
+        tf.setForeground(FG_PRIMARY);
+        tf.setBackground(new Color(49, 73, 105));
+        tf.setCaretColor(FG_PRIMARY);
+        tf.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(new Color(60, 85, 120), 1, true),
+                BorderFactory.createEmptyBorder(8, 14, 8, 14)));
+        tf.putClientProperty("JTextField.roundPlaceholder", true);
+    }
+
+    /** Standard input border used across the app. */
+    public static javax.swing.border.Border inputBorderRegular() {
+        return BorderFactory.createCompoundBorder(
+                new LineBorder(new Color(60, 85, 120), 1, true),
+                BorderFactory.createEmptyBorder(8, 14, 8, 14));
+    }
+
+    /** Compact pill-style input border. */
+    public static javax.swing.border.Border inputBorderPill() {
+        return BorderFactory.createCompoundBorder(
+                new LineBorder(new Color(60, 85, 120), 1, true),
+                BorderFactory.createEmptyBorder(4, 10, 4, 10));
+    }
+
+    /** Focused input border with the given highlight color. */
+    public static javax.swing.border.Border focusInputBorder(Color focusColor) {
+        return BorderFactory.createCompoundBorder(
+                new LineBorder(focusColor, 1, true),
+                BorderFactory.createEmptyBorder(8, 14, 8, 14));
+    }
+
+    /** Apply standard table defaults for consistent look-and-feel. */
+    public static void applyTableDefaults(JTable table) {
+        if (table == null) return;
+        table.setBackground(BG_SURFACE);
+        table.setForeground(FG_PRIMARY);
+        table.setSelectionBackground(new Color(63, 94, 138));
+        table.setSelectionForeground(FG_PRIMARY);
+        table.setGridColor(new Color(79, 102, 135));
+        table.setFont(BODY);
+        table.getTableHeader().setBackground(new Color(49, 73, 105));
+        table.getTableHeader().setForeground(FG_MUTED);
+        table.getTableHeader().setFont(TITLE);
+        table.setRowHeight(Math.max(22, table.getRowHeight()));
+        table.setAutoCreateRowSorter(true);
+        DefaultTableCellRenderer hdr = (DefaultTableCellRenderer) table.getTableHeader().getDefaultRenderer();
+        hdr.setHorizontalAlignment(SwingConstants.CENTER);
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+        for (int i = 0; i < table.getColumnCount(); i++) {
+            table.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
+        }
     }
 
     private static void applyRecursive(Component c) {

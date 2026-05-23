@@ -39,6 +39,8 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextArea;
+import javax.swing.JComboBox;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import loginregister.Login;
@@ -53,7 +55,7 @@ import ui.InventoryRegistrationPanel;
 import ui.StaffPanel;
 import ui.InventoryGuidePanel;
 import ui.AppTheme;
-import ui.RoundedPanel;
+import ui.CardPanel;
 import ui.SidebarPanel;
 import persistence.sqlite.SQLiteInventoryRepository;
 import persistence.sqlite.SQLiteStaffShiftRepository;
@@ -138,6 +140,11 @@ public class POSSystem extends javax.swing.JFrame {
     private JTextField searchField;
     private JPanel orderPanel;
     private JPanel receiptPanel;
+    private JTextArea inventoryDetailArea;
+    private JTextField inventorySearchField;
+    private JComboBox<String> inventoryCategoryFilter;
+    private final List<InventoryRowView> inventoryRowsCache = new ArrayList<>();
+    private static final String INVENTORY_SEARCH_PLACEHOLDER = "Search ingredients";
 
     public POSSystem(String username, UserDataManager.Role role) {
         this.currentUserRole = role;
@@ -240,9 +247,7 @@ public class POSSystem extends javax.swing.JFrame {
     private JPanel createProductCard(MenuItem item, String category) {
         JPanel card = new JPanel(new BorderLayout(0, 3));
         card.setBackground(new Color(36, 55, 83));
-        card.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(60, 85, 120), 1),
-            BorderFactory.createEmptyBorder(6, 5, 5, 5)));
+        card.setBorder(ui.AppTheme.inputBorderRegular());
 
         JLabel imgLabel = new JLabel("", SwingConstants.CENTER);
         imgLabel.setPreferredSize(new Dimension(56, 44));
@@ -374,13 +379,7 @@ public class POSSystem extends javax.swing.JFrame {
     }
 
     private void styleSearchField() {
-        searchField.setBackground(new Color(36, 55, 83));
-        searchField.setForeground(new Color(197, 209, 224));
-        searchField.setCaretColor(new Color(197, 209, 224));
-        searchField.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        searchField.setBorder(BorderFactory.createCompoundBorder(
-            new LineBorder(new Color(60, 85, 120), 1, true),
-            BorderFactory.createEmptyBorder(6, 10, 6, 10)));
+        AppTheme.styleSearchField(searchField);
     }
 
     private void addOrderItem(String name, String variant, double price) {
@@ -514,11 +513,7 @@ public class POSSystem extends javax.swing.JFrame {
 
         JTextField cashField = new JTextField(10);
         cashField.setHorizontalAlignment(JTextField.RIGHT);
-        cashField.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        cashField.setBackground(new Color(36, 55, 83));
-        cashField.setForeground(new Color(197, 209, 224));
-        cashField.setCaretColor(new Color(197, 209, 224));
-        cashField.setBorder(new LineBorder(new Color(60, 85, 120), 1, true));
+        AppTheme.styleSearchField(cashField);
         cashField.setMaximumSize(new Dimension(120, 26));
         cashField.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
         receiptPanel.add(cashField);
@@ -686,9 +681,7 @@ public class POSSystem extends javax.swing.JFrame {
             btn.setBackground(new Color(36, 55, 83));
             btn.setForeground(new Color(245, 248, 252));
             btn.setFocusPainted(false);
-            btn.setBorder(BorderFactory.createCompoundBorder(
-                new LineBorder(new Color(60, 85, 120), 1, true),
-                BorderFactory.createEmptyBorder(4, 12, 4, 12)));
+            btn.setBorder(ui.AppTheme.inputBorderPill());
             btn.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
             btn.addActionListener(e -> showCategory(btn.getText()));
             sidebarPanel.add(btn);
@@ -711,13 +704,7 @@ public class POSSystem extends javax.swing.JFrame {
         searchPanel.add(searchIcon);
 
         searchField = new JTextField("Search a product", 20);
-        searchField.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        searchField.setBackground(new Color(36, 55, 83));
-        searchField.setForeground(new Color(100, 130, 160));
-        searchField.setCaretColor(new Color(197, 209, 224));
-        searchField.setBorder(BorderFactory.createCompoundBorder(
-            new LineBorder(new Color(60, 85, 120), 1, true),
-            BorderFactory.createEmptyBorder(6, 10, 6, 10)));
+        AppTheme.styleSearchField(searchField);
         searchField.setPreferredSize(new Dimension(250, 32));
         searchField.addFocusListener(new java.awt.event.FocusAdapter() {
             @Override
@@ -827,8 +814,7 @@ public class POSSystem extends javax.swing.JFrame {
 
         for (int i = 0; i < 4; i++) {
             final int idx = i;
-            RoundedPanel card = new RoundedPanel(16);
-            card.setFillColor(AppTheme.BG_SURFACE);
+            CardPanel card = new CardPanel(16, AppTheme.BG_SURFACE);
             card.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
             card.setLayout(new BorderLayout(12, 0));
 
@@ -870,11 +856,10 @@ public class POSSystem extends javax.swing.JFrame {
             summaryPanel.add(card);
         }
 
-        jPanelInventory.add(summaryPanel, BorderLayout.CENTER);
+        jPanelInventory.add(summaryPanel, BorderLayout.NORTH);
 
         // ─── Main Table Card ────────────────────────────────
-        RoundedPanel mainCard = new RoundedPanel(16);
-        mainCard.setFillColor(AppTheme.BG_SURFACE);
+        CardPanel mainCard = new CardPanel(16, AppTheme.BG_SURFACE);
         mainCard.setLayout(new BorderLayout(0, 12));
         mainCard.setBorder(BorderFactory.createEmptyBorder(16, 20, 20, 20));
 
@@ -885,19 +870,35 @@ public class POSSystem extends javax.swing.JFrame {
         JPanel leftControls = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         leftControls.setOpaque(false);
 
-        JTextField searchField = new JTextField(18);
-        searchField.setFont(BODY_FONT);
-        searchField.setForeground(AppTheme.FG_PRIMARY);
-        searchField.setBackground(new Color(49, 73, 105));
-        searchField.setCaretColor(AppTheme.FG_PRIMARY);
-        searchField.setBorder(BorderFactory.createCompoundBorder(
-            new LineBorder(new Color(60, 85, 120), 1, true),
-            BorderFactory.createEmptyBorder(8, 14, 8, 14)));
-        searchField.putClientProperty("JTextField.roundPlaceholder", true);
-        searchField.addKeyListener(new java.awt.event.KeyAdapter() {
-            public void keyReleased(java.awt.event.KeyEvent e) {
-                filterInventoryTable(searchField.getText());
+        inventorySearchField = new JTextField(18);
+        AppTheme.styleSearchField(inventorySearchField);
+        // UX: placeholder and tooltip so users know the field is interactive
+        inventorySearchField.setText(INVENTORY_SEARCH_PLACEHOLDER);
+        inventorySearchField.setToolTipText("Type to filter ingredients (press Esc to clear)");
+        inventorySearchField.putClientProperty("JTextField.roundPlaceholder", true);
+        inventorySearchField.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override
+            public void focusGained(java.awt.event.FocusEvent e) {
+                if (isInventorySearchPlaceholderVisible()) {
+                    inventorySearchField.setText("");
+                }
+                inventorySearchField.setBorder(ui.AppTheme.focusInputBorder(new Color(90, 140, 190)));
             }
+            @Override
+            public void focusLost(java.awt.event.FocusEvent e) {
+                if (inventorySearchField.getText().isBlank()) {
+                    inventorySearchField.setText(INVENTORY_SEARCH_PLACEHOLDER);
+                }
+                inventorySearchField.setBorder(ui.AppTheme.inputBorderRegular());
+            }
+        });
+        inventorySearchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            @Override
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { applyInventoryFilters(); }
+            @Override
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { applyInventoryFilters(); }
+            @Override
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { applyInventoryFilters(); }
         });
 
         JLabel searchIconLabel = new JLabel("\uD83D\uDD0D");
@@ -906,21 +907,30 @@ public class POSSystem extends javax.swing.JFrame {
 
         JPanel searchPill = new JPanel(new BorderLayout(6, 0));
         searchPill.setOpaque(false);
-        searchPill.setBorder(BorderFactory.createCompoundBorder(
-            new LineBorder(new Color(60, 85, 120), 1, true),
-            BorderFactory.createEmptyBorder(4, 10, 4, 10)));
+        searchPill.setBorder(ui.AppTheme.inputBorderPill());
         searchPill.add(searchIconLabel, BorderLayout.WEST);
-        searchPill.add(searchField, BorderLayout.CENTER);
+        searchPill.add(inventorySearchField, BorderLayout.CENTER);
         leftControls.add(searchPill);
+
+        inventoryCategoryFilter = new JComboBox<>(new String[] {
+            "All",
+            "Coffee",
+            "Non-Coffee",
+            "Fruit Tea",
+            "Herbal Tea",
+            "Food"
+        });
+        inventoryCategoryFilter.setFont(BODY_FONT);
+        inventoryCategoryFilter.addActionListener(e -> applyInventoryFilters());
+        leftControls.add(inventoryCategoryFilter);
 
         JButton filterBtn = new JButton("\u2699 Filter");
         filterBtn.setFont(BODY_FONT);
         filterBtn.setForeground(AppTheme.FG_PRIMARY);
         filterBtn.setBackground(AppTheme.BG_SURFACE);
-        filterBtn.setBorder(BorderFactory.createCompoundBorder(
-            new LineBorder(new Color(60, 85, 120), 1, true),
-            BorderFactory.createEmptyBorder(8, 14, 8, 14)));
+        filterBtn.setBorder(ui.AppTheme.inputBorderRegular());
         filterBtn.setFocusPainted(false);
+        filterBtn.addActionListener(e -> applyInventoryFilters());
         leftControls.add(filterBtn);
 
         controlsPanel.add(leftControls, BorderLayout.WEST);
@@ -942,6 +952,9 @@ public class POSSystem extends javax.swing.JFrame {
 
         mainCard.add(controlsPanel, BorderLayout.NORTH);
 
+        JPanel tableAndDetail = new JPanel(new BorderLayout(16, 0));
+        tableAndDetail.setOpaque(false);
+
         // Table
         jScrollPane3 = new javax.swing.JScrollPane();
         jScrollPane3.setBorder(null);
@@ -950,56 +963,77 @@ public class POSSystem extends javax.swing.JFrame {
         inventoryTable = new javax.swing.JTable();
         inventoryTable.setModel(new DefaultTableModel(
             new Object[][]{},
-            new String[]{"Item Name", "Quantity", "Storage Location", "Last Updated", "Status", "Actions"}
+            new String[]{"Item Name", "Quantity", "Last Updated", "Status", "Actions"}
         ) {
-            boolean[] canEdit = new boolean[]{false, false, false, false, false, false};
+            boolean[] canEdit = new boolean[]{false, false, false, false, false};
             public boolean isCellEditable(int rowIndex, int columnIndex) {
                 return canEdit[columnIndex];
             }
         });
-        inventoryTable.setFont(BODY_FONT);
-        inventoryTable.setForeground(AppTheme.FG_PRIMARY);
-        inventoryTable.setBackground(AppTheme.BG_SURFACE);
-        inventoryTable.setRowHeight(44);
+        AppTheme.applyTableDefaults(inventoryTable);
         inventoryTable.setShowHorizontalLines(true);
         inventoryTable.setShowVerticalLines(false);
-        inventoryTable.setGridColor(new Color(79, 102, 135));
-        inventoryTable.setSelectionBackground(new Color(63, 94, 138));
-        inventoryTable.setSelectionForeground(AppTheme.FG_PRIMARY);
         inventoryTable.setRowMargin(4);
-        inventoryTable.getTableHeader().setFont(BOLD_FONT);
-        inventoryTable.getTableHeader().setForeground(AppTheme.FG_MUTED);
-        inventoryTable.getTableHeader().setBackground(new Color(49, 73, 105));
         inventoryTable.getTableHeader().setReorderingAllowed(false);
-        ((DefaultTableCellRenderer) inventoryTable.getTableHeader().getDefaultRenderer()).setHorizontalAlignment(SwingConstants.CENTER);
-        inventoryTable.setAutoCreateRowSorter(true);
 
-        // Column widths
+        // Column widths (storage & used-in removed)
         inventoryTable.getColumnModel().getColumn(0).setPreferredWidth(180);
         inventoryTable.getColumnModel().getColumn(1).setPreferredWidth(100);
-        inventoryTable.getColumnModel().getColumn(2).setPreferredWidth(130);
-        inventoryTable.getColumnModel().getColumn(3).setPreferredWidth(140);
-        inventoryTable.getColumnModel().getColumn(4).setPreferredWidth(100);
-        inventoryTable.getColumnModel().getColumn(5).setPreferredWidth(80);
+        inventoryTable.getColumnModel().getColumn(2).setPreferredWidth(140);
+        inventoryTable.getColumnModel().getColumn(3).setPreferredWidth(100);
+        inventoryTable.getColumnModel().getColumn(4).setPreferredWidth(80);
 
         // Center align all columns
         DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
         centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < 5; i++) {
             inventoryTable.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
         }
 
-        // Actions column: three-dot button
-        inventoryTable.getColumnModel().getColumn(5).setCellRenderer(new ActionsCellRenderer());
-        inventoryTable.getColumnModel().getColumn(5).setCellEditor(new ActionsCellEditor());
+        // Actions column: three-dot button (now at index 4)
+        inventoryTable.getColumnModel().getColumn(4).setCellRenderer(new ActionsCellRenderer());
+        inventoryTable.getColumnModel().getColumn(4).setCellEditor(new ActionsCellEditor());
 
-        // Status column: colored badge renderer
-        inventoryTable.getColumnModel().getColumn(4).setCellRenderer(new StatusBadgeRenderer());
+        // Status column: colored badge renderer (now at index 3)
+        inventoryTable.getColumnModel().getColumn(3).setCellRenderer(new StatusBadgeRenderer());
+
+        inventoryTable.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                updateInventoryDetailPanel();
+            }
+        });
 
         jScrollPane3.setViewportView(inventoryTable);
-        mainCard.add(jScrollPane3, BorderLayout.CENTER);
 
-        jPanelInventory.add(mainCard, BorderLayout.SOUTH);
+        CardPanel detailCard = new CardPanel(16, AppTheme.BG_PRIMARY);
+        detailCard.setLayout(new BorderLayout(0, 10));
+        detailCard.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+        detailCard.setPreferredSize(new Dimension(330, 0));
+
+        JLabel detailTitle = new JLabel("Ingredient Details");
+        detailTitle.setFont(BOLD_FONT);
+        detailTitle.setForeground(AppTheme.FG_PRIMARY);
+        detailCard.add(detailTitle, BorderLayout.NORTH);
+
+        inventoryDetailArea = new JTextArea("Select an ingredient to see its full stock and menu usage.");
+        inventoryDetailArea.setEditable(false);
+        inventoryDetailArea.setLineWrap(true);
+        inventoryDetailArea.setWrapStyleWord(true);
+        inventoryDetailArea.setFont(BODY_FONT);
+        inventoryDetailArea.setForeground(AppTheme.FG_PRIMARY);
+        inventoryDetailArea.setBackground(AppTheme.BG_PRIMARY);
+        inventoryDetailArea.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+
+        JScrollPane detailScroll = new JScrollPane(inventoryDetailArea);
+        detailScroll.setBorder(BorderFactory.createLineBorder(new Color(60, 85, 120), 1, true));
+        detailScroll.getViewport().setBackground(AppTheme.BG_PRIMARY);
+        detailCard.add(detailScroll, BorderLayout.CENTER);
+
+        tableAndDetail.add(jScrollPane3, BorderLayout.CENTER);
+        tableAndDetail.add(detailCard, BorderLayout.EAST);
+        mainCard.add(tableAndDetail, BorderLayout.CENTER);
+
+        jPanelInventory.add(mainCard, BorderLayout.CENTER);
         contentPanel.add(jPanelInventory, "Inventory");
 
         // ═══════════════════════════════════════════════════════════
@@ -1019,6 +1053,7 @@ public class POSSystem extends javax.swing.JFrame {
             new Object[][] { {null, null, null, null} },
             new String[] { "Item", "Variant", "Quantity", "Total Price" }
         ));
+        AppTheme.applyTableDefaults(jTableSales);
         jScrollPane4 = new javax.swing.JScrollPane(jTableSales);
 
         jTableMonitoring = new javax.swing.JTable();
@@ -1026,6 +1061,7 @@ public class POSSystem extends javax.swing.JFrame {
             new Object[][] { {null, null, null, null, null} },
             new String[] { "Ingredient", "Quantity", "Unit", "Alert Level", "Status" }
         ));
+        AppTheme.applyTableDefaults(jTableMonitoring);
         jScrollPane5 = new javax.swing.JScrollPane(jTableMonitoring);
 
         jLabel4 = new javax.swing.JLabel();
@@ -1150,21 +1186,104 @@ public class POSSystem extends javax.swing.JFrame {
     }
 
     private void loadInventoryTable() {
-        DefaultTableModel model = (DefaultTableModel) inventoryTable.getModel();
-        model.setRowCount(0);
         if (inventoryController == null) {
             inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
         }
-        List<InventoryRowView> rows = inventoryController.buildInventoryRows();
-        int totalItems = 0, lowStock = 0, expired = 0, outOfStock = 0;
-        for (InventoryRowView row : rows) {
+        inventoryRowsCache.clear();
+        inventoryRowsCache.addAll(inventoryController.buildInventoryRows());
+        updateInventorySummaryCards();
+        applyInventoryFilters();
+    }
+
+    private void applyInventoryFilters() {
+        if (inventoryTable == null) {
+            return;
+        }
+        DefaultTableModel model = (DefaultTableModel) inventoryTable.getModel();
+        model.setRowCount(0);
+
+        String query = getInventorySearchQuery();
+        String selectedCategory = inventoryCategoryFilter == null || inventoryCategoryFilter.getSelectedItem() == null
+                ? "All"
+                : inventoryCategoryFilter.getSelectedItem().toString();
+
+        for (InventoryRowView row : inventoryRowsCache) {
+            if (!matchesInventoryFilters(row, query, selectedCategory)) {
+                continue;
+            }
             String qtyDisplay = row.getQuantity() + " " + row.getUnit();
-            model.addRow(new Object[]{row.getName(), qtyDisplay, row.getStorageLocation(), row.getLastUpdated(), row.getStatus(), "..."});
+            model.addRow(new Object[]{row.getName(), qtyDisplay, row.getLastUpdated(), row.getStatus(), "..."});
+        }
+
+        if (model.getRowCount() > 0) {
+            inventoryTable.setRowSelectionInterval(0, 0);
+        } else if (inventoryDetailArea != null) {
+            inventoryDetailArea.setText("No ingredients match the current search and category filter.");
+        }
+    }
+
+    private boolean matchesInventoryFilters(InventoryRowView row, String query, String selectedCategory) {
+        boolean categoryMatch = "All".equalsIgnoreCase(selectedCategory)
+                || containsToken(row.getCategories(), selectedCategory);
+
+        if (!categoryMatch) {
+            return false;
+        }
+
+        if (query == null || query.isEmpty()) {
+            return true;
+        }
+
+        String haystack = String.join(" ",
+            row.getName(),
+            row.getUnit(),
+            row.getStatus(),
+            safeText(row.getCategories()),
+            safeText(row.getLastUpdated())).toLowerCase();
+        return haystack.contains(query);
+    }
+
+    private String getInventorySearchQuery() {
+        if (inventorySearchField == null) {
+            return "";
+        }
+        String query = inventorySearchField.getText() == null ? "" : inventorySearchField.getText().trim();
+        if (query.isEmpty() || INVENTORY_SEARCH_PLACEHOLDER.equalsIgnoreCase(query)) {
+            return "";
+        }
+        return query.toLowerCase();
+    }
+
+    private boolean isInventorySearchPlaceholderVisible() {
+        return inventorySearchField != null
+                && INVENTORY_SEARCH_PLACEHOLDER.equalsIgnoreCase(
+                        inventorySearchField.getText() == null ? "" : inventorySearchField.getText().trim());
+    }
+
+    private boolean containsToken(String csv, String token) {
+        if (csv == null || csv.isBlank() || token == null || token.isBlank()) {
+            return false;
+        }
+        for (String part : csv.split(",")) {
+            if (part.trim().equalsIgnoreCase(token.trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String safeText(String value) {
+        return value == null ? "" : value;
+    }
+
+    private void updateInventorySummaryCards() {
+        int totalItems = 0, lowStock = 0, expired = 0, outOfStock = 0;
+        for (InventoryRowView row : inventoryRowsCache) {
             totalItems++;
             switch (row.getStatus()) {
-                case "Low Stock": lowStock++; break;
-                case "Out of Stock": outOfStock++; break;
-                case "Expired": expired++; break;
+                case "Low Stock" -> lowStock++;
+                case "Out of Stock" -> outOfStock++;
+                case "Expired" -> expired++;
             }
         }
         // Update summary cards
@@ -1172,8 +1291,8 @@ public class POSSystem extends javax.swing.JFrame {
         for (Component comp : summaryParent) {
             if (comp instanceof JPanel) {
                 for (Component card : ((JPanel) comp).getComponents()) {
-                    if (card instanceof RoundedPanel) {
-                        for (Component c2 : ((RoundedPanel) card).getComponents()) {
+                    if (card instanceof CardPanel) {
+                        for (Component c2 : ((CardPanel) card).getComponents()) {
                             if (c2 instanceof JPanel) {
                                 for (Component c3 : ((JPanel) c2).getComponents()) {
                                     if (c3 instanceof JLabel && "summaryCount_0".equals(c3.getName())) {
@@ -1341,7 +1460,7 @@ public class POSSystem extends javax.swing.JFrame {
             if (query == null || query.trim().isEmpty()
                     || row.getName().toLowerCase().contains(query.toLowerCase())) {
                 String qtyDisplay = row.getQuantity() + " " + row.getUnit();
-                model.addRow(new Object[]{row.getName(), qtyDisplay, row.getStorageLocation(), row.getLastUpdated(), row.getStatus(), "..."});
+                model.addRow(new Object[]{row.getName(), qtyDisplay, row.getLastUpdated(), row.getStatus(), "..."});
             }
         }
     }
@@ -1414,6 +1533,12 @@ public class POSSystem extends javax.swing.JFrame {
                         }
                     });
                     changeStatus.addActionListener(ev -> {
+
+                if (inventoryTable.getRowCount() > 0) {
+                    inventoryTable.setRowSelectionInterval(0, 0);
+                } else {
+                    updateInventoryDetailPanel();
+                }
                         String newStatus = JOptionPane.showInputDialog(POSSystem.this,
                                 "Change status for " + itemName + " (Good, Low Stock, Out of Stock, Expired):");
                         if (newStatus != null && !newStatus.trim().isEmpty()) {
@@ -1436,6 +1561,39 @@ public class POSSystem extends javax.swing.JFrame {
             editingRow = row;
             return panel;
         }
+    }
+
+    private void updateInventoryDetailPanel() {
+        if (inventoryDetailArea == null || inventoryController == null || inventoryTable == null) {
+            return;
+        }
+
+        int selectedRow = inventoryTable.getSelectedRow();
+        if (selectedRow < 0) {
+            inventoryDetailArea.setText("Select an ingredient to see its full stock and menu usage.");
+            return;
+        }
+
+        String itemName = String.valueOf(inventoryTable.getValueAt(selectedRow, 0));
+        List<InventoryRowView> rows = inventoryController.buildInventoryRows();
+        for (InventoryRowView row : rows) {
+            if (!row.getName().equals(itemName)) {
+                continue;
+            }
+
+            StringBuilder details = new StringBuilder();
+            details.append("Name: ").append(row.getName()).append('\n');
+            details.append("Quantity: ").append(row.getQuantity()).append(' ').append(row.getUnit()).append('\n');
+            details.append("Alert Level: ").append(row.getAlertLevel()).append(' ').append(row.getUnit()).append('\n');
+            details.append("Status: ").append(row.getStatus()).append('\n');
+            details.append("Updated: ").append(row.getLastUpdated() == null || row.getLastUpdated().isBlank() ? "N/A" : row.getLastUpdated()).append('\n');
+                details.append("Categories: ").append(row.getCategories() == null || row.getCategories().isBlank() ? "N/A" : row.getCategories()).append('\n');
+            inventoryDetailArea.setText(details.toString());
+            inventoryDetailArea.setCaretPosition(0);
+            return;
+        }
+
+        inventoryDetailArea.setText("No detail record found for the selected ingredient.");
     }
 
     private void InventoryEditActionPerformed(java.awt.event.ActionEvent evt) {

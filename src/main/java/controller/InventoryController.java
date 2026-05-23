@@ -13,6 +13,7 @@ import java.util.Set;
 import persistence.InventoryRepository;
 import pos.Menu;
 import pos.MenuItem;
+import util.StringUtil;
 
 public class InventoryController {
 
@@ -173,7 +174,7 @@ public class InventoryController {
 
     public void addItem(String name, String quantity, String unit, String alertLevel) {
         validateInputs(name, quantity, unit, alertLevel);
-        String key = name.trim();
+        String key = StringUtil.normalizeName(name);
         if (inventory.getItem(key) != null) {
             throw new IllegalArgumentException("Item already exists in inventory");
         }
@@ -184,22 +185,22 @@ public class InventoryController {
 
     public void updateItem(String originalName, String newName, String quantity, String unit, String alertLevel) {
         validateInputs(newName, quantity, unit, alertLevel);
-        InventoryItem existing = inventory.getItem(originalName.trim());
+        InventoryItem existing = inventory.getItem(StringUtil.normalizeName(originalName));
         if (existing == null) {
             throw new IllegalArgumentException("Item not found in inventory");
         }
-        existing.setName(newName.trim());
+        existing.setName(StringUtil.normalizeName(newName));
         existing.setQuantity(Double.parseDouble(quantity.trim()));
         existing.setUnit(unit.trim());
         existing.setAlertLevel(Double.parseDouble(alertLevel.trim()));
-        inventory.updateItem(originalName.trim(), existing);
+        inventory.updateItem(StringUtil.normalizeName(originalName), existing);
     }
 
     public void removeItem(String name) {
         if (name == null || name.trim().isEmpty()) {
             throw new IllegalArgumentException("Item name is required");
         }
-        inventory.removeItem(name.trim());
+        inventory.removeItem(StringUtil.normalizeName(name));
     }
 
     private static void validateInputs(String name, String quantity, String unit, String alertLevel) {

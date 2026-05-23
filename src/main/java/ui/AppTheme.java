@@ -10,6 +10,7 @@ import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JPasswordField;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
@@ -56,6 +57,9 @@ public final class AppTheme {
         tf.setForeground(FG_PRIMARY);
         tf.setBackground(new Color(49, 73, 105));
         tf.setCaretColor(FG_PRIMARY);
+        if (tf.getCaret() != null) {
+            tf.getCaret().setBlinkRate(500);
+        }
         tf.setBorder(BorderFactory.createCompoundBorder(
                 new LineBorder(new Color(60, 85, 120), 1, true),
                 BorderFactory.createEmptyBorder(8, 14, 8, 14)));
@@ -124,11 +128,28 @@ public final class AppTheme {
         if (c instanceof JTextField tf) {
             tf.setBackground(Color.WHITE);
             tf.setForeground(new Color(33, 33, 33));
+            tf.setCaretColor(new Color(33, 33, 33));
+            if (tf.getCaret() != null) {
+                tf.getCaret().setBlinkRate(500);
+            }
             tf.setFont(BODY);
+        }
+        if (c instanceof JPasswordField pf) {
+            pf.setBackground(Color.WHITE);
+            pf.setForeground(new Color(33, 33, 33));
+            pf.setCaretColor(new Color(33, 33, 33));
+            if (pf.getCaret() != null) {
+                pf.getCaret().setBlinkRate(500);
+            }
+            pf.setFont(BODY);
         }
         if (c instanceof JTextArea ta) {
             ta.setBackground(Color.WHITE);
             ta.setForeground(new Color(33, 33, 33));
+            ta.setCaretColor(new Color(33, 33, 33));
+            if (ta.getCaret() != null) {
+                ta.getCaret().setBlinkRate(500);
+            }
             ta.setFont(BODY);
         }
         if (c instanceof JTable table) {

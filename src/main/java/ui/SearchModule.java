@@ -257,8 +257,8 @@ public class SearchModule extends JPanel {
         // Type column — badge renderer
         table.getColumnModel().getColumn(0).setCellRenderer(new BadgeCellRenderer());
 
-        // Status column — availability badge renderer
-        table.getColumnModel().getColumn(3).setCellRenderer(new AvailabilityBadgeCellRenderer());
+        // Status column — smart renderer for menu availability, inventory alerts, and sales dates
+        table.getColumnModel().getColumn(3).setCellRenderer(new StatusCellRenderer());
 
         // Alternating row renderer for other columns
         DefaultTableCellRenderer altRenderer = new DefaultTableCellRenderer() {
@@ -276,7 +276,6 @@ public class SearchModule extends JPanel {
         };
         table.getColumnModel().getColumn(1).setCellRenderer(altRenderer);
         table.getColumnModel().getColumn(2).setCellRenderer(altRenderer);
-        table.getColumnModel().getColumn(3).setCellRenderer(altRenderer);
 
         JScrollPane scroll = new JScrollPane(table);
         scroll.setBorder(BorderFactory.createEmptyBorder());
@@ -352,10 +351,14 @@ public class SearchModule extends JPanel {
                 String unit = rs.getString("unit");
                 if (!matches(q, name, unit))
                     continue;
-                String details = "Qty: " + String.format("%.1f", rs.getDouble("quantity"))
-                        + " " + unit
-                        + "  ·  Alert: " + String.format("%.1f", rs.getDouble("alert_level"));
-                tableModel.addRow(new Object[] { "Inventory", name, details, "" });
+                double quantity = rs.getDouble("quantity");
+                double alert = rs.getDouble("alert_level");
+                String status = quantity <= 0 ? "Out of Stock"
+                    : quantity <= alert ? "Low Stock"
+                    : "Good";
+                String details = "Qty: " + String.format("%.1f", quantity)
+                    + " " + unit;
+                tableModel.addRow(new Object[] { "Inventory", name, details, status });
             }
         }
     }
@@ -412,15 +415,15 @@ public class SearchModule extends JPanel {
     // ── Inner helpers ─────────────────────────────────────────────────────────
 
     /**
-     * Renders an Available / Unavailable pill badge for menu items; plain cell for
-     * other rows.
+     * Renders menu availability and inventory alert statuses as pill badges.
+     * Sales dates remain plain text.
      */
-    private static class AvailabilityBadgeCellRenderer extends DefaultTableCellRenderer {
+    private static class StatusCellRenderer extends DefaultTableCellRenderer {
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value,
                 boolean sel, boolean foc, int row, int col) {
-            // Non-boolean cells (Sales date strings, Inventory empty) — plain text
-            if (!(value instanceof Boolean)) {
+            Object rowType = table.getValueAt(row, 0);
+            if (!(rowType instanceof String type)) {
                 super.getTableCellRendererComponent(table, value, sel, foc, row, col);
                 setFont(FONT_TABLE);
                 setForeground(TEXT_SECONDARY);
@@ -430,10 +433,41 @@ public class SearchModule extends JPanel {
                 return this;
             }
 
-            boolean available = (Boolean) value;
-            Color badgeBg = available ? AVAIL_BG : UNAVAIL_BG;
-            Color badgeFg = available ? AVAIL_FG : UNAVAIL_FG;
-            String label = available ? "Available" : "Unavailable";
+            if ("Sales".equalsIgnoreCase(type)) {
+                super.getTableCellRendererComponent(table, value, sel, foc, row, col);
+                setFont(FONT_TABLE);
+                setForeground(TEXT_SECONDARY);
+                setBorder(new EmptyBorder(0, 14, 0, 14));
+                if (!sel)
+                    setBackground(row % 2 == 0 ? BG_CARD : ROW_ALT);
+                return this;
+            }
+
+            String label;
+            Color badgeBg;
+            Color badgeFg;
+            if ("Menu".equalsIgnoreCase(type)) {
+                boolean available = value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value));
+                badgeBg = available ? AVAIL_BG : UNAVAIL_BG;
+                badgeFg = available ? AVAIL_FG : UNAVAIL_FG;
+                label = available ? "Available" : "Unavailable";
+            } else {
+                label = value == null ? "Good" : value.toString();
+                switch (label) {
+                    case "Out of Stock" -> {
+                        badgeBg = UNAVAIL_BG;
+                        badgeFg = UNAVAIL_FG;
+                    }
+                    case "Low Stock" -> {
+                        badgeBg = SALE_BG;
+                        badgeFg = SALE_FG;
+                    }
+                    default -> {
+                        badgeBg = AVAIL_BG;
+                        badgeFg = AVAIL_FG;
+                    }
+                }
+            }
 
             JPanel cell = new JPanel(new GridBagLayout());
             cell.setBackground(sel ? new Color(0x1A3A5C) : (row % 2 == 0 ? BG_CARD : ROW_ALT));

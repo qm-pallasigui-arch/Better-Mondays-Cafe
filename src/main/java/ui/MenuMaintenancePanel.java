@@ -23,6 +23,7 @@ import persistence.MenuRepository;
 import persistence.sqlite.SQLiteMenuRepository;
 import pos.Menu;
 import pos.MenuItem;
+import util.StringUtil;
 
 public class MenuMaintenancePanel extends JPanel {
 
@@ -156,7 +157,7 @@ public class MenuMaintenancePanel extends JPanel {
         }
         String name = model.getValueAt(r, 0).toString();
         try {
-            Optional<MenuItem> opt = repo.findByName(name);
+            Optional<MenuItem> opt = repo.findByName(StringUtil.normalizeName(name));
             if (opt.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "Item not found in repository");
                 return;
@@ -181,12 +182,12 @@ public class MenuMaintenancePanel extends JPanel {
                     .parseDouble(JOptionPane.showInputDialog(this, "Iced regular price:", item.getIcedRegularPrice()));
             double large = Double
                     .parseDouble(JOptionPane.showInputDialog(this, "Iced large price:", item.getIcedLargePrice()));
-                MenuItem edited = createMenuItem(normalizeCategory(newCat.trim()), newName.trim(), hot, reg, large);
+                MenuItem edited = createMenuItem(normalizeCategory(newCat.trim()), StringUtil.normalizeName(newName.trim()), hot, reg, large);
             String ing = JOptionPane.showInputDialog(this, "Ingredients (name:qty,name:qty):",
                     ingredientsToCsv(item.getIngredients()));
             parseAndSetIngredients(edited, ing);
                 // Keep in-memory ordering data and DB in sync
-                if (!name.equals(newName.trim())) {
+                    if (!StringUtil.normalizeName(name).equals(StringUtil.normalizeName(newName.trim()))) {
                 Menu.getInstance().removeItem(name);
                 }
                 Menu.getInstance().saveItem(edited);
@@ -244,7 +245,7 @@ public class MenuMaintenancePanel extends JPanel {
             String[] kv = p.split(":", 2);
             if (kv.length == 2) {
                 try {
-                    item.addIngredient(kv[0].trim(), Double.parseDouble(kv[1].trim()));
+                    item.addIngredient(StringUtil.normalizeName(kv[0].trim()), Double.parseDouble(kv[1].trim()));
                 } catch (Exception ignored) {
                 }
             }

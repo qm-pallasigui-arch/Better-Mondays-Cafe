@@ -2,6 +2,8 @@ package loginregister;
 
 import pos.POSSystem;
 import ui.AppTheme;
+import util.FieldAssist;
+import java.util.stream.Collectors;
 
 /**
  *
@@ -15,6 +17,9 @@ public class Login extends javax.swing.JFrame {
         setResizable(true);
         jButton1.setVisible(false);
         jButton1.setEnabled(false);
+        FieldAssist.installAutocomplete(jTextField1, () -> UserDataManager.listUsers().stream()
+                .map(UserAccount::getUsername)
+                .collect(Collectors.toList()));
         AppTheme.applyToFrame(this);
     }
 

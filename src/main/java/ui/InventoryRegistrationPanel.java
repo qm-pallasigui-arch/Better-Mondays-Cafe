@@ -3,6 +3,8 @@ package ui;
 import inventory.InventoryBatch;
 import inventory.validation.InventoryBatchValidator;
 import persistence.InventoryRepository;
+import util.FieldAssist;
+import util.StringUtil;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -14,6 +16,10 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.geom.RoundRectangle2D;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -24,6 +30,13 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DocumentFilter;
 
 /**
  * Inventory Batch Registration panel.
@@ -43,6 +56,8 @@ public class InventoryRegistrationPanel extends JPanel {
 
     // ── Persistence ───────────────────────────────────────────────────────────
     private final InventoryRepository inventoryRepository;
+    private final Runnable inventoryRefreshCallback;
+    private final Runnable monitoringRefreshCallback;
     private static final Path JSON_FILE = Paths.get(System.getProperty("user.home"), ".inventory_batches.json");
     private static final Path DELETED_IDS_FILE = Paths.get(System.getProperty("user.home"),
             ".inventory_deleted_ids.txt");
@@ -106,13 +121,26 @@ public class InventoryRegistrationPanel extends JPanel {
     // (which may not support hard-delete) are always filtered out on load.
     private final Set<String> deletedIds = new HashSet<>();
 
-    // ── Constructor (matches POSSystem call signature) ─────────────────────────
+    private final List<String> existingItemSuggestions = new ArrayList<>();
+    private final JPopupMenu nameSuggestionPopup = new JPopupMenu();
+    private final JList<String> nameSuggestionList = new JList<>();
+
+    // ── Constructor ────────────────────────────────────────────────────────────
     public InventoryRegistrationPanel(InventoryRepository inventoryRepository) {
+        this(inventoryRepository, null, null);
+    }
+
+    public InventoryRegistrationPanel(InventoryRepository inventoryRepository,
+                                      Runnable inventoryRefreshCallback,
+                                      Runnable monitoringRefreshCallback) {
         super(new BorderLayout());
         this.inventoryRepository = inventoryRepository;
+        this.inventoryRefreshCallback = inventoryRefreshCallback;
+        this.monitoringRefreshCallback = monitoringRefreshCallback;
         setBackground(BG_PAGE);
         setBorder(new EmptyBorder(24, 28, 24, 28));
         loadDeletedIds(); // must run before loadAllBatches()
+        loadExistingItemSuggestions();
 
         add(buildTopBar(), BorderLayout.NORTH);
         add(buildTableArea(), BorderLayout.CENTER);
@@ -153,7 +181,7 @@ public class InventoryRegistrationPanel extends JPanel {
         g.insets = new Insets(0, 0, 0, 10);
 
         // Row 1: Item name | SKU | spacer
-        addLabeledField(card, g, 0, "Item name", itemNameField, 1.5);
+        addLabeledField(card, g, 0, "Item name *", itemNameField, 1.5);
         addLabeledField(card, g, 2, "SKU (optional)", skuField, 1.0);
         g.gridx = 4;
         g.weightx = 0.5;
@@ -162,7 +190,7 @@ public class InventoryRegistrationPanel extends JPanel {
         // Row 2: Quantity | Expiry | Buttons
         g.gridy = 1;
         g.insets = new Insets(12, 0, 0, 10);
-        addLabeledField(card, g, 0, "Quantity", qtyField, 0.6);
+        addLabeledField(card, g, 0, "Quantity *", qtyField, 0.6);
         addLabeledField(card, g, 2, "Expiry (YYYY-MM-DD)", expiryField, 1.0);
 
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
@@ -185,6 +213,9 @@ public class InventoryRegistrationPanel extends JPanel {
         // Enter on any field → add
         for (JTextField f : new JTextField[] { itemNameField, skuField, qtyField, expiryField })
             f.addActionListener(e -> onAdd(null));
+
+        installNameSuggestions(itemNameField);
+        installExpiryAutoFormat(expiryField);
 
         wrapper.add(card, BorderLayout.CENTER);
         return wrapper;
@@ -248,11 +279,11 @@ public class InventoryRegistrationPanel extends JPanel {
             table.getColumnModel().getColumn(i).setCellRenderer(std);
         table.getColumnModel().getColumn(5).setCellRenderer(new StatusBadgeRenderer());
 
-        // Delete column — renderer + editor
-        DeleteButtonRenderer deleteRenderer = new DeleteButtonRenderer();
-        DeleteButtonEditor deleteEditor = new DeleteButtonEditor(table);
-        table.getColumnModel().getColumn(6).setCellRenderer(deleteRenderer);
-        table.getColumnModel().getColumn(6).setCellEditor(deleteEditor);
+        // Edit column — renderer + editor (opens edit dialog that contains Delete)
+        EditButtonRenderer editRenderer = new EditButtonRenderer();
+        EditButtonEditor editEditor = new EditButtonEditor(table);
+        table.getColumnModel().getColumn(6).setCellRenderer(editRenderer);
+        table.getColumnModel().getColumn(6).setCellEditor(editEditor);
 
         JScrollPane scroll = new JScrollPane(table);
         scroll.setBorder(AppTheme.inputBorderRegular());
@@ -281,7 +312,7 @@ public class InventoryRegistrationPanel extends JPanel {
     // Event handlers
     // ─────────────────────────────────────────────────────────────────────────
     private void onAdd(ActionEvent e) {
-        String name = itemNameField.getText().trim();
+        String name = StringUtil.normalizeName(itemNameField.getText());
         String sku = skuField.getText().trim();
         String qtys = qtyField.getText().trim();
         String expiry = expiryField.getText().trim();
@@ -325,6 +356,14 @@ public class InventoryRegistrationPanel extends JPanel {
         // loadAllBatches() re-queries the DB by item name and would resurrect
         // any previously deleted batches for the same item name.
         rebuildTable();
+
+        // Ensure Inventory singleton gets updated to reflect new aggregated quantity
+        try {
+            inventory.Inventory.getInstance().refreshItem(name);
+        } catch (Exception ignored) {
+        }
+        triggerRefreshCallbacks();
+        loadExistingItemSuggestions();
 
         // Keep item name, clear per-batch fields for fast consecutive entry
         skuField.setText("");
@@ -381,6 +420,7 @@ public class InventoryRegistrationPanel extends JPanel {
         saveDeletedIds();
         writeJsonFallback();
         rebuildTable();
+        triggerRefreshCallbacks();
         setStatus("✓  Batch " + batchId + " deleted.", BADGE_ERR_FG);
     }
 
@@ -588,6 +628,8 @@ public class InventoryRegistrationPanel extends JPanel {
         return l;
     }
 
+    
+
     private void styleInput(JTextField f) {
         f.setFont(FONT_INPUT);
         f.setForeground(TEXT_PRIMARY);
@@ -762,12 +804,12 @@ public class InventoryRegistrationPanel extends JPanel {
         }
     }
 
-    // ── Delete button renderer ─────────────────────────────────────────────────
-    /** Paints a styled "Delete" pill button in each row of the last column. */
-    static class DeleteButtonRenderer extends JPanel implements TableCellRenderer {
-        private final JLabel btn = new JLabel("Delete");
+    // ── Edit button renderer ───────────────────────────────────────────────────
+    /** Paints a styled "Edit" pill button in each row of the last column. */
+    static class EditButtonRenderer extends JPanel implements TableCellRenderer {
+        private final JLabel btn = new JLabel("Edit");
 
-        DeleteButtonRenderer() {
+        EditButtonRenderer() {
             setLayout(new GridBagLayout());
             setOpaque(true);
             btn.setFont(FONT_BADGE);
@@ -790,18 +832,17 @@ public class InventoryRegistrationPanel extends JPanel {
         }
     }
 
-    // ── Delete button editor ───────────────────────────────────────────────────
+    // ── Edit button editor ────────────────────────────────────────────────────
     /**
-     * Makes the delete cell clickable. On click it fires onDelete(row) on the
-     * enclosing panel and immediately cancels editing so the table stays clean.
+     * Opens an edit dialog for qty/expiry and exposes delete inside the modal.
      */
-    class DeleteButtonEditor extends DefaultCellEditor {
+    class EditButtonEditor extends DefaultCellEditor {
         private final JPanel cell = new JPanel(new GridBagLayout());
-        private final JLabel btn = new JLabel("Delete");
+        private final JLabel btn = new JLabel("Edit");
         private int currentRow = -1;
 
-        DeleteButtonEditor(JTable table) {
-            super(new JCheckBox()); // required superclass arg — not shown
+        EditButtonEditor(JTable table) {
+            super(new JCheckBox());
             setClickCountToStart(1);
 
             btn.setFont(FONT_BADGE);
@@ -825,20 +866,159 @@ public class InventoryRegistrationPanel extends JPanel {
             currentRow = table.convertRowIndexToModel(row);
             cell.setBackground(isSelected ? table.getSelectionBackground()
                     : (row % 2 == 0 ? BG_CARD : ROW_ALT));
+
+            // Show modal dialog immediately to edit
+            SwingUtilities.invokeLater(() -> openEditDialog(currentRow));
             return cell;
         }
 
         @Override
         public Object getCellEditorValue() {
-            return "Delete";
+            return "Edit";
         }
 
         @Override
         public boolean stopCellEditing() {
-            // Fire delete on the enclosing panel, then stop editing
-            SwingUtilities.invokeLater(() -> onDelete(currentRow));
             return super.stopCellEditing();
         }
+
+        private void openEditDialog(int modelRow) {
+            if (modelRow < 0 || modelRow >= batchCache.size()) return;
+            String[] row = batchCache.get(modelRow);
+            String batchId = row[0];
+            String itemName = row[1];
+
+            JTextField qtyFld = new JTextField(row[3]);
+            JTextField expFld = new JTextField(row[4]);
+
+            JPanel p = new JPanel(new GridBagLayout());
+            GridBagConstraints c = new GridBagConstraints();
+            c.insets = new Insets(6, 6, 6, 6);
+            c.gridx = 0; c.gridy = 0; c.anchor = GridBagConstraints.WEST;
+            p.add(new JLabel("Quantity:"), c);
+            c.gridx = 1; c.fill = GridBagConstraints.HORIZONTAL; c.weightx = 1.0;
+            qtyFld.setPreferredSize(new Dimension(200, 28));
+            p.add(qtyFld, c);
+
+            c.gridx = 0; c.gridy = 1; c.weightx = 0; c.fill = GridBagConstraints.NONE;
+            p.add(new JLabel("Expiry (YYYY-MM-DD):"), c);
+            c.gridx = 1; c.fill = GridBagConstraints.HORIZONTAL; c.weightx = 1.0;
+            p.add(expFld, c);
+
+            JButton deleteBtn = new JButton("Delete Batch");
+            deleteBtn.setForeground(BTN_DEL_FG);
+            deleteBtn.addActionListener(ae -> {
+                int confirm = JOptionPane.showConfirmDialog(
+                        InventoryRegistrationPanel.this,
+                        "Delete batch " + batchId + "?",
+                        "Confirm Delete",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.WARNING_MESSAGE);
+                if (confirm == JOptionPane.YES_OPTION) {
+                    onDelete(modelRow);
+                    Window w = SwingUtilities.getWindowAncestor(p);
+                    if (w != null) w.dispose();
+                }
+            });
+
+            Object[] options = new Object[] {"Save", deleteBtn, "Cancel"};
+            int res = JOptionPane.showOptionDialog(InventoryRegistrationPanel.this, p,
+                    "Edit Batch " + batchId,
+                    JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE,
+                    null, options, options[0]);
+
+            if (res == 0) { // Save
+                String newQty = qtyFld.getText().trim();
+                String newExp = expFld.getText().trim();
+                try {
+                    double q = InventoryBatchValidator.parseQuantity(newQty);
+                    String normExp = InventoryBatchValidator.normalizeExpiry(newExp);
+                    row[3] = String.valueOf(q);
+                    row[4] = normExp.isBlank() ? "" : normExp;
+                    writeJsonFallback();
+
+                    // Try to update DB by deleting old batch id then re-adding
+                    try {
+                        if (inventoryRepository instanceof persistence.DeletableBatchRepository) {
+                            ((persistence.DeletableBatchRepository) inventoryRepository).deleteBatch(batchId);
+                        }
+                        InventoryBatch nb = new InventoryBatch(row[2], q, row[4].isBlank() ? null : row[4]);
+                        inventoryRepository.addBatch(itemName, nb);
+                    } catch (Exception ignored) {
+                    }
+
+                    rebuildTable();
+                    try { inventory.Inventory.getInstance().refreshItem(itemName); } catch (Exception ignored) {}
+                    triggerRefreshCallbacks();
+                    setStatus("✓  Batch " + batchId + " updated.", BADGE_OK_FG);
+                } catch (Exception ex) {
+                    setStatus("⚠  " + ex.getMessage(), BADGE_WARN_FG);
+                }
+            }
+        }
+    }
+
+    private void triggerRefreshCallbacks() {
+        if (inventoryRefreshCallback != null) {
+            inventoryRefreshCallback.run();
+        }
+        if (monitoringRefreshCallback != null) {
+            monitoringRefreshCallback.run();
+        }
+    }
+
+    private void loadExistingItemSuggestions() {
+        existingItemSuggestions.clear();
+        try {
+            inventoryRepository.findAll().stream()
+                    .map(item -> StringUtil.normalizeName(item.getName()))
+                    .filter(name -> !name.isBlank())
+                    .distinct()
+                    .forEach(existingItemSuggestions::add);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void installNameSuggestions(JTextField field) {
+        FieldAssist.installAutocomplete(field, () -> existingItemSuggestions);
+    }
+
+    private void installExpiryAutoFormat(JTextField field) {
+        AbstractDocument doc = (AbstractDocument) field.getDocument();
+        doc.setDocumentFilter(new DocumentFilter() {
+            @Override
+            public void insertString(FilterBypass fb, int offset, String string, AttributeSet attr) throws BadLocationException {
+                replace(fb, offset, 0, string, attr);
+            }
+
+            @Override
+            public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attrs) throws BadLocationException {
+                String current = fb.getDocument().getText(0, fb.getDocument().getLength());
+                String raw = new StringBuilder(current).replace(offset, offset + length, text == null ? "" : text).toString();
+                String digits = raw.replaceAll("[^0-9]", "").substring(0, Math.min(8, raw.replaceAll("[^0-9]", "").length()));
+                String formatted = formatExpiryDigits(digits);
+                fb.replace(0, fb.getDocument().getLength(), formatted, attrs);
+            }
+
+            @Override
+            public void remove(FilterBypass fb, int offset, int length) throws BadLocationException {
+                String current = fb.getDocument().getText(0, fb.getDocument().getLength());
+                String raw = new StringBuilder(current).delete(offset, offset + length).toString();
+                String digits = raw.replaceAll("[^0-9]", "").substring(0, Math.min(8, raw.replaceAll("[^0-9]", "").length()));
+                String formatted = formatExpiryDigits(digits);
+                fb.replace(0, fb.getDocument().getLength(), formatted, null);
+            }
+
+            private String formatExpiryDigits(String digits) {
+                if (digits.isEmpty()) return "";
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < digits.length() && i < 8; i++) {
+                    if (i == 4 || i == 6) sb.append('-');
+                    sb.append(digits.charAt(i));
+                }
+                return sb.toString();
+            }
+        });
     }
 
     // ─────────────────────────────────────────────────────────────────────────

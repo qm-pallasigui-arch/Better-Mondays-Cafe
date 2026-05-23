@@ -19,6 +19,7 @@ import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JLabel;
+import util.FontHelper;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
@@ -52,6 +53,7 @@ public class SidebarPanel extends JPanel {
     private JButton logoutBtn;
     private final JPanel navPanel;
     private final JPanel headerPanel;
+    private JPanel bottomHolder;
 
     public SidebarPanel(String username, Role role, NavigationListener listener) {
         this(username, role, listener, null);
@@ -65,6 +67,21 @@ public class SidebarPanel extends JPanel {
 
         setLayout(new BorderLayout(0, 0));
         setBackground(AppTheme.BG_PRIMARY);
+
+        // create logout button early so toggleCollapse() can reference it
+        logoutBtn = new JButton("Logout");
+        logoutBtn.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        logoutBtn.setForeground(Color.WHITE);
+        logoutBtn.setBackground(new Color(180, 60, 60));
+        logoutBtn.setBorder(BorderFactory.createEmptyBorder(6, 12, 6, 12));
+        logoutBtn.setFocusPainted(false);
+        logoutBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        logoutBtn.setPreferredSize(new Dimension(84, 28));
+        logoutBtn.addActionListener(e -> {
+            if (logoutListener != null) {
+                logoutListener.onLogout();
+            }
+        });
 
         headerPanel = createHeader();
         add(headerPanel, BorderLayout.NORTH);
@@ -107,8 +124,11 @@ public class SidebarPanel extends JPanel {
         collapseBtn.setText(collapsed ? "\u25B6" : "\u25C0");
         if (logoutBtn != null) {
             logoutBtn.setText(collapsed ? "\u21AA" : "Logout");
-            logoutBtn.setPreferredSize(collapsed ? new Dimension(34, 24) : new Dimension(70, 24));
+            logoutBtn.setPreferredSize(collapsed ? new Dimension(34, 24) : new Dimension(84, 28));
             logoutBtn.setToolTipText(collapsed ? "Logout" : null);
+            if (bottomHolder != null && bottomHolder.getLayout() instanceof java.awt.FlowLayout) {
+                ((java.awt.FlowLayout) bottomHolder.getLayout()).setAlignment(collapsed ? java.awt.FlowLayout.CENTER : java.awt.FlowLayout.RIGHT);
+            }
         }
         revalidate();
         repaint();
@@ -126,6 +146,7 @@ public class SidebarPanel extends JPanel {
         JLabel logo = new JLabel("\u2615");
         logo.setFont(new Font("Segoe UI", Font.PLAIN, 18));
         logo.setForeground(AppTheme.FG_PRIMARY);
+        FontHelper.ensureGlyphs(logo, '\u2615');
 
         brandingText = new JLabel("Better Mondays");
         brandingText.setFont(new Font("Segoe UI", Font.BOLD, 13));
@@ -158,7 +179,6 @@ public class SidebarPanel extends JPanel {
 
         JPanel controls = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
         controls.setOpaque(false);
-        controls.add(logoutBtn);
         controls.add(collapseBtn);
 
         p.add(brand, BorderLayout.CENTER);
@@ -229,11 +249,39 @@ public class SidebarPanel extends JPanel {
         threeDots.setFont(new Font("Segoe UI", Font.BOLD, 16));
         threeDots.setForeground(AppTheme.FG_MUTED);
         threeDots.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        FontHelper.ensureGlyphs(threeDots, '\u22EE');
+
+        // Show a popup menu (contains logout) when three-dots clicked — useful when collapsed
+        javax.swing.JPopupMenu dotsMenu = new javax.swing.JPopupMenu();
+        javax.swing.JMenuItem logoutItem = new javax.swing.JMenuItem("Logout");
+        logoutItem.addActionListener(ae -> {
+            if (logoutListener != null) logoutListener.onLogout();
+        });
+        dotsMenu.add(logoutItem);
+        threeDots.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                dotsMenu.show(threeDots, e.getX(), e.getY());
+            }
+        });
 
         p.add(userIcon, BorderLayout.WEST);
         p.add(userNameLabel, BorderLayout.CENTER);
         p.add(threeDots, BorderLayout.EAST);
-        return p;
+
+        // wrapper to position profile at top and logout at bottom
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.setBackground(AppTheme.BG_PRIMARY);
+        wrapper.add(p, BorderLayout.NORTH);
+
+        bottomHolder = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 8, 6));
+        bottomHolder.setOpaque(false);
+        bottomHolder.setBorder(new EmptyBorder(6, 8, 8, 8));
+        bottomHolder.add(logoutBtn);
+        wrapper.add(bottomHolder, BorderLayout.SOUTH);
+
+        wrapper.setPreferredSize(new Dimension(EXPANDED_WIDTH, 80));
+        return wrapper;
     }
 
     // ─── Icon painters (minimalist line-art) ─────────────────

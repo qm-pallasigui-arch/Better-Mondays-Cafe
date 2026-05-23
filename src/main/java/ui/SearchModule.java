@@ -97,7 +97,7 @@ public class SearchModule extends JPanel {
         wrapper.add(title, BorderLayout.NORTH);
 
         // Controls card
-        JPanel card = new RoundedPanel(12, BG_CARD);
+        CardPanel card = new CardPanel(12, BG_CARD);
         card.setBorder(new EmptyBorder(16, 18, 16, 18));
         card.setLayout(new GridBagLayout());
         GridBagConstraints g = new GridBagConstraints();
@@ -112,7 +112,7 @@ public class SearchModule extends JPanel {
         card.add(fieldLabel("Keyword"), g);
         g.gridx = 1;
         g.weightx = 1;
-        styleInput(queryField);
+        AppTheme.styleSearchField(queryField);
         card.add(queryField, g);
 
         // Target
@@ -136,14 +136,14 @@ public class SearchModule extends JPanel {
         card.add(fieldLabel("From date"), g);
         g.gridx = 1;
         g.weightx = 1;
-        styleInput(fromDateField);
+        AppTheme.styleSearchField(fromDateField);
         card.add(fromDateField, g);
         g.gridx = 2;
         g.weightx = 0;
         card.add(fieldLabel("To date"), g);
         g.gridx = 3;
         g.weightx = 0.3;
-        styleInput(toDateField);
+        AppTheme.styleSearchField(toDateField);
         card.add(toDateField, g);
 
         // Search button
@@ -172,21 +172,15 @@ public class SearchModule extends JPanel {
         field.setForeground(TEXT_PRIMARY);
         field.setBackground(BG_INPUT);
         field.setCaretColor(ACCENT);
-        field.setBorder(BorderFactory.createCompoundBorder(
-                new RoundedBorder(6, BORDER_SUBTLE),
-                new EmptyBorder(6, 10, 6, 10)));
+        field.setBorder(AppTheme.inputBorderRegular());
         field.setPreferredSize(new Dimension(field.getPreferredSize().width, 34));
         field.addFocusListener(new FocusAdapter() {
             public void focusGained(FocusEvent e) {
-                field.setBorder(BorderFactory.createCompoundBorder(
-                        new RoundedBorder(6, BORDER_FOCUS),
-                        new EmptyBorder(6, 10, 6, 10)));
+                field.setBorder(AppTheme.focusInputBorder(BORDER_FOCUS));
             }
 
             public void focusLost(FocusEvent e) {
-                field.setBorder(BorderFactory.createCompoundBorder(
-                        new RoundedBorder(6, BORDER_SUBTLE),
-                        new EmptyBorder(6, 10, 6, 10)));
+                field.setBorder(AppTheme.inputBorderRegular());
             }
         });
     }
@@ -287,7 +281,7 @@ public class SearchModule extends JPanel {
         JScrollPane scroll = new JScrollPane(table);
         scroll.setBorder(BorderFactory.createEmptyBorder());
         scroll.getViewport().setBackground(BG_CARD);
-        scroll.setBorder(new RoundedBorder(12, BORDER_SUBTLE));
+        scroll.setBorder(AppTheme.inputBorderRegular());
 
         JPanel card = new JPanel(new BorderLayout());
         card.setOpaque(false);
@@ -566,9 +560,7 @@ public class SearchModule extends JPanel {
             setForeground(TEXT_PRIMARY);
             setBackground(BG_INPUT);
             setPreferredSize(new Dimension(130, 34));
-            setBorder(BorderFactory.createCompoundBorder(
-                    new RoundedBorder(6, BORDER_SUBTLE),
-                    new EmptyBorder(4, 8, 4, 8)));
+            setBorder(AppTheme.inputBorderPill());
             setFocusable(false);
         }
     }

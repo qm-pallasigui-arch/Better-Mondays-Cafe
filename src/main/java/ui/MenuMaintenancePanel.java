@@ -48,15 +48,13 @@ public class MenuMaintenancePanel extends JPanel {
         table.setPreferredScrollableViewportSize(new Dimension(700, 300));
         table.setFillsViewportHeight(true);
         table.setRowHeight(26);
-        table.setAutoCreateRowSorter(true);
+        AppTheme.applyTableDefaults(table);
 
-        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
+        FilterRow filterPanel = new FilterRow();
         categoryFilter = new JComboBox<>(new String[]{"All", "Coffee", "Non-Coffee", "Fruit Tea", "Herbal Tea", "Food"});
         searchField = new JTextField(24);
-        filterPanel.add(new JLabel("Category"));
-        filterPanel.add(categoryFilter);
-        filterPanel.add(new JLabel("Search"));
-        filterPanel.add(searchField);
+        filterPanel.addLabeled("Category", categoryFilter);
+        filterPanel.addLabeled("Search", searchField);
 
         JPanel buttons = new JPanel();
         JButton add = new JButton("Add");

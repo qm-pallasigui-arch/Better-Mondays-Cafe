@@ -7,6 +7,13 @@ import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import util.StringUtil;
 
 /**
  * Central database entry point for the local SQLite store.
@@ -42,11 +49,107 @@ public final class AppDatabase {
 
         try (Connection connection = openRawConnection()) {
             SchemaInitializer.initialize(connection);
+            consolidateInventoryItemNames(connection);
         }
         initialized = true;
     }
 
     private static Connection openRawConnection() throws SQLException {
         return DriverManager.getConnection(JDBC_PREFIX + DATABASE_PATH.toAbsolutePath());
+    }
+
+    private static void consolidateInventoryItemNames(Connection connection) throws SQLException {
+        class InventoryRow {
+            final long id;
+            String name;
+            double quantity;
+            String unit;
+            double alertLevel;
+            String storageLocation;
+            String lastUpdated;
+
+            InventoryRow(long id, String name, double quantity, String unit, double alertLevel, String storageLocation, String lastUpdated) {
+                this.id = id;
+                this.name = name;
+                this.quantity = quantity;
+                this.unit = unit;
+                this.alertLevel = alertLevel;
+                this.storageLocation = storageLocation;
+                this.lastUpdated = lastUpdated;
+            }
+        }
+
+        Map<String, List<InventoryRow>> groups = new LinkedHashMap<>();
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT id, name, quantity, unit, alert_level, storage_location, last_updated FROM inventory_items ORDER BY id");
+             ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                InventoryRow row = new InventoryRow(
+                        resultSet.getLong("id"),
+                        resultSet.getString("name"),
+                        resultSet.getDouble("quantity"),
+                        resultSet.getString("unit"),
+                        resultSet.getDouble("alert_level"),
+                        resultSet.getString("storage_location"),
+                        resultSet.getString("last_updated"));
+                String key = StringUtil.normalizeName(row.name);
+                groups.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
+            }
+        }
+
+        for (Map.Entry<String, List<InventoryRow>> entry : groups.entrySet()) {
+            String normalizedName = entry.getKey();
+            List<InventoryRow> rows = entry.getValue();
+            if (rows.isEmpty()) {
+                continue;
+            }
+
+            InventoryRow canonical = rows.get(0);
+            double totalQuantity = 0.0;
+            String unit = canonical.unit == null ? "" : canonical.unit;
+            double alertLevel = canonical.alertLevel;
+            String storageLocation = canonical.storageLocation == null ? "" : canonical.storageLocation;
+            String lastUpdated = canonical.lastUpdated == null ? "" : canonical.lastUpdated;
+
+            for (InventoryRow row : rows) {
+                totalQuantity += row.quantity;
+                if ((unit == null || unit.isBlank()) && row.unit != null && !row.unit.isBlank()) {
+                    unit = row.unit;
+                }
+                if ((storageLocation == null || storageLocation.isBlank()) && row.storageLocation != null && !row.storageLocation.isBlank()) {
+                    storageLocation = row.storageLocation;
+                }
+                if ((lastUpdated == null || lastUpdated.isBlank()) && row.lastUpdated != null && !row.lastUpdated.isBlank()) {
+                    lastUpdated = row.lastUpdated;
+                }
+            }
+
+            for (int i = 1; i < rows.size(); i++) {
+                InventoryRow duplicate = rows.get(i);
+                try (PreparedStatement moveBatches = connection.prepareStatement(
+                        "UPDATE inventory_batches SET inventory_item_id = ? WHERE inventory_item_id = ?")) {
+                    moveBatches.setLong(1, canonical.id);
+                    moveBatches.setLong(2, duplicate.id);
+                    moveBatches.executeUpdate();
+                }
+                try (PreparedStatement deleteDuplicate = connection.prepareStatement(
+                        "DELETE FROM inventory_items WHERE id = ?")) {
+                    deleteDuplicate.setLong(1, duplicate.id);
+                    deleteDuplicate.executeUpdate();
+                }
+            }
+
+            try (PreparedStatement updateCanonical = connection.prepareStatement(
+                    "UPDATE inventory_items SET name = ?, quantity = ?, unit = ?, alert_level = ?, storage_location = ?, last_updated = ? WHERE id = ?")) {
+                updateCanonical.setString(1, normalizedName);
+                updateCanonical.setDouble(2, totalQuantity);
+                updateCanonical.setString(3, unit == null ? "" : unit);
+                updateCanonical.setDouble(4, alertLevel);
+                updateCanonical.setString(5, storageLocation == null ? "" : storageLocation);
+                updateCanonical.setString(6, lastUpdated == null ? "" : lastUpdated);
+                updateCanonical.setLong(7, canonical.id);
+                updateCanonical.executeUpdate();
+            }
+        }
     }
 }

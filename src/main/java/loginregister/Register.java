@@ -2,6 +2,8 @@
 package loginregister;
 
 import ui.AppTheme;
+import util.FieldAssist;
+import java.util.stream.Collectors;
 
 /**
  *
@@ -16,6 +18,9 @@ public class Register extends javax.swing.JFrame {
         initComponents();
         setMinimumSize(new java.awt.Dimension(700, 520));
         setResizable(true);
+        FieldAssist.installAutocomplete(jTextField1, () -> UserDataManager.listUsers().stream()
+            .map(UserAccount::getUsername)
+            .collect(Collectors.toList()));
         AppTheme.applyToFrame(this);
         javax.swing.JOptionPane.showMessageDialog(this,
                 "User self-registration is disabled. Please contact an admin.",

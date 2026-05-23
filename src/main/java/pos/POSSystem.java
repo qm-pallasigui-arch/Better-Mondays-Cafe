@@ -610,7 +610,7 @@ public class POSSystem extends javax.swing.JFrame {
             MenuItem menuItem = menu.getMenuItem(entry.name);
             if (menuItem != null) {
                 for (Map.Entry<String, Double> e : menuItem.getIngredients().entrySet()) {
-                    inv.deductIngredient(e.getKey(), e.getValue());
+                    inv.deductIngredient(e.getKey(), e.getValue() * entry.quantity);
                 }
             }
         }
@@ -1114,7 +1114,14 @@ public class POSSystem extends javax.swing.JFrame {
             contentPanel.add(new MenuMaintenancePanel(), "Menu Maintenance");
         } catch (Exception e) { System.err.println("MenuMaintenancePanel init failed: " + e.getMessage()); }
         try {
-            contentPanel.add(new InventoryRegistrationPanel(new SQLiteInventoryRepository()), "Register Product");
+                contentPanel.add(new InventoryRegistrationPanel(
+                    new SQLiteInventoryRepository(),
+                    this::loadInventoryTable,
+                    () -> {
+                        if (monitoring != null) {
+                            monitoring.loadLowStockIngredients();
+                        }
+                    }), "Register Product");
         } catch (Exception e) { System.err.println("InventoryRegistrationPanel init failed: " + e.getMessage()); }
         try {
             contentPanel.add(new StaffPanel(new SQLiteStaffShiftRepository(), new SQLiteUserRepository(), currentUsername, currentUserRole), "Staff");

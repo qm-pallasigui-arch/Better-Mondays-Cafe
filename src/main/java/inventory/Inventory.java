@@ -2,14 +2,18 @@ package inventory;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.swing.JOptionPane;
 import persistence.sqlite.SQLiteInventoryRepository;
+import util.StringUtil;
 
 public class Inventory {
 
     private static Inventory instance;
     private final SQLiteInventoryRepository repository;
     private final Map<String, InventoryItem> inventoryItems;
+    private static final Logger LOGGER = Logger.getLogger(Inventory.class.getName());
 
     private Inventory() {
         repository = new SQLiteInventoryRepository();
@@ -27,7 +31,7 @@ public class Inventory {
     private void loadFromRepositoryOrInitializeDefaults() {
         try {
             for (InventoryItem item : repository.findAll()) {
-                inventoryItems.put(item.getName(), item);
+                inventoryItems.put(StringUtil.normalizeName(item.getName()), item);
             }
         } catch (Exception e) {
             JOptionPane.showMessageDialog(null,
@@ -140,7 +144,7 @@ public class Inventory {
     }
 
     private void addDefaultItem(String name, InventoryItem item) {
-        inventoryItems.putIfAbsent(name, item);
+        inventoryItems.putIfAbsent(StringUtil.normalizeName(name), item);
     }
 
     private void persistAll() {
@@ -160,11 +164,12 @@ public class Inventory {
             JOptionPane.showMessageDialog(null, "Cannot add item: Name is empty or invalid.");
             return;
         }
-        String name = item.getName().trim();
+        String name = StringUtil.normalizeName(item.getName());
         if (inventoryItems.containsKey(name)) {
             JOptionPane.showMessageDialog(null, "Item '" + name + "' already exists in inventory.");
             return;
         }
+        item.setName(name);
         inventoryItems.put(name, item);
         try {
             repository.save(item);
@@ -180,10 +185,13 @@ public class Inventory {
             return;
         }
 
-        inventoryItems.remove(originalName.trim());
-        inventoryItems.put(item.getName(), item);
+        String on = StringUtil.normalizeName(originalName);
+        String nn = StringUtil.normalizeName(item.getName());
+        inventoryItems.remove(on);
+        item.setName(nn);
+        inventoryItems.put(nn, item);
         try {
-            repository.delete(originalName.trim());
+            repository.delete(on);
             repository.save(item);
         } catch (Exception e) {
             JOptionPane.showMessageDialog(null,
@@ -193,9 +201,10 @@ public class Inventory {
     }
 
     public void removeItem(String name) {
-        inventoryItems.remove(name);
+        String n = StringUtil.normalizeName(name);
+        inventoryItems.remove(n);
         try {
-            repository.delete(name);
+            repository.delete(n);
         } catch (Exception e) {
             JOptionPane.showMessageDialog(null,
                     "Unable to remove inventory item from database: " + e.getMessage(),
@@ -204,16 +213,19 @@ public class Inventory {
     }
 
     public void deductIngredient(String name, double amount) {
-        InventoryItem item = inventoryItems.get(name);
+        String nn = StringUtil.normalizeName(name);
+        InventoryItem item = inventoryItems.get(nn);
         if (item != null) {
+            LOGGER.log(Level.INFO, "Deducting {0} from {1}", new Object[]{amount, nn});
             try {
                 // Prefer FEFO deduction when batches exist; falls back internally to aggregate-only flow.
-                repository.deductFEFO(name, amount);
-                repository.findByName(name).ifPresent(updated -> {
+                repository.deductFEFO(nn, amount);
+                repository.findByName(nn).ifPresent(updated -> {
                     item.setQuantity(updated.getQuantity());
                     item.setUnit(updated.getUnit());
                     item.setAlertLevel(updated.getAlertLevel());
                 });
+                LOGGER.log(Level.INFO, "After deduction {0} has quantity {1}", new Object[]{nn, item.getQuantity()});
             } catch (Exception e) {
                 item.deduct(amount);
                 try {
@@ -223,12 +235,28 @@ public class Inventory {
                 JOptionPane.showMessageDialog(null,
                         "Unable to persist inventory deduction: " + e.getMessage(),
                         "Database", JOptionPane.WARNING_MESSAGE);
+                LOGGER.log(Level.WARNING, "Deduction fallback for {0}: {1}", new Object[]{nn, e.getMessage()});
             }
+        } else {
+            LOGGER.log(Level.WARNING, "Attempted to deduct from unknown inventory item: {0}", name);
+        }
+    }
+
+    /** Refreshes a single inventory item from the repository (if present). */
+    public void refreshItem(String name) {
+        if (name == null || name.isBlank()) return;
+        String nn = StringUtil.normalizeName(name);
+        try {
+            repository.findByName(nn).ifPresent(found -> {
+                inventoryItems.put(nn, found);
+            });
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "refreshItem failed for {0}: {1}", new Object[]{nn, e.getMessage()});
         }
     }
 
     public InventoryItem getItem(String name) {
-        return inventoryItems.get(name);
+        return inventoryItems.get(StringUtil.normalizeName(name));
     }
 
     public Map<String, InventoryItem> getAllItems() {

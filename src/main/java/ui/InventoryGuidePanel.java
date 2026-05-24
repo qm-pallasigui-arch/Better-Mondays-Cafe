@@ -16,6 +16,11 @@ public class InventoryGuidePanel extends JPanel {
         guide.setText("""
 Inventory Status Guide
 
+Ingredient Tracking
+- Track each ingredient by the menu items that use it.
+- Show the ingredient's purpose and where it appears in the menu.
+- Keep quantities, expiry, and usage history visible for quick review.
+
 ABC Classification
 - A: High-priority inventory value items (top ~80% cumulative usage value)
 - B: Medium-priority items (next ~15%)

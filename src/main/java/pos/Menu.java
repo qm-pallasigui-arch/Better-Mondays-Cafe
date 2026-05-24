@@ -4,6 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.swing.JOptionPane;
 import persistence.sqlite.SQLiteMenuRepository;
+import ui.ImageRegistry;
 import util.StringUtil;
 
 public class Menu {
@@ -29,6 +30,7 @@ public class Menu {
     private void loadFromRepositoryOrInitializeDefaults() {
         try {
             for (MenuItem item : repository.findAll()) {
+                applyImagePath(item);
                 menuItems.put(StringUtil.normalizeName(item.getName()), item);
             }
             if (!menuItems.isEmpty()) {
@@ -46,46 +48,46 @@ public class Menu {
 
     private void initializeMenu() {
         // Espresso & Coffee
-        menuItems.put(StringUtil.normalizeName("Americano"), new CoffeeItem("Americano", 125, 140, 155));
-        menuItems.put(StringUtil.normalizeName("Latte"), new CoffeeItem("Latte", 145, 160, 175));
-        menuItems.put(StringUtil.normalizeName("Cappuccino"), new CoffeeItem("Cappuccino", 145, 160, 175));
-        menuItems.put(StringUtil.normalizeName("Salted Cream Latte"), new CoffeeItem("Salted Cream Latte", 160, 175, 190));
-        menuItems.put(StringUtil.normalizeName("Spanish Latte"), new CoffeeItem("Spanish Latte", 175, 190, 205));
-        menuItems.put(StringUtil.normalizeName("Dark Mocha"), new CoffeeItem("Dark Mocha", 175, 190, 205));
-        menuItems.put(StringUtil.normalizeName("White Mocha"), new CoffeeItem("White Mocha", 175, 190, 205));
-        menuItems.put(StringUtil.normalizeName("Caramel Macchiato"), new CoffeeItem("Caramel Macchiato", 175, 190, 205));
-        menuItems.put(StringUtil.normalizeName("Brewed Coffee"), new CoffeeItem("Brewed Coffee", 115, 0, 0));
+        addItem(new CoffeeItem("Americano", 125, 140, 155));
+        addItem(new CoffeeItem("Latte", 145, 160, 175));
+        addItem(new CoffeeItem("Cappuccino", 145, 160, 175));
+        addItem(new CoffeeItem("Salted Cream Latte", 160, 175, 190));
+        addItem(new CoffeeItem("Spanish Latte", 175, 190, 205));
+        addItem(new CoffeeItem("Dark Mocha", 175, 190, 205));
+        addItem(new CoffeeItem("White Mocha", 175, 190, 205));
+        addItem(new CoffeeItem("Caramel Macchiato", 175, 190, 205));
+        addItem(new CoffeeItem("Brewed Coffee", 115, 0, 0));
 
         // Specialty Drinks (Iced Regular only)
-        menuItems.put(StringUtil.normalizeName("Vietnamese Coffee"), new CoffeeItem("Vietnamese Coffee", 0, 190, 0));
-        menuItems.put(StringUtil.normalizeName("Ube Espresso"), new CoffeeItem("Ube Espresso", 0, 210, 0));
-        menuItems.put(StringUtil.normalizeName("Pumpkin Spice Latte"), new CoffeeItem("Pumpkin Spice Latte", 0, 220, 0));
-        menuItems.put(StringUtil.normalizeName("Spiced Cookie Latte"), new CoffeeItem("Spiced Cookie Latte", 0, 225, 0));
+        addItem(new CoffeeItem("Vietnamese Coffee", 0, 190, 0));
+        addItem(new CoffeeItem("Ube Espresso", 0, 210, 0));
+        addItem(new CoffeeItem("Pumpkin Spice Latte", 0, 220, 0));
+        addItem(new CoffeeItem("Spiced Cookie Latte", 0, 225, 0));
 
         // Tea Latte (Hot + Iced Regular only)
-        menuItems.put(StringUtil.normalizeName("Matcha Latte"), new NonCoffeeItem("Matcha Latte", 205, 220, 0));
-        menuItems.put(StringUtil.normalizeName("Chocolate Matcha"), new NonCoffeeItem("Chocolate Matcha", 215, 230, 0));
-        menuItems.put(StringUtil.normalizeName("Matcha Espresso"), new CoffeeItem("Matcha Espresso", 230, 245, 0));
-        menuItems.put(StringUtil.normalizeName("Hojicha Latte"), new NonCoffeeItem("Hojicha Latte", 200, 215, 0));
-        menuItems.put(StringUtil.normalizeName("Chai Latte"), new NonCoffeeItem("Chai Latte", 190, 205, 0));
+        addItem(new NonCoffeeItem("Matcha Latte", 205, 220, 0));
+        addItem(new NonCoffeeItem("Chocolate Matcha", 215, 230, 0));
+        addItem(new CoffeeItem("Matcha Espresso", 230, 245, 0));
+        addItem(new NonCoffeeItem("Hojicha Latte", 200, 215, 0));
+        addItem(new NonCoffeeItem("Chai Latte", 190, 205, 0));
 
         // Non-Coffee
-        menuItems.put(StringUtil.normalizeName("Chocolate Latte"), new NonCoffeeItem("Chocolate Latte", 165, 180, 195));
-        menuItems.put(StringUtil.normalizeName("Strawberry Latte"), new NonCoffeeItem("Strawberry Latte", 0, 190, 205));
-        menuItems.put(StringUtil.normalizeName("Mango Latte"), new NonCoffeeItem("Mango Latte", 0, 190, 205));
-        menuItems.put(StringUtil.normalizeName("Ube Latte"), new NonCoffeeItem("Ube Latte", 0, 200, 215));
+        addItem(new NonCoffeeItem("Chocolate Latte", 165, 180, 195));
+        addItem(new NonCoffeeItem("Strawberry Latte", 0, 190, 205));
+        addItem(new NonCoffeeItem("Mango Latte", 0, 190, 205));
+        addItem(new NonCoffeeItem("Ube Latte", 0, 200, 215));
 
         // Fruit Tea (Iced Regular + Iced Large)
-        menuItems.put(StringUtil.normalizeName("Strawberry Green Tea"), new FruitTeaItem("Strawberry Green Tea", 0, 180, 195));
-        menuItems.put(StringUtil.normalizeName("Mango Green Tea"), new FruitTeaItem("Mango Green Tea", 0, 180, 195));
-        menuItems.put(StringUtil.normalizeName("Peach Green Tea"), new FruitTeaItem("Peach Green Tea", 0, 180, 195));
-        menuItems.put(StringUtil.normalizeName("Passion Fruit Green Tea"), new FruitTeaItem("Passion Fruit Green Tea", 0, 180, 195));
+        addItem(new FruitTeaItem("Strawberry Green Tea", 0, 180, 195));
+        addItem(new FruitTeaItem("Mango Green Tea", 0, 180, 195));
+        addItem(new FruitTeaItem("Peach Green Tea", 0, 180, 195));
+        addItem(new FruitTeaItem("Passion Fruit Green Tea", 0, 180, 195));
 
         // Herbal Tea (Hot only)
-        menuItems.put(StringUtil.normalizeName("Peppermint"), new HerbalTeaItem("Peppermint", 120, 0, 0));
-        menuItems.put(StringUtil.normalizeName("Chamomile"), new HerbalTeaItem("Chamomile", 120, 0, 0));
-        menuItems.put(StringUtil.normalizeName("Earl Grey"), new HerbalTeaItem("Earl Grey", 135, 0, 0));
-        menuItems.put(StringUtil.normalizeName("Cinnamon"), new HerbalTeaItem("Cinnamon", 135, 0, 0));
+        addItem(new HerbalTeaItem("Peppermint", 120, 0, 0));
+        addItem(new HerbalTeaItem("Chamomile", 120, 0, 0));
+        addItem(new HerbalTeaItem("Earl Grey", 135, 0, 0));
+        addItem(new HerbalTeaItem("Cinnamon", 135, 0, 0));
     }
 
     private void ensureExtraItems() {
@@ -162,6 +164,7 @@ public class Menu {
 
         if (!extra.isEmpty()) {
             for (MenuItem item : extra.values()) {
+                applyImagePath(item);
                 menuItems.put(StringUtil.normalizeName(item.getName()), item);
                 try {
                     repository.save(item);
@@ -177,6 +180,7 @@ public class Menu {
             try {
                 MenuItem earlGrey = menuItems.get("Earl Grey");
                 if (earlGrey != null) {
+                    applyImagePath(earlGrey);
                     repository.save(earlGrey);
                 }
             } catch (Exception e) {
@@ -210,6 +214,7 @@ public class Menu {
     public void saveItem(MenuItem item) {
         String name = StringUtil.normalizeName(item.getName());
         item.name = name;
+        applyImagePath(item);
         menuItems.put(name, item);
         try {
             repository.save(item);
@@ -258,5 +263,16 @@ public class Menu {
         }
 
         return price;
+    }
+
+    private void addItem(MenuItem item) {
+        applyImagePath(item);
+        menuItems.put(StringUtil.normalizeName(item.getName()), item);
+    }
+
+    private void applyImagePath(MenuItem item) {
+        if (item != null) {
+            item.setImagePath(ImageRegistry.getPath(item.getName()));
+        }
     }
 }

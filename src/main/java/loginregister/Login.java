@@ -23,6 +23,11 @@ public class Login extends javax.swing.JFrame {
         AppTheme.applyToFrame(this);
     }
 
+    private javax.swing.ImageIcon loadLogoIcon() {
+        java.net.URL location = getClass().getResource("/images/logo.png");
+        return location != null ? new javax.swing.ImageIcon(location) : null;
+    }
+
     /**
      * This method is called from within the constructor to initialize the form.
      * WARNING: Do NOT modify this code. The content of this method is always
@@ -43,7 +48,10 @@ public class Login extends javax.swing.JFrame {
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setTitle("Better Mondays Coffeee Cafe Management System");
         setBackground(new java.awt.Color(204, 204, 204));
-        setIconImage(new javax.swing.ImageIcon(getClass().getResource("/images/logo.png")).getImage());
+        javax.swing.ImageIcon logoIcon = loadLogoIcon();
+        if (logoIcon != null) {
+            setIconImage(logoIcon.getImage());
+        }
         setResizable(true);
 
         jPanel2.setBackground(new java.awt.Color(29, 44, 63));
@@ -76,7 +84,9 @@ public class Login extends javax.swing.JFrame {
             }
         });
 
-        jLabel3.setIcon(new javax.swing.ImageIcon(getClass().getResource("/images/logo.png"))); // NOI18N
+        if (logoIcon != null) {
+            jLabel3.setIcon(logoIcon); // NOI18N
+        }
 
         javax.swing.GroupLayout jPanel2Layout = new javax.swing.GroupLayout(jPanel2);
         jPanel2.setLayout(jPanel2Layout);

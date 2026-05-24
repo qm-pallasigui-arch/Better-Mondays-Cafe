@@ -63,30 +63,30 @@ public class InventoryRegistrationPanel extends JPanel {
             ".inventory_deleted_ids.txt");
 
     // ── Colors (= SearchModule palette) ──────────────────────────────────────
-    private static final Color BG_PAGE = new Color(0x1C2A3A);
-    private static final Color BG_CARD = new Color(0x243447);
-    private static final Color BG_INPUT = new Color(0x1C2A3A);
-    private static final Color BORDER_SUBTLE = new Color(0x2E4060);
-    private static final Color BORDER_FOCUS = new Color(0x2E86DE);
-    private static final Color TEXT_PRIMARY = new Color(0xEAEEF2);
-    private static final Color TEXT_SECONDARY = new Color(0x8FA3B8);
-    private static final Color TEXT_HINT = new Color(0x566A7F);
-    private static final Color ACCENT = new Color(0x2E86DE);
-    private static final Color ACCENT_HOVER = new Color(0x1A6BBF);
-    private static final Color ROW_ALT = new Color(0x1F3145);
-    private static final Color HEADER_BG = new Color(0x1A2B3C);
-    private static final Color BTN_SEC_HOV = new Color(0x2D4058);
+    private static final Color BG_PAGE = AppTheme.BG_PRIMARY;
+    private static final Color BG_CARD = AppTheme.BG_SURFACE;
+    private static final Color BG_INPUT = AppTheme.BG_SURFACE;
+    private static final Color BORDER_SUBTLE = AppTheme.BORDER;
+    private static final Color BORDER_FOCUS = AppTheme.ACCENT;
+    private static final Color TEXT_PRIMARY = AppTheme.FG_PRIMARY;
+    private static final Color TEXT_SECONDARY = AppTheme.FG_MUTED;
+    private static final Color TEXT_HINT = AppTheme.FG_SUBTLE;
+    private static final Color ACCENT = AppTheme.ACCENT;
+    private static final Color ACCENT_HOVER = AppTheme.ACCENT_DARK;
+    private static final Color ROW_ALT = new Color(0xF9FAFB);
+    private static final Color HEADER_BG = AppTheme.BG_PRIMARY;
+    private static final Color BTN_SEC_HOV = new Color(0xF3F4F6);
 
-    private static final Color BADGE_OK_BG = new Color(0x1A3A28);
-    private static final Color BADGE_OK_FG = new Color(0x6FCF97);
-    private static final Color BADGE_WARN_BG = new Color(0x3A2E14);
-    private static final Color BADGE_WARN_FG = new Color(0xF6C86B);
-    private static final Color BADGE_ERR_BG = new Color(0x3A1A1A);
-    private static final Color BADGE_ERR_FG = new Color(0xF28B82);
+    private static final Color BADGE_OK_BG = AppTheme.BG_BADGE_GREEN;
+    private static final Color BADGE_OK_FG = AppTheme.SUCCESS;
+    private static final Color BADGE_WARN_BG = AppTheme.BG_BADGE_YELLOW;
+    private static final Color BADGE_WARN_FG = AppTheme.WARNING;
+    private static final Color BADGE_ERR_BG = AppTheme.BG_BADGE_RED;
+    private static final Color BADGE_ERR_FG = AppTheme.DANGER;
 
-    private static final Color BTN_DEL_BG = new Color(0x3A1A1A);
-    private static final Color BTN_DEL_FG = new Color(0xF28B82);
-    private static final Color BTN_DEL_HOV_BG = new Color(0x5A2020);
+    private static final Color BTN_DEL_BG = AppTheme.BG_BADGE_RED;
+    private static final Color BTN_DEL_FG = AppTheme.DANGER;
+    private static final Color BTN_DEL_HOV_BG = new Color(0xFECACA);
 
     // ── Fonts (= SearchModule) ────────────────────────────────────────────────
     private static final Font FONT_TITLE = new Font("Segoe UI", Font.PLAIN, 17);
@@ -253,7 +253,7 @@ public class InventoryRegistrationPanel extends JPanel {
         table.setRowHeight(40);
         table.setShowGrid(false);
         table.setBackground(BG_CARD);
-        table.setSelectionBackground(new Color(0x1A3A5C));
+        table.setSelectionBackground(AppTheme.BG_BADGE_BLUE);
         table.setSelectionForeground(TEXT_PRIMARY);
         table.setFocusable(false);
         table.setIntercellSpacing(new Dimension(0, 0));

@@ -155,6 +155,7 @@ public class StaffPanel extends JPanel {
 
         // --- Toolbar ---
         FilterRow toolbar = new FilterRow();
+        AppTheme.styleSearchField(shiftSearchField);
         toolbar.addLabeled("Search username:", shiftSearchField);
         toolbar.addLabeled("Status:", shiftStatusFilter);
         toolbar.add(refreshAllShiftsBtn);
@@ -188,6 +189,7 @@ public class StaffPanel extends JPanel {
 
         // Search bar
         FilterRow searchPanel = new FilterRow();
+        AppTheme.styleSearchField(userSearchField);
         searchPanel.addLabeled("Search:", userSearchField);
 
         // Action buttons

@@ -1,8 +1,10 @@
 package ui;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.util.ArrayList;
 import java.util.Map;
@@ -15,9 +17,12 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 import javax.swing.table.DefaultTableModel;
 import persistence.MenuRepository;
 import persistence.sqlite.SQLiteMenuRepository;
@@ -32,6 +37,7 @@ public class MenuMaintenancePanel extends JPanel {
     private final JTable table;
     private final JComboBox<String> categoryFilter;
     private final JTextField searchField;
+    private final JTextArea ingredientDetailArea = new JTextArea();
     private java.util.List<MenuItem> cachedItems = new ArrayList<>();
 
     public MenuMaintenancePanel() throws Exception {
@@ -54,10 +60,11 @@ public class MenuMaintenancePanel extends JPanel {
         FilterRow filterPanel = new FilterRow();
         categoryFilter = new JComboBox<>(new String[]{"All", "Coffee", "Non-Coffee", "Fruit Tea", "Herbal Tea", "Food"});
         searchField = new JTextField(24);
+        AppTheme.styleSearchField(searchField);
         filterPanel.addLabeled("Category", categoryFilter);
         filterPanel.addLabeled("Search", searchField);
 
-        JPanel buttons = new JPanel();
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         JButton add = new JButton("Add");
         JButton edit = new JButton("Edit");
         JButton delete = new JButton("Delete");
@@ -79,10 +86,29 @@ public class MenuMaintenancePanel extends JPanel {
         buttons.add(edit);
         buttons.add(delete);
 
-        add(filterPanel, BorderLayout.NORTH);
-        add(new JScrollPane(table), BorderLayout.CENTER);
-        add(buttons, BorderLayout.SOUTH);
+        JPanel topBar = new JPanel(new BorderLayout(12, 0));
+        topBar.setOpaque(false);
+        topBar.add(filterPanel, BorderLayout.CENTER);
+        topBar.add(buttons, BorderLayout.EAST);
 
+        JPanel detailPanel = buildIngredientDetailPanel();
+
+        JPanel center = new JPanel(new BorderLayout(12, 0));
+        center.setOpaque(false);
+        center.add(new JScrollPane(table), BorderLayout.CENTER);
+        center.add(detailPanel, BorderLayout.EAST);
+
+        add(topBar, BorderLayout.NORTH);
+        add(center, BorderLayout.CENTER);
+
+        table.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
+            @Override
+            public void valueChanged(ListSelectionEvent e) {
+                if (!e.getValueIsAdjusting()) {
+                    updateIngredientDetail();
+                }
+            }
+        });
         reload();
         AppTheme.applyToComponent(this);
     }
@@ -91,6 +117,7 @@ public class MenuMaintenancePanel extends JPanel {
         try {
             cachedItems = repo.findAll();
             applyFilters();
+            updateIngredientDetail();
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Unable to load menu: " + e.getMessage());
         }
@@ -118,6 +145,8 @@ public class MenuMaintenancePanel extends JPanel {
                 });
             }
         }
+
+        updateIngredientDetail();
     }
 
     private void onAdd() {
@@ -262,5 +291,67 @@ public class MenuMaintenancePanel extends JPanel {
             sb.append(k).append(":").append(v);
         });
         return sb.toString();
+    }
+
+    private JPanel buildIngredientDetailPanel() {
+        JPanel panel = new JPanel(new BorderLayout(0, 10));
+        panel.setPreferredSize(new Dimension(260, 0));
+        panel.setOpaque(false);
+
+        JLabel title = new JLabel("Ingredients Used");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        title.setForeground(AppTheme.FG_PRIMARY);
+        panel.add(title, BorderLayout.NORTH);
+
+        ingredientDetailArea.setEditable(false);
+        ingredientDetailArea.setLineWrap(true);
+        ingredientDetailArea.setWrapStyleWord(true);
+        ingredientDetailArea.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        ingredientDetailArea.setForeground(AppTheme.FG_PRIMARY);
+        ingredientDetailArea.setBackground(AppTheme.BG_SURFACE);
+        ingredientDetailArea.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        ingredientDetailArea.setText("Click an item to see the ingredients it uses.");
+
+        JScrollPane scrollPane = new JScrollPane(ingredientDetailArea);
+        scrollPane.setBorder(javax.swing.BorderFactory.createLineBorder(AppTheme.BORDER, 1));
+        scrollPane.setPreferredSize(new Dimension(260, 220));
+        panel.add(scrollPane, BorderLayout.CENTER);
+        return panel;
+    }
+
+    private void updateIngredientDetail() {
+        int selectedRow = table.getSelectedRow();
+        if (selectedRow < 0 || selectedRow >= model.getRowCount()) {
+            ingredientDetailArea.setText("Click an item to see the ingredients it uses.");
+            return;
+        }
+
+        String itemName = String.valueOf(model.getValueAt(selectedRow, 0));
+        MenuItem item = cachedItems.stream()
+                .filter(menuItem -> itemName.equals(menuItem.getName()))
+                .findFirst()
+                .orElse(null);
+
+        if (item == null) {
+            ingredientDetailArea.setText("No ingredient data available for this item.");
+            return;
+        }
+
+        Map<String, Double> ingredients = item.getIngredients();
+        if (ingredients.isEmpty()) {
+            ingredientDetailArea.setText(item.getName() + "\n\nNo ingredient data recorded yet.");
+            return;
+        }
+
+        StringBuilder text = new StringBuilder();
+        text.append(item.getName()).append("\n\n");
+        text.append("Used ingredients:\n");
+        ingredients.forEach((ingredient, qty) -> text.append("• ")
+                .append(ingredient)
+                .append(" - ")
+                .append(qty)
+                .append("\n"));
+        ingredientDetailArea.setText(text.toString());
+        ingredientDetailArea.setCaretPosition(0);
     }
 }

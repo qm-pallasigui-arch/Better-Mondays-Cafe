@@ -21,34 +21,34 @@ import java.time.format.DateTimeFormatter;
 public class SearchModule extends JPanel {
 
     // ── Colors ────────────────────────────────────────────────────────────────
-    private static final Color BG_PAGE = new Color(0x1C2A3A);
-    private static final Color BG_CARD = new Color(0x243447);
-    private static final Color BG_INPUT = new Color(0x1C2A3A);
-    private static final Color BG_HOVER = new Color(0x2D4058);
-    private static final Color BORDER_SUBTLE = new Color(0x2E4060);
-    private static final Color BORDER_FOCUS = new Color(0x2E86DE);
-    private static final Color TEXT_PRIMARY = new Color(0xEAEEF2);
-    private static final Color TEXT_SECONDARY = new Color(0x8FA3B8);
-    private static final Color TEXT_HINT = new Color(0x566A7F);
-    private static final Color ACCENT = new Color(0x2E86DE);
-    private static final Color ACCENT_HOVER = new Color(0x1A6BBF);
-    private static final Color ROW_ALT = new Color(0x1F3145);
-    private static final Color ROW_HOVER_CLR = new Color(0x2D4058);
-    private static final Color HEADER_BG = new Color(0x1A2B3C);
+    private static final Color BG_PAGE = AppTheme.BG_PRIMARY;
+    private static final Color BG_CARD = AppTheme.BG_SURFACE;
+    private static final Color BG_INPUT = AppTheme.BG_SURFACE;
+    private static final Color BG_HOVER = new Color(0xF3F4F6);
+    private static final Color BORDER_SUBTLE = AppTheme.BORDER;
+    private static final Color BORDER_FOCUS = AppTheme.ACCENT;
+    private static final Color TEXT_PRIMARY = AppTheme.FG_PRIMARY;
+    private static final Color TEXT_SECONDARY = AppTheme.FG_MUTED;
+    private static final Color TEXT_HINT = AppTheme.FG_SUBTLE;
+    private static final Color ACCENT = AppTheme.ACCENT;
+    private static final Color ACCENT_HOVER = AppTheme.ACCENT_DARK;
+    private static final Color ROW_ALT = new Color(0xF9FAFB);
+    private static final Color ROW_HOVER_CLR = AppTheme.BG_BADGE_BLUE;
+    private static final Color HEADER_BG = AppTheme.BG_PRIMARY;
 
     // Status badge colors
-    private static final Color MENU_BG = new Color(0x1A3A5C);
-    private static final Color MENU_FG = new Color(0x7AB8F5);
-    private static final Color INV_BG = new Color(0x1A3A28);
-    private static final Color INV_FG = new Color(0x6FCF97);
-    private static final Color SALE_BG = new Color(0x3A2E14);
-    private static final Color SALE_FG = new Color(0xF6C86B);
+    private static final Color MENU_BG = AppTheme.BG_BADGE_BLUE;
+    private static final Color MENU_FG = AppTheme.ACCENT_DARK;
+    private static final Color INV_BG = AppTheme.BG_BADGE_GREEN;
+    private static final Color INV_FG = AppTheme.SUCCESS;
+    private static final Color SALE_BG = AppTheme.BG_BADGE_YELLOW;
+    private static final Color SALE_FG = AppTheme.WARNING;
 
     // Availability badge colors
-    private static final Color AVAIL_BG = new Color(0x1A3A28);
-    private static final Color AVAIL_FG = new Color(0x6FCF97);
-    private static final Color UNAVAIL_BG = new Color(0x3A1A1A);
-    private static final Color UNAVAIL_FG = new Color(0xF28B82);
+    private static final Color AVAIL_BG = AppTheme.BG_BADGE_GREEN;
+    private static final Color AVAIL_FG = AppTheme.SUCCESS;
+    private static final Color UNAVAIL_BG = AppTheme.BG_BADGE_RED;
+    private static final Color UNAVAIL_FG = AppTheme.DANGER;
 
     // ── Fonts ─────────────────────────────────────────────────────────────────
     private static final Font FONT_TITLE = new Font("Segoe UI", Font.PLAIN, 17);
@@ -232,8 +232,8 @@ public class SearchModule extends JPanel {
         table.setRowHeight(38);
         table.setShowVerticalLines(false);
         table.setShowHorizontalLines(true);
-        table.setGridColor(new Color(0xEEEDE8));
-        table.setSelectionBackground(new Color(0x1A3A5C));
+        table.setGridColor(BORDER_SUBTLE);
+        table.setSelectionBackground(ROW_HOVER_CLR);
         table.setSelectionForeground(TEXT_PRIMARY);
         table.setFocusable(false);
         table.setBackground(BG_CARD);
@@ -470,7 +470,7 @@ public class SearchModule extends JPanel {
             }
 
             JPanel cell = new JPanel(new GridBagLayout());
-            cell.setBackground(sel ? new Color(0x1A3A5C) : (row % 2 == 0 ? BG_CARD : ROW_ALT));
+            cell.setBackground(sel ? ROW_HOVER_CLR : (row % 2 == 0 ? BG_CARD : ROW_ALT));
 
             JLabel badge = new JLabel(label) {
                 @Override
@@ -503,7 +503,7 @@ public class SearchModule extends JPanel {
             JPanel cell = new JPanel(new GridBagLayout());
             cell.setBackground(row % 2 == 0 ? BG_CARD : ROW_ALT);
             if (sel)
-                cell.setBackground(new Color(0x1A3A5C));
+                cell.setBackground(ROW_HOVER_CLR);
 
             String text = value == null ? "" : value.toString();
             Color[] colors = switch (text) {
@@ -578,7 +578,7 @@ public class SearchModule extends JPanel {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setColor(bg);
             g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), radius, radius));
-            g2.setColor(new Color(0x2E4060));
+            g2.setColor(BORDER_SUBTLE);
             g2.setStroke(new BasicStroke(0.8f));
             g2.draw(new RoundRectangle2D.Float(0.4f, 0.4f, getWidth() - 0.8f, getHeight() - 0.8f, radius, radius));
             g2.dispose();

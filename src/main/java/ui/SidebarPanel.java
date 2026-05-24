@@ -218,7 +218,7 @@ public class SidebarPanel extends JPanel {
 
     private JPanel createUserProfile() {
         JPanel p = new JPanel(new BorderLayout(6, 0));
-        p.setBackground(new Color(28, 43, 63));
+        p.setBackground(AppTheme.BG_PRIMARY);
         p.setBorder(new EmptyBorder(8, 10, 8, 8));
         p.setPreferredSize(new Dimension(EXPANDED_WIDTH, 50));
 

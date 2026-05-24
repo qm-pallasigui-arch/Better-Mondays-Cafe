@@ -22,11 +22,21 @@ import javax.swing.border.LineBorder;
 /** Shared palette and typography for visual consistency across screens. */
 public final class AppTheme {
 
-    public static final Color BG_PRIMARY = new Color(23, 36, 54);
-    public static final Color BG_SURFACE = new Color(36, 55, 83);
-    public static final Color FG_PRIMARY = new Color(245, 248, 252);
-    public static final Color FG_MUTED = new Color(197, 209, 224);
-    public static final Color ACCENT = new Color(50, 157, 111);
+    public static final Color BG_PRIMARY = new Color(0xF9FAFB);
+    public static final Color BG_SURFACE = new Color(0xFFFFFF);
+    public static final Color FG_PRIMARY = new Color(0x111827);
+    public static final Color FG_MUTED = new Color(0x6B7280);
+    public static final Color FG_SUBTLE = new Color(0x9CA3AF);
+    public static final Color ACCENT = new Color(0x3B82F6);
+    public static final Color ACCENT_DARK = new Color(0x2563EB);
+    public static final Color BORDER = new Color(0xE5E7EB);
+    public static final Color SUCCESS = new Color(0x10B981);
+    public static final Color WARNING = new Color(0xF59E0B);
+    public static final Color DANGER = new Color(0xEF4444);
+    public static final Color BG_BADGE_GREEN = new Color(0xD1FAE5);
+    public static final Color BG_BADGE_YELLOW = new Color(0xFEF3C7);
+    public static final Color BG_BADGE_RED = new Color(0xFEE2E2);
+    public static final Color BG_BADGE_BLUE = new Color(0xDBEAFE);
 
     private static final Font BODY = new Font("Segoe UI", Font.PLAIN, 13);
     private static final Font TITLE = new Font("Segoe UI", Font.BOLD, 14);
@@ -57,13 +67,13 @@ public final class AppTheme {
         if (tf == null) return;
         tf.setFont(BODY);
         tf.setForeground(FG_PRIMARY);
-        tf.setBackground(new Color(49, 73, 105));
+        tf.setBackground(BG_SURFACE);
         tf.setCaretColor(FG_PRIMARY);
         if (tf.getCaret() != null) {
             tf.getCaret().setBlinkRate(500);
         }
         tf.setBorder(BorderFactory.createCompoundBorder(
-                new RoundedLineBorder(new Color(60, 85, 120), BORDER_THICKNESS, BORDER_RADIUS),
+                new RoundedLineBorder(BORDER, BORDER_THICKNESS, BORDER_RADIUS),
                 BorderFactory.createEmptyBorder(8, 14, 8, 14)));
         tf.putClientProperty("JTextField.roundPlaceholder", true);
     }
@@ -94,11 +104,11 @@ public final class AppTheme {
         if (table == null) return;
         table.setBackground(BG_SURFACE);
         table.setForeground(FG_PRIMARY);
-        table.setSelectionBackground(new Color(63, 94, 138));
+        table.setSelectionBackground(BG_BADGE_BLUE);
         table.setSelectionForeground(FG_PRIMARY);
-        table.setGridColor(new Color(79, 102, 135));
+        table.setGridColor(BORDER);
         table.setFont(BODY);
-        table.getTableHeader().setBackground(new Color(49, 73, 105));
+        table.getTableHeader().setBackground(BG_PRIMARY);
         table.getTableHeader().setForeground(FG_MUTED);
         table.getTableHeader().setFont(TITLE);
         table.setRowHeight(Math.max(22, table.getRowHeight()));
@@ -157,23 +167,23 @@ public final class AppTheme {
         if (c instanceof JTable table) {
             table.setBackground(BG_SURFACE);
             table.setForeground(FG_PRIMARY);
-            table.setSelectionBackground(new Color(63, 94, 138));
+            table.setSelectionBackground(BG_BADGE_BLUE);
             table.setSelectionForeground(FG_PRIMARY);
-            table.setGridColor(new Color(79, 102, 135));
+            table.setGridColor(BORDER);
             table.setFont(BODY);
-            table.getTableHeader().setBackground(new Color(49, 73, 105));
-            table.getTableHeader().setForeground(FG_PRIMARY);
+            table.getTableHeader().setBackground(BG_PRIMARY);
+            table.getTableHeader().setForeground(FG_MUTED);
             table.getTableHeader().setFont(TITLE);
             table.setRowHeight(Math.max(22, table.getRowHeight()));
         }
         if (c instanceof JScrollPane sp) {
             sp.getViewport().setBackground(BG_SURFACE);
             sp.setBorder(BorderFactory.createCompoundBorder(
-                    new RoundedLineBorder(new Color(49, 73, 105), BORDER_THICKNESS, BORDER_RADIUS),
+                    new RoundedLineBorder(BORDER, BORDER_THICKNESS, BORDER_RADIUS),
                     BorderFactory.createEmptyBorder(2, 2, 2, 2)));
         }
         if (c instanceof JTable table) {
-            table.setBorder(new RoundedLineBorder(new Color(60, 85, 120), BORDER_THICKNESS, BORDER_RADIUS));
+            table.setBorder(new RoundedLineBorder(BORDER, BORDER_THICKNESS, BORDER_RADIUS));
         }
         if (c instanceof Container container) {
             for (Component child : container.getComponents()) {

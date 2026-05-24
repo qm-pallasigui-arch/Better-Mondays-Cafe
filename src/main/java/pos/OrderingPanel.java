@@ -1,0 +1,1331 @@
+package pos;
+
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.GridLayout;
+import java.awt.Insets;
+import java.awt.RenderingHints;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import javax.imageio.ImageIO;
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextField;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import inventory.Inventory;
+import monitoring.SalesRecord;
+
+public class OrderingPanel extends JPanel {
+
+    // ─── Dark Slate Cafe palette ───
+    private static final Color BG_PRIMARY       = new Color(15, 25, 35);
+    private static final Color BG_SURFACE       = new Color(26, 37, 53);
+    private static final Color BG_CARD          = new Color(26, 37, 53);
+    private static final Color BG_INPUT         = new Color(20, 30, 44);
+    private static final Color FG_PRIMARY       = new Color(232, 213, 176);
+    private static final Color FG_MUTED         = new Color(107, 127, 142);
+    private static final Color ACCENT           = new Color(200, 134, 10);
+    private static final Color ACCENT_HOVER     = new Color(220, 155, 30);
+    private static final Color SUCCESS          = new Color(59, 158, 95);
+    private static final Color SUCCESS_HOVER    = new Color(75, 180, 115);
+    private static final Color INFO             = new Color(58, 122, 191);
+    private static final Color DANGER           = new Color(184, 64, 64);
+    private static final Color BORDER           = new Color(30, 45, 61);
+    private static final Color TEXT_MUTED       = new Color(77, 96, 112);
+    private static final Color LOG_BG           = new Color(15, 25, 35);
+
+    // Status colors
+    private static final Color ST_WAITING_BG  = new Color(42, 31, 8);
+    private static final Color ST_WAITING_FG  = new Color(200, 134, 10);
+    private static final Color ST_READY_BG    = new Color(10, 32, 21);
+    private static final Color ST_READY_FG    = new Color(59, 158, 95);
+    private static final Color ST_DONE_BG     = new Color(10, 26, 46);
+    private static final Color ST_DONE_FG     = new Color(58, 122, 191);
+    private static final Color ST_CANCEL_BG   = new Color(42, 13, 13);
+    private static final Color ST_CANCEL_FG   = new Color(184, 64, 64);
+
+    private static final Font FONT_TITLE    = new Font("Segoe UI", Font.BOLD, 16);
+    private static final Font FONT_SUBTITLE = new Font("Segoe UI", Font.BOLD, 13);
+    private static final Font FONT_BODY     = new Font("Segoe UI", Font.PLAIN, 12);
+    private static final Font FONT_SMALL    = new Font("Segoe UI", Font.PLAIN, 11);
+    private static final Font FONT_BOLD_SM  = new Font("Segoe UI", Font.BOLD, 11);
+    private static final Font FONT_XSMALL   = new Font("Segoe UI", Font.PLAIN, 9);
+    private static final Font FONT_BADGE    = new Font("Segoe UI", Font.BOLD, 9);
+    private static final Font FONT_PRICE    = new Font("Segoe UI", Font.BOLD, 14);
+
+    // ─── Menu Data ───
+    private static final Map<String, List<String>> CATEGORY_ITEMS = new LinkedHashMap<>();
+    private static final Map<String, String> NAME_MAP = new HashMap<>();
+    private static final Map<String, String> IMAGE_MAP = new HashMap<>();
+    private static final Map<String, ImageIcon> imageCache = new HashMap<>();
+
+    static {
+        CATEGORY_ITEMS.put("Espresso & Coffee", Arrays.asList(
+            "Hot Brewed Coffee",
+            "Hot Americano", "Iced Americano",
+            "Hot Latte", "Iced Latte",
+            "Hot Cappuccino", "Iced Cappuccino",
+            "Hot Salted Cream Latte", "Iced Salted Cream Latte",
+            "Hot Spanish Latte", "Iced Spanish Latte",
+            "Hot Dark Mocha", "Iced Dark Mocha",
+            "Hot White Mocha", "Iced White Mocha",
+            "Hot Caramel Macchiato", "Iced Caramel Macchiato"));
+        CATEGORY_ITEMS.put("Specialty Drinks", Arrays.asList(
+            "Vietnamese Coffee", "Ube Espresso", "Manila Latte",
+            "Iced Pumpkin Spiced Latte", "Iced Spiced Cookie Latte"));
+        CATEGORY_ITEMS.put("Tea Latte", Arrays.asList(
+            "Hot Matcha Latte", "Iced Matcha Latte",
+            "Hot Chocolate Matcha", "Iced Chocolate Matcha",
+            "Hot Matcha Espresso", "Iced Matcha Espresso",
+            "Hot Hojicha Latte", "Iced Hojicha Latte",
+            "Hot Chai Latte", "Iced Chai Latte"));
+        CATEGORY_ITEMS.put("Non-Coffee", Arrays.asList(
+            "Hot Chocolate Latte", "Iced Chocolate Latte",
+            "Strawberry Latte", "Iced Mango Latte",
+            "Iced Dragon Fruit Coconut Latte", "Ube Latte"));
+        CATEGORY_ITEMS.put("Fruit Tea", Arrays.asList(
+            "Strawberry Green Tea", "Mango Green Tea",
+            "Peach Green Tea", "Passion Fruit Green Tea"));
+        CATEGORY_ITEMS.put("Herbal Tea", Arrays.asList(
+            "Peppermint", "Chamomile", "Earl Grey", "Cinnamon"));
+        CATEGORY_ITEMS.put("Sandwiches", Arrays.asList(
+            "Signature Ham & Cheese", "Classic Grilled Cheese", "Homestyle Pesto & Cheese"));
+        CATEGORY_ITEMS.put("Pandesal Pairs", Arrays.asList(
+            "Ham & Cheese", "Cheesy Pesto", "Spam & Cheese"));
+        CATEGORY_ITEMS.put("Pastries", Arrays.asList(
+            "Chocolate Crinkles", "Signature Chocolate Cookies", "S'mores Cookie",
+            "Red Velvet Cream Cheese Cookie", "Brownies", "Banana Loaf Slice",
+            "Chocolate Tiramisu", "Matcha Tiramisu", "Creamy Spinach", "Blueberry Cheesecake"));
+
+        NAME_MAP.put("Pumpkin Spiced Latte", "Pumpkin Spice Latte");
+        NAME_MAP.put("Signature Chocolate Cookies", "Chocolate Cookies");
+        NAME_MAP.put("Banana Loaf Slice", "Banana Bread");
+
+        IMAGE_MAP.put("Pumpkin Spiced Latte", "Iced Pumpkin Spiced Latte");
+        IMAGE_MAP.put("Spiced Cookie Latte", "Iced Spiced Cookie Latte");
+        IMAGE_MAP.put("Signature Chocolate Cookies", "Signature Cookie");
+        IMAGE_MAP.put("S'mores Cookie", "S_mores Cookie");
+        IMAGE_MAP.put("Red Velvet Cream Cheese Cookie", "Red Velvet Cream Cheese Cookie");
+        IMAGE_MAP.put("Banana Loaf Slice", "banana bread");
+        IMAGE_MAP.put("Creamy Spinach", "creamy spinach bread");
+        IMAGE_MAP.put("Chocolate Cookies", "chocolate cookies");
+        IMAGE_MAP.put("Banana Bread", "banana bread");
+    }
+
+    // ─── Item variant helper ───
+    private static class ItemSpec {
+        String displayName;
+        String baseName;
+        String variant;
+        double price;
+        ItemSpec(String displayName, String baseName, String variant, double price) {
+            this.displayName = displayName;
+            this.baseName = baseName;
+            this.variant = variant;
+            this.price = price;
+        }
+    }
+
+    private ItemSpec resolveItem(String name) {
+        String lower = name.toLowerCase();
+        String baseName, variant;
+        if (lower.startsWith("hot ")) {
+            baseName = name.substring(4);
+            variant = "Hot";
+        } else if (lower.startsWith("iced ")) {
+            baseName = name.substring(5);
+            variant = "Regular Iced";
+        } else {
+            baseName = name;
+            variant = "";
+        }
+        String backendName = NAME_MAP.getOrDefault(baseName, baseName);
+        MenuItem item = Menu.getInstance().getMenuItem(backendName);
+        if (item == null) return new ItemSpec(name, "", variant, 0);
+
+        double price;
+        switch (variant) {
+            case "Hot" -> price = item.getHotPrice();
+            case "Regular Iced" -> price = item.getIcedRegularPrice();
+            default -> {
+                price = item.getIcedRegularPrice();
+                if (price <= 0) price = item.getHotPrice();
+                if (price <= 0) price = item.getIcedLargePrice();
+                if (price <= 0) { baseName = ""; }
+            }
+        }
+        if (price <= 0) {
+            price = item.getIcedRegularPrice();
+            if (price <= 0) price = item.getHotPrice();
+            if (price <= 0) price = item.getIcedLargePrice();
+        }
+        return new ItemSpec(name, backendName, variant, price);
+    }
+
+    // ─── Order Entry ───
+    private static class OrderEntry {
+        String displayName;
+        String baseName;
+        String variant;
+        int quantity;
+        double unitPrice;
+        OrderEntry(String displayName, String baseName, String variant, int quantity, double unitPrice) {
+            this.displayName = displayName;
+            this.baseName = baseName;
+            this.variant = variant;
+            this.quantity = quantity;
+            this.unitPrice = unitPrice;
+        }
+        String orderLabel() {
+            return variant.isEmpty() ? displayName : displayName + " (" + variant + ")";
+        }
+        double lineTotal() { return quantity * unitPrice; }
+    }
+
+    // ─── Completed Order Record ───
+    private static class CompletedOrder {
+        int orderId;
+        String customerName;
+        String timestamp;
+        String status;
+        List<OrderEntry> items;
+        CompletedOrder(int orderId, String customerName, String timestamp, String status, List<OrderEntry> items) {
+            this.orderId = orderId;
+            this.customerName = customerName;
+            this.timestamp = timestamp;
+            this.status = status;
+            this.items = items;
+        }
+    }
+
+    // ─── State ───
+    private final List<OrderEntry> orderEntries = new ArrayList<>();
+    private final List<CompletedOrder> completedOrders = new ArrayList<>();
+    private int orderCount = 0;
+    private int transactionCounter = 1000;
+    private String activeCategory = "Espresso & Coffee";
+    private final List<JButton> pillButtons = new ArrayList<>();
+    private final Runnable onRefresh;
+
+    // ─── UI Components ───
+    private JPanel productGridPanel;
+    private JPanel orderListCards;
+    private JPanel orderItemsPanel;
+    private JLabel subtotalLabel;
+    private JLabel taxLabel;
+    private JLabel totalLabel;
+    private JTextField customerNameField;
+    private JLabel orderNumLabel;
+    private JButton processBtn;
+    private JLabel orderListHeaderCount;
+
+    public OrderingPanel(Runnable onRefresh) {
+        this.onRefresh = onRefresh;
+        setLayout(new BorderLayout());
+        setBackground(BG_PRIMARY);
+        buildUI();
+        rebuildProductGrid();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  UI Construction
+    // ═══════════════════════════════════════════════════════════════
+
+    private void buildUI() {
+        JPanel topBar = createTopBar();
+        add(topBar, BorderLayout.NORTH);
+
+        JPanel body = new JPanel(new BorderLayout());
+        body.setOpaque(false);
+        body.add(buildLeftColumn(), BorderLayout.CENTER);
+        body.add(buildRightColumn(), BorderLayout.EAST);
+        add(body, BorderLayout.CENTER);
+    }
+
+    private JPanel createTopBar() {
+        JPanel bar = new JPanel(new BorderLayout());
+        bar.setBackground(BG_PRIMARY);
+        bar.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER),
+            new EmptyBorder(10, 18, 10, 18)));
+
+        JLabel title = new JLabel("Better Mondays \u2615");
+        title.setFont(FONT_TITLE);
+        title.setForeground(FG_PRIMARY);
+        bar.add(title, BorderLayout.WEST);
+        return bar;
+    }
+
+    // ─── Left Column ───
+
+    private JPanel buildLeftColumn() {
+        JPanel col = new JPanel(new BorderLayout(0, 8));
+        col.setOpaque(false);
+        col.setBorder(new EmptyBorder(10, 14, 10, 8));
+
+        // Top section: order list strip + category pills stacked vertically
+        JPanel topSection = new JPanel(new BorderLayout(0, 6));
+        topSection.setOpaque(false);
+        topSection.add(buildOrderListStrip(), BorderLayout.NORTH);
+        topSection.add(buildCategoryBar(), BorderLayout.CENTER);
+        col.add(topSection, BorderLayout.NORTH);
+
+        // Product grid
+        productGridPanel = new JPanel(new GridLayout(0, 3, 12, 12));
+        productGridPanel.setOpaque(false);
+        productGridPanel.setBorder(new EmptyBorder(6, 0, 0, 0));
+        JScrollPane gridScroll = new JScrollPane(productGridPanel);
+        gridScroll.setBorder(null);
+        gridScroll.getViewport().setBackground(BG_PRIMARY);
+        gridScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        col.add(gridScroll, BorderLayout.CENTER);
+
+        return col;
+    }
+
+    // ─── Order List Strip ───
+    private JPanel buildOrderListStrip() {
+        JPanel strip = new JPanel(new BorderLayout(0, 6));
+        strip.setBackground(LOG_BG);
+        strip.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(BORDER, 1, true),
+            new EmptyBorder(12, 14, 12, 14)));
+
+        // Header row
+        JPanel hdr = new JPanel(new BorderLayout());
+        hdr.setOpaque(false);
+        JLabel lbl = new JLabel("Order List");
+        lbl.setFont(FONT_SUBTITLE);
+        lbl.setForeground(FG_PRIMARY);
+
+        orderListHeaderCount = new JLabel("0 active");
+        orderListHeaderCount.setFont(FONT_SMALL);
+        orderListHeaderCount.setForeground(FG_MUTED);
+
+        JLabel seeAll = new JLabel("See All");
+        seeAll.setFont(FONT_SMALL);
+        seeAll.setForeground(ACCENT);
+        seeAll.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        seeAll.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) { showSeeAllModal(); }
+            public void mouseEntered(MouseEvent e) { seeAll.setForeground(ACCENT_HOVER); }
+            public void mouseExited(MouseEvent e) { seeAll.setForeground(ACCENT); }
+        });
+
+        JPanel leftGroup = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        leftGroup.setOpaque(false);
+        leftGroup.add(lbl);
+        leftGroup.add(orderListHeaderCount);
+        hdr.add(leftGroup, BorderLayout.WEST);
+        hdr.add(seeAll, BorderLayout.EAST);
+        strip.add(hdr, BorderLayout.NORTH);
+
+        // Horizontal scrollable cards
+        orderListCards = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        orderListCards.setOpaque(false);
+        JPanel centerWrap = new JPanel();
+        centerWrap.setLayout(new BoxLayout(centerWrap, BoxLayout.Y_AXIS));
+        centerWrap.setOpaque(false);
+        orderListCards.setAlignmentX(Component.LEFT_ALIGNMENT);
+        centerWrap.add(Box.createVerticalGlue());
+        centerWrap.add(orderListCards);
+        centerWrap.add(Box.createVerticalGlue());
+        JScrollPane cardScroll = new JScrollPane(centerWrap);
+        cardScroll.setBorder(null);
+        cardScroll.setBackground(LOG_BG);
+        cardScroll.getViewport().setBackground(LOG_BG);
+        cardScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        cardScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
+        cardScroll.setPreferredSize(new Dimension(0, 90));
+
+        strip.add(cardScroll, BorderLayout.SOUTH);
+        return strip;
+    }
+
+    private void refreshOrderListCards() {
+        orderListCards.removeAll();
+        if (completedOrders.isEmpty()) {
+            JLabel empty = new JLabel("No completed orders");
+            empty.setFont(FONT_SMALL);
+            empty.setForeground(FG_MUTED);
+            orderListCards.add(empty);
+        } else {
+            for (CompletedOrder co : completedOrders) {
+                orderListCards.add(createOrderCard(co));
+            }
+        }
+        orderListHeaderCount.setText(completedOrders.size() + " active");
+        orderListCards.revalidate();
+        orderListCards.repaint();
+    }
+
+    private JPanel createOrderCard(CompletedOrder co) {
+        JPanel card = new JPanel(new BorderLayout(0, 2));
+        card.setBackground(BG_SURFACE);
+        card.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(BORDER, 1, true),
+            new EmptyBorder(10, 10, 10, 10)));
+        card.setPreferredSize(new Dimension(140, 60));
+
+        JLabel name = new JLabel(co.customerName);
+        name.setFont(FONT_SMALL);
+        name.setForeground(FG_PRIMARY);
+        card.add(name, BorderLayout.NORTH);
+
+        JPanel meta = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        meta.setOpaque(false);
+        JLabel orderId = new JLabel(fmtOrder(co.orderId));
+        orderId.setFont(FONT_XSMALL);
+        orderId.setForeground(TEXT_MUTED);
+        meta.add(orderId);
+
+        // Status badge
+        JLabel badge = new JLabel(co.status);
+        badge.setFont(FONT_BADGE);
+        badge.setBorder(new EmptyBorder(2, 7, 2, 7));
+        switch (co.status) {
+            case "Waiting" -> { badge.setBackground(ST_WAITING_BG); badge.setForeground(ST_WAITING_FG); }
+            case "Ready to Serve" -> { badge.setBackground(ST_READY_BG); badge.setForeground(ST_READY_FG); }
+            case "Completed" -> { badge.setBackground(ST_DONE_BG); badge.setForeground(ST_DONE_FG); }
+            default -> { badge.setBackground(ST_CANCEL_BG); badge.setForeground(ST_CANCEL_FG); }
+        }
+        badge.setOpaque(true);
+        meta.add(badge);
+
+        card.add(meta, BorderLayout.SOUTH);
+        card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        card.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) { showOrderDetailModal(co); }
+        });
+        return card;
+    }
+
+    // ─── Category Tabs ───
+    private JPanel buildCategoryBar() {
+        JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 6));
+        bar.setOpaque(false);
+        bar.setBorder(new EmptyBorder(4, 0, 2, 0));
+        pillButtons.clear();
+
+        for (String cat : CATEGORY_ITEMS.keySet()) {
+            JButton btn = new JButton(cat);
+            btn.setFont(FONT_SMALL);
+            btn.setFocusPainted(false);
+            btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            btn.setBorder(new EmptyBorder(6, 14, 6, 14));
+            btn.setContentAreaFilled(false);
+            btn.setOpaque(false);
+            updatePillStyle(btn, cat.equals(activeCategory));
+            btn.addActionListener(e -> showCategory(cat));
+            pillButtons.add(btn);
+            bar.add(btn);
+        }
+        return bar;
+    }
+
+    private void updatePillStyle(JButton btn, boolean active) {
+        if (active) {
+            btn.setBackground(ACCENT);
+            btn.setForeground(Color.WHITE);
+            btn.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(ACCENT, 1, true),
+                new EmptyBorder(6, 14, 6, 14)));
+        } else {
+            btn.setBackground(BG_PRIMARY);
+            btn.setForeground(FG_MUTED);
+            btn.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(BORDER, 1, true),
+                new EmptyBorder(6, 14, 6, 14)));
+        }
+    }
+
+    private void showCategory(String category) {
+        if (category.equals(activeCategory)) return;
+        activeCategory = category;
+        for (JButton btn : pillButtons) {
+            updatePillStyle(btn, btn.getText().equals(category));
+        }
+        rebuildProductGrid();
+    }
+
+    // ─── Product Grid ───
+    private void rebuildProductGrid() {
+        productGridPanel.removeAll();
+        List<String> names = CATEGORY_ITEMS.getOrDefault(activeCategory, List.of());
+
+        for (String name : names) {
+            ItemSpec spec = resolveItem(name);
+            if (spec.price <= 0 || spec.baseName.isEmpty()) continue;
+            productGridPanel.add(createProductCard(spec));
+        }
+
+        if (productGridPanel.getComponentCount() == 0) {
+            JLabel empty = new JLabel("No items available", SwingConstants.CENTER);
+            empty.setFont(FONT_BODY);
+            empty.setForeground(FG_MUTED);
+            productGridPanel.add(empty);
+        }
+
+        productGridPanel.revalidate();
+        productGridPanel.repaint();
+    }
+
+    // ─── Product Card ───
+    private JPanel createProductCard(ItemSpec spec) {
+        JPanel card = new JPanel(new BorderLayout(0, 0));
+        card.setBackground(BG_CARD);
+        card.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(BORDER, 1, true),
+            new EmptyBorder(0, 0, 8, 0)));
+
+        JLabel icon = new JLabel("\u2615", SwingConstants.CENTER) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                g.setColor(BG_SURFACE);
+                g.fillRect(0, 0, getWidth(), getHeight());
+                super.paintComponent(g);
+            }
+        };
+        icon.setFont(new Font("Segoe UI", Font.PLAIN, 36));
+        icon.setForeground(FG_MUTED);
+        icon.setPreferredSize(new Dimension(0, 110));
+        icon.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER));
+        ImageIcon img = loadProductImage(activeCategory, spec.displayName);
+        if (img != null) { icon.setText(""); icon.setIcon(img); }
+        card.add(icon, BorderLayout.NORTH);
+
+        JPanel content = new JPanel(new BorderLayout(0, 4));
+        content.setOpaque(false);
+        content.setBorder(new EmptyBorder(6, 8, 0, 8));
+
+        JLabel nameLbl = new JLabel(spec.displayName);
+        nameLbl.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        nameLbl.setForeground(FG_PRIMARY);
+        content.add(nameLbl, BorderLayout.NORTH);
+
+        JButton addBtn = new JButton("Add to Cart");
+        addBtn.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        addBtn.setForeground(Color.WHITE);
+        addBtn.setBackground(ACCENT);
+        addBtn.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(ACCENT, 1, true),
+            new EmptyBorder(6, 12, 6, 12)));
+        addBtn.setFocusPainted(false);
+        addBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        addBtn.addActionListener(e -> addOrderItem(spec));
+        content.add(addBtn, BorderLayout.CENTER);
+
+        JLabel priceLbl = new JLabel("\u20B1" + String.format("%.0f", spec.price));
+        priceLbl.setFont(FONT_PRICE);
+        priceLbl.setForeground(ACCENT);
+        content.add(priceLbl, BorderLayout.SOUTH);
+
+        JPanel wrap = new JPanel(new BorderLayout());
+        wrap.setOpaque(false);
+        wrap.add(content, BorderLayout.NORTH);
+        card.add(wrap, BorderLayout.CENTER);
+        return card;
+    }
+
+    // ─── Right Column ───
+    private JPanel buildRightColumn() {
+        JPanel col = new JPanel(new GridBagLayout());
+        col.setBackground(BG_SURFACE);
+        col.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 1, 0, 0, BORDER),
+            new EmptyBorder(12, 12, 12, 12)));
+        col.setPreferredSize(new Dimension(320, 0));
+
+        GridBagConstraints cx = new GridBagConstraints();
+        cx.fill = GridBagConstraints.HORIZONTAL;
+        cx.weightx = 1.0;
+        cx.gridx = 0;
+
+        cx.gridy = 0; cx.weighty = 0; cx.insets = new Insets(0, 0, 0, 0);
+        col.add(buildCustomerSection(), cx);
+
+        orderItemsPanel = new JPanel();
+        orderItemsPanel.setLayout(new BoxLayout(orderItemsPanel, BoxLayout.Y_AXIS));
+        orderItemsPanel.setOpaque(false);
+        JScrollPane itemsScroll = new JScrollPane(orderItemsPanel);
+        itemsScroll.setBorder(null);
+        itemsScroll.getViewport().setBackground(BG_SURFACE);
+        itemsScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+
+        JPanel orderDetailsSection = new JPanel(new BorderLayout(0, 6));
+        orderDetailsSection.setOpaque(false);
+        JLabel odHdr = new JLabel("Order Details");
+        odHdr.setFont(FONT_SUBTITLE);
+        odHdr.setForeground(FG_PRIMARY);
+        orderDetailsSection.add(odHdr, BorderLayout.NORTH);
+        orderDetailsSection.add(itemsScroll, BorderLayout.CENTER);
+
+        cx.gridy = 1; cx.fill = GridBagConstraints.BOTH; cx.weighty = 1; cx.insets = new Insets(6, 0, 0, 0);
+        col.add(orderDetailsSection, cx);
+
+        JPanel bottom = new JPanel(new BorderLayout(0, 8));
+        bottom.setOpaque(false);
+        bottom.add(buildSummarySection(), BorderLayout.CENTER);
+        bottom.add(buildProcessBtn(), BorderLayout.SOUTH);
+
+        cx.gridy = 2; cx.fill = GridBagConstraints.HORIZONTAL; cx.weighty = 0; cx.insets = new Insets(8, 0, 0, 0);
+        col.add(bottom, cx);
+
+        return col;
+    }
+
+    private JPanel buildCustomerSection() {
+        JPanel sec = new JPanel(new BorderLayout(0, 6));
+        sec.setOpaque(false);
+
+        JLabel hdr = new JLabel("Customer's Information");
+        hdr.setFont(FONT_SUBTITLE);
+        hdr.setForeground(FG_PRIMARY);
+        sec.add(hdr, BorderLayout.NORTH);
+
+        JPanel row = new JPanel(new BorderLayout(6, 0));
+        row.setOpaque(false);
+
+        customerNameField = new JTextField(12);
+        customerNameField.setFont(FONT_BODY);
+        customerNameField.setForeground(FG_PRIMARY);
+        customerNameField.setBackground(BG_INPUT);
+        customerNameField.setCaretColor(FG_PRIMARY);
+        customerNameField.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent e) { updateProcessBtnState(); }
+            public void removeUpdate(DocumentEvent e) { updateProcessBtnState(); }
+            public void changedUpdate(DocumentEvent e) { updateProcessBtnState(); }
+        });
+        customerNameField.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(BORDER, 1, true),
+            new EmptyBorder(7, 10, 7, 10)));
+
+        orderNumLabel = new JLabel("Order " + fmtOrder(orderCount + 1));
+        orderNumLabel.setFont(FONT_SMALL);
+        orderNumLabel.setForeground(FG_MUTED);
+        orderNumLabel.setHorizontalAlignment(SwingConstants.RIGHT);
+
+        row.add(customerNameField, BorderLayout.CENTER);
+        row.add(orderNumLabel, BorderLayout.EAST);
+        sec.add(row, BorderLayout.CENTER);
+        return sec;
+    }
+
+    private JPanel buildSummarySection() {
+        JPanel sec = new JPanel(new GridBagLayout());
+        sec.setBackground(BG_INPUT);
+        sec.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(BORDER, 1, true),
+            new EmptyBorder(10, 12, 10, 12)));
+
+        GridBagConstraints c = new GridBagConstraints();
+        c.fill = GridBagConstraints.HORIZONTAL;
+        c.insets = new Insets(2, 0, 2, 0);
+        c.weightx = 1.0;
+
+        c.gridx = 0; c.gridy = 0; c.gridwidth = 2;
+        JLabel osHdr = new JLabel("Order Summary");
+        osHdr.setFont(FONT_SUBTITLE);
+        osHdr.setForeground(FG_PRIMARY);
+        sec.add(osHdr, c);
+
+        c.gridwidth = 1;
+        c.gridx = 0; c.gridy = 1;
+        JLabel sttl = new JLabel("Subtotal");
+        sttl.setFont(FONT_SMALL); sttl.setForeground(FG_MUTED);
+        sec.add(sttl, c);
+
+        c.gridx = 1; c.gridy = 1;
+        subtotalLabel = new JLabel("\u20B10.00", SwingConstants.RIGHT);
+        subtotalLabel.setFont(FONT_SMALL); subtotalLabel.setForeground(FG_PRIMARY);
+        sec.add(subtotalLabel, c);
+
+        c.gridx = 0; c.gridy = 2;
+        JLabel tx = new JLabel("Tax (12%)");
+        tx.setFont(FONT_SMALL); tx.setForeground(FG_MUTED);
+        sec.add(tx, c);
+
+        c.gridx = 1; c.gridy = 2;
+        taxLabel = new JLabel("\u20B10.00", SwingConstants.RIGHT);
+        taxLabel.setFont(FONT_SMALL); taxLabel.setForeground(FG_PRIMARY);
+        sec.add(taxLabel, c);
+
+        // Dashed separator
+        JPanel dash = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setColor(BORDER);
+                float[] d = {4f, 4f};
+                g2.setStroke(new java.awt.BasicStroke(1f, java.awt.BasicStroke.CAP_BUTT,
+                    java.awt.BasicStroke.JOIN_MITER, 1f, d, 0f));
+                g2.drawLine(0, getHeight() / 2, getWidth(), getHeight() / 2);
+                g2.dispose();
+            }
+        };
+        dash.setOpaque(false);
+        dash.setPreferredSize(new Dimension(0, 6));
+        c.gridx = 0; c.gridy = 2; c.gridwidth = 2;
+        sec.add(dash, c);
+
+        c.gridwidth = 1;
+        c.gridx = 0; c.gridy = 3;
+        JLabel ttl = new JLabel("TOTAL");
+        ttl.setFont(FONT_BOLD_SM); ttl.setForeground(ACCENT);
+        sec.add(ttl, c);
+
+        c.gridx = 1; c.gridy = 3;
+        totalLabel = new JLabel("\u20B10.00", SwingConstants.RIGHT);
+        totalLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        totalLabel.setForeground(ACCENT);
+        sec.add(totalLabel, c);
+
+        return sec;
+    }
+
+    private JButton buildProcessBtn() {
+        processBtn = new JButton("Process Transaction");
+        processBtn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        processBtn.setForeground(Color.WHITE);
+        processBtn.setBackground(SUCCESS);
+        processBtn.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(SUCCESS, 1, true),
+            new EmptyBorder(12, 20, 12, 20)));
+        processBtn.setFocusPainted(false);
+        processBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        processBtn.addActionListener(e -> processTransaction());
+        processBtn.setEnabled(false);
+        return processBtn;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Order Management
+    // ═══════════════════════════════════════════════════════════════
+
+    private void addOrderItem(ItemSpec spec) {
+        for (OrderEntry e : orderEntries) {
+            if (e.displayName.equals(spec.displayName) && e.variant.equals(spec.variant)) {
+                e.quantity++;
+                refreshOrderDisplay();
+                return;
+            }
+        }
+        orderEntries.add(new OrderEntry(spec.displayName, spec.baseName, spec.variant, 1, spec.price));
+        refreshOrderDisplay();
+    }
+
+    private void refreshOrderDisplay() {
+        orderItemsPanel.removeAll();
+        if (orderEntries.isEmpty()) {
+            JLabel empty = new JLabel("No items in order", SwingConstants.CENTER);
+            empty.setFont(FONT_SMALL);
+            empty.setForeground(FG_MUTED);
+            empty.setAlignmentX(Component.CENTER_ALIGNMENT);
+            orderItemsPanel.add(empty);
+        } else {
+            for (OrderEntry entry : orderEntries) {
+                orderItemsPanel.add(createOrderRow(entry));
+                orderItemsPanel.add(Box.createVerticalStrut(3));
+            }
+        }
+        updateSummary();
+        orderItemsPanel.revalidate();
+        orderItemsPanel.repaint();
+    }
+
+    private JPanel createOrderRow(OrderEntry entry) {
+        JPanel row = new JPanel(new BorderLayout(6, 0));
+        row.setBackground(BG_INPUT);
+        row.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(BORDER, 1, true),
+            new EmptyBorder(6, 8, 6, 8)));
+
+        // Thumbnail
+        JLabel thumb = new JLabel("\u2615", SwingConstants.CENTER);
+        thumb.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        thumb.setForeground(FG_MUTED);
+        thumb.setPreferredSize(new Dimension(28, 28));
+        thumb.setBackground(BG_SURFACE);
+        thumb.setOpaque(true);
+
+        ImageIcon img = loadProductImage(findCategory(entry.displayName), entry.displayName);
+        if (img != null) {
+            thumb.setText("");
+            thumb.setIcon(new ImageIcon(img.getImage().getScaledInstance(26, 26, java.awt.Image.SCALE_SMOOTH)));
+        }
+        row.add(thumb, BorderLayout.WEST);
+
+        // Name + total
+        JPanel np = new JPanel(new BorderLayout(0, 1));
+        np.setOpaque(false);
+        JLabel nl = new JLabel(entry.orderLabel());
+        nl.setFont(FONT_SMALL); nl.setForeground(FG_PRIMARY);
+        np.add(nl, BorderLayout.NORTH);
+
+        double lt = entry.lineTotal();
+        JLabel tl = new JLabel("\u20B1" + String.format("%.2f", lt));
+        tl.setFont(FONT_SMALL); tl.setForeground(ACCENT);
+        np.add(tl, BorderLayout.SOUTH);
+        row.add(np, BorderLayout.CENTER);
+
+        // Quantity controls
+        JPanel qp = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
+        qp.setOpaque(false);
+
+        JButton minus = new JButton("\u2212");
+        minus.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        minus.setForeground(FG_PRIMARY);
+        minus.setBackground(new Color(50, 65, 85));
+        minus.setPreferredSize(new Dimension(22, 22));
+        minus.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(BORDER, 1),
+            new EmptyBorder(0, 4, 0, 4)));
+        minus.setFocusPainted(false);
+        minus.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        minus.addActionListener(e -> {
+            if (entry.quantity > 1) entry.quantity--;
+            else orderEntries.remove(entry);
+            refreshOrderDisplay();
+        });
+
+        JLabel ql = new JLabel(String.valueOf(entry.quantity));
+        ql.setFont(FONT_BOLD_SM);
+        ql.setForeground(FG_PRIMARY);
+        ql.setPreferredSize(new Dimension(14, 20));
+        ql.setHorizontalAlignment(SwingConstants.CENTER);
+
+        JButton plus = new JButton("+");
+        plus.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        plus.setForeground(Color.WHITE);
+        plus.setBackground(ACCENT);
+        plus.setPreferredSize(new Dimension(22, 22));
+        plus.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(180, 130, 10), 1),
+            new EmptyBorder(0, 4, 0, 4)));
+        plus.setFocusPainted(false);
+        plus.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        plus.addActionListener(e -> { entry.quantity++; refreshOrderDisplay(); });
+
+        qp.add(minus); qp.add(ql); qp.add(plus);
+        row.add(qp, BorderLayout.EAST);
+
+        row.setMaximumSize(new Dimension(9999, 44));
+        return row;
+    }
+
+    private void updateSummary() {
+        double total = 0;
+        for (OrderEntry e : orderEntries) total += e.lineTotal();
+        double sub = total / 1.12;
+        double vat = total - sub;
+        subtotalLabel.setText("\u20B1" + String.format("%.2f", sub));
+        taxLabel.setText("\u20B1" + String.format("%.2f", vat));
+        totalLabel.setText("\u20B1" + String.format("%.2f", total));
+        updateProcessBtnState();
+    }
+
+    private void updateProcessBtnState() {
+        processBtn.setEnabled(!orderEntries.isEmpty()
+            && !customerNameField.getText().trim().isEmpty());
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Transaction
+    // ═══════════════════════════════════════════════════════════════
+
+    private void processTransaction() {
+        if (orderEntries.isEmpty()) return;
+
+        final String customerName = customerNameField.getText().trim().isEmpty()
+            ? "Walk-in Customer" : customerNameField.getText().trim();
+
+        double sum = 0;
+        for (OrderEntry e : orderEntries) sum += e.lineTotal();
+        final double totalInclusive = sum;
+
+        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), "Payment",
+            JDialog.ModalityType.APPLICATION_MODAL);
+        dialog.getContentPane().setBackground(BG_PRIMARY);
+
+        JPanel mp = new JPanel(new BorderLayout(0, 16));
+        mp.setBackground(BG_PRIMARY);
+        mp.setBorder(new EmptyBorder(24, 28, 24, 28));
+
+        JLabel title = new JLabel("Complete Transaction", SwingConstants.CENTER);
+        title.setFont(FONT_TITLE);
+        title.setForeground(ACCENT);
+        mp.add(title, BorderLayout.NORTH);
+
+        JPanel center = new JPanel(new GridBagLayout());
+        center.setOpaque(false);
+        GridBagConstraints cx = new GridBagConstraints();
+        cx.fill = GridBagConstraints.HORIZONTAL;
+        cx.insets = new Insets(6, 0, 6, 0);
+        cx.weightx = 1.0;
+
+        cx.gridx = 0; cx.gridy = 0; cx.gridwidth = 2;
+        JLabel cl = new JLabel("Customer: " + customerName);
+        cl.setFont(FONT_BODY); cl.setForeground(FG_PRIMARY);
+        center.add(cl, cx);
+
+        cx.gridy = 1;
+        JLabel ol = new JLabel("Order " + fmtOrder(orderCount + 1));
+        ol.setFont(FONT_BODY); ol.setForeground(FG_MUTED);
+        center.add(ol, cx);
+
+        cx.gridy = 2; cx.gridwidth = 1;
+        JLabel tdl = new JLabel("Total Due:");
+        tdl.setFont(FONT_BODY); tdl.setForeground(FG_MUTED);
+        center.add(tdl, cx);
+        cx.gridx = 1;
+        JLabel tdv = new JLabel("\u20B1" + String.format("%.2f", totalInclusive), SwingConstants.RIGHT);
+        tdv.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        tdv.setForeground(ACCENT);
+        center.add(tdv, cx);
+
+        cx.gridx = 0; cx.gridy = 3;
+        JLabel csh = new JLabel("Cash Amount:");
+        csh.setFont(FONT_BODY); csh.setForeground(FG_PRIMARY);
+        center.add(csh, cx);
+
+        cx.gridx = 1;
+        JTextField cf = new JTextField(10);
+        cf.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        cf.setForeground(FG_PRIMARY);
+        cf.setBackground(BG_INPUT);
+        cf.setCaretColor(FG_PRIMARY);
+        cf.setHorizontalAlignment(JTextField.RIGHT);
+        cf.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(BORDER, 1, true),
+            new EmptyBorder(7, 10, 7, 10)));
+        center.add(cf, cx);
+
+        cx.gridx = 0; cx.gridy = 4;
+        JLabel chl = new JLabel("Change:");
+        chl.setFont(FONT_BODY); chl.setForeground(FG_MUTED);
+        center.add(chl, cx);
+        cx.gridx = 1;
+        JLabel chv = new JLabel("\u20B10.00", SwingConstants.RIGHT);
+        chv.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        chv.setForeground(SUCCESS);
+        center.add(chv, cx);
+
+        cf.addActionListener(ae -> calcChange(cf, totalInclusive, chv));
+        cf.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyReleased(java.awt.event.KeyEvent e) {
+                calcChange(cf, totalInclusive, chv);
+            }
+        });
+
+        mp.add(center, BorderLayout.CENTER);
+
+        JPanel bp = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 0));
+        bp.setOpaque(false);
+
+        JButton cancel = new JButton("Cancel");
+        cancel.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        cancel.setForeground(FG_MUTED);
+        cancel.setBackground(BG_SURFACE);
+        cancel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(BORDER, 1, true),
+            new EmptyBorder(10, 24, 10, 24)));
+        cancel.setFocusPainted(false);
+        cancel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        cancel.addActionListener(e -> dialog.dispose());
+
+        JButton confirm = new JButton("Pay \u20B1" + String.format("%.2f", totalInclusive));
+        confirm.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        confirm.setForeground(Color.WHITE);
+        confirm.setBackground(SUCCESS);
+        confirm.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(SUCCESS, 1, true),
+            new EmptyBorder(10, 24, 10, 24)));
+        confirm.setFocusPainted(false);
+        confirm.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        final JDialog dialogRef = dialog;
+        final JTextField cashField = cf;
+        final JLabel changeVal = chv;
+        confirm.addActionListener(e -> {
+            String cs = cashField.getText().trim();
+            if (cs.isEmpty()) {
+                JOptionPane.showMessageDialog(dialogRef, "Enter cash amount.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            try {
+                double cash = Double.parseDouble(cs);
+                if (cash < totalInclusive) {
+                    JOptionPane.showMessageDialog(dialogRef, "Insufficient cash.", "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                double change = cash - totalInclusive;
+                dialogRef.dispose();
+                completeTransaction(customerName, totalInclusive, cash, change);
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(dialogRef, "Invalid amount.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        bp.add(cancel); bp.add(confirm);
+        mp.add(bp, BorderLayout.SOUTH);
+
+        dialog.getContentPane().add(mp);
+        dialog.pack();
+        dialog.setSize(380, 400);
+        dialog.setLocationRelativeTo(SwingUtilities.getWindowAncestor(this));
+        dialog.setVisible(true);
+    }
+
+    private void calcChange(JTextField cf, double total, JLabel chv) {
+        try {
+            String t = cf.getText().trim();
+            if (t.isEmpty()) { chv.setText("\u20B10.00"); chv.setForeground(SUCCESS); return; }
+            double cash = Double.parseDouble(t);
+            double change = cash - total;
+            if (change >= 0) { chv.setText("\u20B1" + String.format("%.2f", change)); chv.setForeground(SUCCESS); }
+            else { chv.setText("\u20B1" + String.format("%.2f", change)); chv.setForeground(DANGER); }
+        } catch (NumberFormatException e) {
+            chv.setText("\u20B10.00"); chv.setForeground(FG_MUTED);
+        }
+    }
+
+    private void completeTransaction(String customerName, double totalInclusive, double cash, double change) {
+        double subtotal = totalInclusive / 1.12;
+        double vat = totalInclusive - subtotal;
+        String txnRef = "TXN" + String.format("%06d", ++transactionCounter);
+
+        Inventory inv = Inventory.getInstance();
+        Menu menu = Menu.getInstance();
+        for (OrderEntry entry : orderEntries) {
+            MenuItem mi = menu.getMenuItem(entry.baseName);
+            if (mi != null) {
+                for (Map.Entry<String, Double> ing : mi.getIngredients().entrySet()) {
+                    inv.deductIngredient(ing.getKey(), ing.getValue() * entry.quantity);
+                }
+            }
+        }
+
+        List<SalesRecord> sales = new ArrayList<>();
+        for (OrderEntry entry : orderEntries) {
+            sales.add(new SalesRecord(entry.orderLabel(), entry.quantity, entry.unitPrice, entry.lineTotal()));
+        }
+
+        try {
+            controller.OrderController oc = new controller.OrderController(
+                new persistence.sqlite.SQLiteSalesRepository());
+            oc.persistCompletedTransaction(txnRef, sales, totalInclusive, cash, change);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Save error: " + ex.getMessage(),
+                "Database", JOptionPane.WARNING_MESSAGE);
+        }
+
+        // Add to completed orders list
+        String ts = new SimpleDateFormat("MM/dd HH:mm").format(new Date());
+        completedOrders.add(0, new CompletedOrder(orderCount + 1, customerName, ts, "Completed", new ArrayList<>(orderEntries)));
+        refreshOrderListCards();
+
+        showReceipt(customerName, txnRef, subtotal, vat, totalInclusive, cash, change);
+
+        orderCount++;
+        orderEntries.clear();
+        customerNameField.setText("");
+        orderNumLabel.setText("Order " + fmtOrder(orderCount + 1));
+        refreshOrderDisplay();
+
+        if (onRefresh != null) onRefresh.run();
+    }
+
+    private void showReceipt(String customer, String txnRef,
+                             double sub, double vat, double total, double cash, double change) {
+        String line = "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n";
+        String dbl = "\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("            \u2615 Better Mondays Cafe \u2615\n");
+        sb.append("            123 Main St., Manila\n");
+        sb.append("            VAT REG TIN: 123-456-789\n");
+        sb.append(dbl);
+        sb.append(" Date: ").append(new SimpleDateFormat("MM/dd/yyyy HH:mm").format(new Date())).append("\n");
+        sb.append(" Customer: ").append(customer).append("\n");
+        sb.append(" ").append(txnRef).append("\n");
+        sb.append(dbl);
+        sb.append(String.format(" %-16s %2s %8s\n", "ITEM", "QTY", "AMOUNT"));
+        sb.append(line);
+        for (OrderEntry entry : orderEntries) {
+            sb.append(String.format(" %-16s %2d %8.2f\n",
+                trunc(entry.orderLabel(), 16), entry.quantity, entry.lineTotal()));
+        }
+        sb.append(line);
+        sb.append(String.format(" %-22s %8.2f\n", "Subtotal (excl VAT):", sub));
+        sb.append(String.format(" %-22s %8.2f\n", "VAT (12%):", vat));
+        sb.append(String.format(" %-22s %8.2f\n", "TOTAL (incl VAT):", total));
+        sb.append(line);
+        sb.append(String.format(" %-22s %8.2f\n", "Cash:", cash));
+        sb.append(String.format(" %-22s %8.2f\n", "Change:", change));
+        sb.append(dbl);
+        sb.append("         Thank you! Come again!\n");
+        sb.append("         *** Have a nice day ***\n");
+
+        JOptionPane.showMessageDialog(this, sb.toString(),
+            "\u2705 RECEIPT - " + txnRef, JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  See All Modal
+    // ═══════════════════════════════════════════════════════════════
+
+    private void showOrderDetailModal(CompletedOrder co) {
+        JDialog d = new JDialog(SwingUtilities.getWindowAncestor(this));
+        d.setTitle("Order " + fmtOrder(co.orderId));
+        d.setModal(true);
+        d.setSize(340, 320);
+        d.setLocationRelativeTo(this);
+        d.getContentPane().setBackground(BG_PRIMARY);
+
+        JPanel body = new JPanel(new BorderLayout(0, 10));
+        body.setBackground(BG_PRIMARY);
+        body.setBorder(new EmptyBorder(16, 16, 16, 16));
+
+        // Header
+        JPanel hdr = new JPanel(new BorderLayout(0, 2));
+        hdr.setOpaque(false);
+        JLabel oid = new JLabel("Order " + fmtOrder(co.orderId));
+        oid.setFont(FONT_TITLE); oid.setForeground(FG_PRIMARY);
+        hdr.add(oid, BorderLayout.NORTH);
+        JLabel cust = new JLabel(co.customerName + " \u2022 " + co.timestamp);
+        cust.setFont(FONT_SMALL); cust.setForeground(FG_MUTED);
+        hdr.add(cust, BorderLayout.SOUTH);
+        body.add(hdr, BorderLayout.NORTH);
+
+        // Items list
+        JPanel list = new JPanel(new GridBagLayout());
+        list.setOpaque(false);
+        GridBagConstraints cx = new GridBagConstraints();
+        cx.fill = GridBagConstraints.HORIZONTAL;
+        cx.weightx = 1.0;
+        cx.insets = new Insets(2, 0, 2, 0);
+        cx.gridx = 0; cx.gridy = 0;
+        if (co.items != null) {
+            for (OrderEntry e : co.items) {
+                if (cx.gridy > 0) cx.insets.top = 4;
+                JPanel row = new JPanel(new BorderLayout());
+                row.setOpaque(false);
+                JLabel nl = new JLabel(e.orderLabel());
+                nl.setFont(FONT_BODY); nl.setForeground(FG_PRIMARY);
+                row.add(nl, BorderLayout.CENTER);
+                JLabel ql = new JLabel("x" + e.quantity);
+                ql.setFont(FONT_BODY); ql.setForeground(TEXT_MUTED);
+                row.add(ql, BorderLayout.EAST);
+                list.add(row, cx);
+                cx.gridy++;
+            }
+        }
+        JScrollPane sp = new JScrollPane(list);
+        sp.setBorder(null);
+        sp.setBackground(BG_PRIMARY);
+        sp.getViewport().setBackground(BG_PRIMARY);
+        body.add(sp, BorderLayout.CENTER);
+
+        // Close button
+        JButton close = new JButton("Close");
+        close.setFont(FONT_BODY);
+        close.setForeground(Color.WHITE);
+        close.setBackground(ACCENT);
+        close.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(ACCENT, 1, true),
+            new EmptyBorder(8, 20, 8, 20)));
+        close.setFocusPainted(false);
+        close.addActionListener(ev -> d.dispose());
+        JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        btnRow.setOpaque(false);
+        btnRow.add(close);
+        body.add(btnRow, BorderLayout.SOUTH);
+
+        d.add(body);
+        d.setVisible(true);
+    }
+
+    private void showSeeAllModal() {
+        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this),
+            "All Orders", JDialog.ModalityType.APPLICATION_MODAL);
+        dialog.getContentPane().setBackground(BG_PRIMARY);
+
+        JPanel mp = new JPanel(new BorderLayout(0, 12));
+        mp.setBackground(BG_PRIMARY);
+        mp.setBorder(new EmptyBorder(20, 20, 20, 20));
+
+        JLabel title = new JLabel("All Recent Orders", SwingConstants.CENTER);
+        title.setFont(FONT_TITLE);
+        title.setForeground(ACCENT);
+        mp.add(title, BorderLayout.NORTH);
+
+        JPanel grid = new JPanel(new GridLayout(0, 3, 10, 10));
+        grid.setOpaque(false);
+
+        if (completedOrders.isEmpty()) {
+            JLabel empty = new JLabel("No completed orders yet", SwingConstants.CENTER);
+            empty.setFont(FONT_BODY);
+            empty.setForeground(FG_MUTED);
+            grid.add(empty);
+        } else {
+            for (CompletedOrder co : completedOrders) {
+                JPanel card = new JPanel(new BorderLayout(0, 4));
+                card.setBackground(BG_CARD);
+                card.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(BORDER, 1, true),
+                    new EmptyBorder(12, 12, 12, 12)));
+
+                JLabel orderTitle = new JLabel("Order " + fmtOrder(co.orderId));
+                orderTitle.setFont(FONT_BOLD_SM);
+                orderTitle.setForeground(FG_PRIMARY);
+                card.add(orderTitle, BorderLayout.NORTH);
+
+                JPanel info = new JPanel(new GridLayout(0, 1, 0, 2));
+                info.setOpaque(false);
+                JLabel cn = new JLabel(co.customerName);
+                cn.setFont(FONT_SMALL); cn.setForeground(FG_PRIMARY);
+                info.add(cn);
+                JLabel ts = new JLabel(co.timestamp);
+                ts.setFont(FONT_SMALL); ts.setForeground(FG_MUTED);
+                info.add(ts);
+
+                JLabel badge = new JLabel(co.status);
+                badge.setFont(FONT_BADGE);
+                badge.setBorder(new EmptyBorder(2, 7, 2, 7));
+                switch (co.status) {
+                    case "Completed" -> { badge.setBackground(ST_DONE_BG); badge.setForeground(ST_DONE_FG); }
+                    case "Ready to Serve" -> { badge.setBackground(ST_READY_BG); badge.setForeground(ST_READY_FG); }
+                    case "Waiting" -> { badge.setBackground(ST_WAITING_BG); badge.setForeground(ST_WAITING_FG); }
+                    default -> { badge.setBackground(ST_CANCEL_BG); badge.setForeground(ST_CANCEL_FG); }
+                }
+                badge.setOpaque(true);
+                info.add(badge);
+
+                card.add(info, BorderLayout.CENTER);
+                grid.add(card);
+            }
+        }
+
+        JScrollPane scroll = new JScrollPane(grid);
+        scroll.setBorder(null);
+        scroll.getViewport().setBackground(BG_PRIMARY);
+        mp.add(scroll, BorderLayout.CENTER);
+
+        JButton close = new JButton("Close");
+        close.setFont(FONT_BODY);
+        close.setForeground(Color.WHITE);
+        close.setBackground(ACCENT);
+        close.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(ACCENT, 1, true),
+            new EmptyBorder(8, 20, 8, 20)));
+        close.setFocusPainted(false);
+        close.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        close.addActionListener(e -> dialog.dispose());
+
+        JPanel bp = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        bp.setOpaque(false);
+        bp.add(close);
+        mp.add(bp, BorderLayout.SOUTH);
+
+        dialog.getContentPane().add(mp);
+        dialog.setSize(640, 460);
+        dialog.setLocationRelativeTo(SwingUtilities.getWindowAncestor(this));
+        dialog.setVisible(true);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Helpers
+    // ═══════════════════════════════════════════════════════════════
+
+    private ImageIcon loadProductImage(String category, String prodName) {
+        String key = category + "|" + prodName;
+        ImageIcon cached = imageCache.get(key);
+        if (cached != null) return cached;
+
+        String baseName = IMAGE_MAP.getOrDefault(prodName, prodName);
+        List<String> attempts = new ArrayList<>();
+        String lc = baseName.toLowerCase();
+        if (lc.startsWith("hot ") || lc.startsWith("iced ")) {
+            attempts.add(baseName + ".jpg");
+            attempts.add(baseName + " .jpg");
+            attempts.add(baseName + ".png");
+            attempts.add(baseName + " .png");
+        } else {
+            attempts.add("Hot " + baseName + ".jpg");
+            attempts.add("Hot " + baseName + " .jpg");
+            attempts.add("Iced " + baseName + ".jpg");
+            attempts.add("Iced " + baseName + " .jpg");
+            attempts.add(baseName + ".jpg");
+            attempts.add(baseName + " .jpg");
+            attempts.add(baseName + ".png");
+            attempts.add(baseName + " .png");
+            attempts.add(baseName.toLowerCase() + ".jpg");
+            attempts.add(baseName.toLowerCase() + " .jpg");
+            attempts.add(baseName.toLowerCase() + ".png");
+            attempts.add(baseName.toLowerCase() + " .png");
+        }
+        for (String fn : attempts) {
+            try {
+                java.net.URL url = getClass().getResource("/images/" + category + "/" + fn);
+                if (url != null) {
+                    BufferedImage img = ImageIO.read(url);
+                    if (img != null) {
+                        ImageIcon icon = new ImageIcon(img.getScaledInstance(80, 80, java.awt.Image.SCALE_SMOOTH));
+                        imageCache.put(key, icon);
+                        return icon;
+                    }
+                }
+            } catch (Exception e) {}
+        }
+        imageCache.put(key, null);
+        return null;
+    }
+
+    private String findCategory(String itemName) {
+        for (Map.Entry<String, List<String>> e : CATEGORY_ITEMS.entrySet()) {
+            for (String n : e.getValue()) {
+                if (n.equals(itemName)) return e.getKey();
+            }
+        }
+        return "";
+    }
+
+    private static String fmtOrder(int id) {
+        return String.format("#%05d", id);
+    }
+
+    private String trunc(String s, int len) {
+        return s.length() > len ? s.substring(0, len - 3) + "..." : s;
+    }
+}

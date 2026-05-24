@@ -30,6 +30,8 @@ public final class AppTheme {
 
     private static final Font BODY = new Font("Segoe UI", Font.PLAIN, 13);
     private static final Font TITLE = new Font("Segoe UI", Font.BOLD, 14);
+    public static final int BORDER_RADIUS = 12;
+    public static final int BORDER_THICKNESS = 1;
 
     private AppTheme() {
     }
@@ -61,7 +63,7 @@ public final class AppTheme {
             tf.getCaret().setBlinkRate(500);
         }
         tf.setBorder(BorderFactory.createCompoundBorder(
-                new LineBorder(new Color(60, 85, 120), 1, true),
+                new RoundedLineBorder(new Color(60, 85, 120), BORDER_THICKNESS, BORDER_RADIUS),
                 BorderFactory.createEmptyBorder(8, 14, 8, 14)));
         tf.putClientProperty("JTextField.roundPlaceholder", true);
     }
@@ -69,22 +71,22 @@ public final class AppTheme {
     /** Standard input border used across the app. */
     public static javax.swing.border.Border inputBorderRegular() {
         return BorderFactory.createCompoundBorder(
-                new LineBorder(new Color(60, 85, 120), 1, true),
-                BorderFactory.createEmptyBorder(8, 14, 8, 14));
+            new RoundedLineBorder(new Color(60, 85, 120), BORDER_THICKNESS, BORDER_RADIUS),
+            BorderFactory.createEmptyBorder(8, 14, 8, 14));
     }
 
     /** Compact pill-style input border. */
     public static javax.swing.border.Border inputBorderPill() {
         return BorderFactory.createCompoundBorder(
-                new LineBorder(new Color(60, 85, 120), 1, true),
-                BorderFactory.createEmptyBorder(4, 10, 4, 10));
+            new RoundedLineBorder(new Color(60, 85, 120), BORDER_THICKNESS, BORDER_RADIUS),
+            BorderFactory.createEmptyBorder(4, 10, 4, 10));
     }
 
     /** Focused input border with the given highlight color. */
     public static javax.swing.border.Border focusInputBorder(Color focusColor) {
         return BorderFactory.createCompoundBorder(
-                new LineBorder(focusColor, 1, true),
-                BorderFactory.createEmptyBorder(8, 14, 8, 14));
+            new RoundedLineBorder(focusColor, BORDER_THICKNESS, BORDER_RADIUS),
+            BorderFactory.createEmptyBorder(8, 14, 8, 14));
     }
 
     /** Apply standard table defaults for consistent look-and-feel. */
@@ -166,6 +168,12 @@ public final class AppTheme {
         }
         if (c instanceof JScrollPane sp) {
             sp.getViewport().setBackground(BG_SURFACE);
+            sp.setBorder(BorderFactory.createCompoundBorder(
+                    new RoundedLineBorder(new Color(49, 73, 105), BORDER_THICKNESS, BORDER_RADIUS),
+                    BorderFactory.createEmptyBorder(2, 2, 2, 2)));
+        }
+        if (c instanceof JTable table) {
+            table.setBorder(new RoundedLineBorder(new Color(60, 85, 120), BORDER_THICKNESS, BORDER_RADIUS));
         }
         if (c instanceof Container container) {
             for (Component child : container.getComponents()) {

@@ -11,7 +11,6 @@ import javax.swing.border.LineBorder;
 import monitoring.Monitoring;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.stream.Collectors;
 import monitoring.SalesRecord;
@@ -73,41 +72,87 @@ public class POSSystem extends javax.swing.JFrame {
     private InventoryController inventoryController;
     private OrderController orderController;
 
-    private static final Map<String, List<String>> CATEGORY_ITEMS = new LinkedHashMap<>();
-    static {
-        CATEGORY_ITEMS.put("Espresso & Coffee", Arrays.asList(
-            "Americano", "Latte", "Cappuccino", "Salted Cream Latte", "Spanish Latte",
-            "Dark Mocha", "White Mocha", "Caramel Macchiato", "Brewed Coffee"));
-        CATEGORY_ITEMS.put("Specialty Drinks", Arrays.asList(
-            "Vietnamese Coffee", "Ube Espresso", "Manila Latte",
-            "Pumpkin Spice Latte", "Spiced Cookie Latte"));
-        CATEGORY_ITEMS.put("Tea Latte", Arrays.asList(
-            "Matcha Latte", "Chocolate Matcha", "Matcha Espresso",
-            "Hojicha Latte", "Chai Latte"));
-        CATEGORY_ITEMS.put("Non-Coffee", Arrays.asList(
-            "Chocolate Latte", "Strawberry Latte", "Mango Latte",
-            "Dragon Fruit Coconut Latte", "Ube Latte"));
-        CATEGORY_ITEMS.put("House Favorites", Arrays.asList(
-            "Mango Latte", "Strawberry Latte", "Salted Cream Latte", "Spanish Latte"));
-        CATEGORY_ITEMS.put("Fruit Tea", Arrays.asList(
-            "Strawberry Green Tea", "Mango Green Tea", "Peach Green Tea",
-            "Passion Fruit Green Tea"));
-        CATEGORY_ITEMS.put("Herbal Tea", Arrays.asList(
-            "Peppermint", "Chamomile", "Earl Grey", "Cinnamon"));
-        CATEGORY_ITEMS.put("Sandwiches", Arrays.asList(
-            "Signature Ham & Cheese", "Classic Grilled Cheese", "Homestyle Pesto & Cheese"));
-        CATEGORY_ITEMS.put("Pandesal Pairs", Arrays.asList(
-            "Ham & Cheese", "Cheesy Pesto", "Spam & Cheese"));
-        CATEGORY_ITEMS.put("Pastries", Arrays.asList(
-            "Chocolate Crinkles", "Chocolate Cookies", "Brownies", "Banana Bread",
-            "Chocolate Tiramisu", "Matcha Tiramisu", "Creamy Spinach", "Blueberry Cheesecake"));
-    }
+    private static final List<String> ORDERING_CATEGORIES = List.of(
+        "Espresso & Coffee",
+        "Specialty Drinks",
+        "Tea Latte",
+        "Non-Coffee",
+        "House Favorites",
+        "Fruit Tea",
+        "Herbal Tea",
+        "Sandwiches",
+        "Pandesal Pairs",
+        "Pastries"
+    );
+
+    private final Map<String, List<String>> categoryItems;
 
     private static final Map<String, Double> HOUSE_FAVORITES_PRICES = Map.of(
         "Mango Latte", 210.0,
         "Strawberry Latte", 200.0,
         "Salted Cream Latte", 190.0,
         "Spanish Latte", 180.0
+    );
+
+    private static final List<String> SPECIALTY_DRINKS = List.of(
+        "Vietnamese Coffee",
+        "Ube Espresso",
+        "Manila Latte",
+        "Pumpkin Spice Latte",
+        "Spiced Cookie Latte"
+    );
+
+    private static final List<String> TEA_LATTE_ITEMS = List.of(
+        "Matcha Latte",
+        "Chocolate Matcha",
+        "Matcha Espresso",
+        "Hojicha Latte",
+        "Chai Latte"
+    );
+
+    private static final List<String> NON_COFFEE_ITEMS = List.of(
+        "Chocolate Latte",
+        "Strawberry Latte",
+        "Mango Latte",
+        "Dragon Fruit Coconut Latte",
+        "Ube Latte"
+    );
+
+    private static final List<String> FRUIT_TEA_ITEMS = List.of(
+        "Strawberry Green Tea",
+        "Mango Green Tea",
+        "Peach Green Tea",
+        "Passion Fruit Green Tea"
+    );
+
+    private static final List<String> HERBAL_TEA_ITEMS = List.of(
+        "Peppermint",
+        "Chamomile",
+        "Earl Grey",
+        "Cinnamon"
+    );
+
+    private static final List<String> SANDWICH_ITEMS = List.of(
+        "Signature Ham & Cheese",
+        "Classic Grilled Cheese",
+        "Homestyle Pesto & Cheese"
+    );
+
+    private static final List<String> PANDESAL_PAIR_ITEMS = List.of(
+        "Ham & Cheese",
+        "Cheesy Pesto",
+        "Spam & Cheese"
+    );
+
+    private static final List<String> PASTRY_ITEMS = List.of(
+        "Chocolate Crinkles",
+        "Chocolate Cookies",
+        "Brownies",
+        "Banana Bread",
+        "Chocolate Tiramisu",
+        "Matcha Tiramisu",
+        "Creamy Spinach",
+        "Blueberry Cheesecake"
     );
 
     private static class OrderEntry {
@@ -149,11 +194,6 @@ public class POSSystem extends javax.swing.JFrame {
     public POSSystem(String username, UserDataManager.Role role) {
         this.currentUserRole = role;
         this.currentUsername = username;
-        initComponents();
-        setTitle("Better Mondays Coffeee Cafe Management System - " + username);
-        setMinimumSize(new java.awt.Dimension(1280, 720));
-        setResizable(true);
-        setLocationRelativeTo(null);
         try {
             Phase2Bootstrap.seedCatalogIfEmpty();
         } catch (Exception e) {
@@ -162,6 +202,13 @@ public class POSSystem extends javax.swing.JFrame {
                     "Database",
                     JOptionPane.WARNING_MESSAGE);
         }
+
+        categoryItems = buildCategoryItems();
+        initComponents();
+        setTitle("Better Mondays Coffeee Cafe Management System - " + username);
+        setMinimumSize(new java.awt.Dimension(1280, 720));
+        setResizable(true);
+        setLocationRelativeTo(null);
 
         loadInventoryTable();
 
@@ -175,6 +222,7 @@ public class POSSystem extends javax.swing.JFrame {
         styleSearchField();
 
         showCategory("Espresso & Coffee");
+        refreshOrderDisplay();
     }
 
     @Deprecated
@@ -211,7 +259,7 @@ public class POSSystem extends javax.swing.JFrame {
 
     private void rebuildProductGrid(String category, String search) {
         productGridPanel.removeAll();
-        List<String> itemNames = CATEGORY_ITEMS.getOrDefault(category, List.of());
+        List<String> itemNames = categoryItems.getOrDefault(category, List.of());
 
         List<MenuItem> items = itemNames.stream()
             .map(name -> Menu.getInstance().getMenuItem(name))
@@ -230,13 +278,32 @@ public class POSSystem extends javax.swing.JFrame {
         }
 
         if (items.isEmpty()) {
+            JPanel emptyRow = new JPanel(new BorderLayout());
+            emptyRow.setOpaque(false);
+            emptyRow.setBorder(BorderFactory.createEmptyBorder(20, 0, 0, 0));
             JLabel emptyLabel = new JLabel("No items found", SwingConstants.CENTER);
             emptyLabel.setFont(new Font("Segoe UI", Font.PLAIN, 16));
             emptyLabel.setForeground(new Color(197, 209, 224));
-            productGridPanel.add(emptyLabel);
+            emptyRow.add(emptyLabel, BorderLayout.CENTER);
+            productGridPanel.add(emptyRow);
         } else {
-            for (MenuItem item : items) {
-                productGridPanel.add(createProductCard(item, category));
+            for (int index = 0; index < items.size(); index += 3) {
+                JPanel rowPanel = new JPanel(new GridLayout(1, 3, 14, 0));
+                rowPanel.setOpaque(false);
+                rowPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 14, 0));
+
+                int endIndex = Math.min(index + 3, items.size());
+                for (int itemIndex = index; itemIndex < endIndex; itemIndex++) {
+                    rowPanel.add(createProductCard(items.get(itemIndex), category));
+                }
+
+                for (int filler = endIndex - index; filler < 3; filler++) {
+                    JPanel emptyCell = new JPanel();
+                    emptyCell.setOpaque(false);
+                    rowPanel.add(emptyCell);
+                }
+
+                productGridPanel.add(rowPanel);
             }
         }
 
@@ -245,29 +312,51 @@ public class POSSystem extends javax.swing.JFrame {
     }
 
     private JPanel createProductCard(MenuItem item, String category) {
-        JPanel card = new JPanel(new BorderLayout(0, 3));
-        card.setBackground(new Color(36, 55, 83));
-        card.setBorder(ui.AppTheme.inputBorderRegular());
+        CardPanel card = new CardPanel(12, ui.AppTheme.BG_SURFACE);
+        card.setLayout(new BorderLayout(0, 6));
+        card.setFillColor(ui.AppTheme.BG_SURFACE);
+        card.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        card.setBorderColor(new Color(60, 85, 120));
+        card.setPreferredSize(new Dimension(188, 184));
+        card.setMinimumSize(new Dimension(188, 184));
+        card.setMaximumSize(new Dimension(188, 184));
 
         JLabel imgLabel = new JLabel("", SwingConstants.CENTER);
-        imgLabel.setPreferredSize(new Dimension(56, 44));
+        imgLabel.setPreferredSize(new Dimension(56, 46));
         imgLabel.setOpaque(true);
         imgLabel.setBackground(new Color(49, 73, 105));
         card.add(imgLabel, BorderLayout.NORTH);
 
         double displayPrice = pickDisplayPrice(item, category);
+        JPanel textPanel = new JPanel(new BorderLayout());
+        textPanel.setOpaque(false);
+        textPanel.setPreferredSize(new Dimension(160, 66));
+        textPanel.setMinimumSize(new Dimension(160, 66));
+        textPanel.setMaximumSize(new Dimension(160, 66));
+
         JLabel nameLabel = new JLabel(
-            "<html><div style='text-align:center;'><b style='color:#F5F8FC;font-size:12px;'>" + item.getName()
-            + "</b><br><span style='color:#32C075;font-size:11px;'>\u20B1" + String.format("%.2f", displayPrice) + "</span></div></html>",
+            "<html><div style='width:164px;text-align:center;line-height:1.15;'><b style='color:#F5F8FC;font-size:11px;'>" + item.getName()
+            + "</b><br><span style='color:#32C075;font-size:10px;'>\u20B1" + String.format("%.2f", displayPrice) + "</span></div></html>",
             SwingConstants.CENTER);
         nameLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        card.add(nameLabel, BorderLayout.CENTER);
+        nameLabel.setVerticalAlignment(SwingConstants.CENTER);
+        textPanel.add(nameLabel, BorderLayout.CENTER);
+        card.add(textPanel, BorderLayout.CENTER);
 
-        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 3, 0));
+        JPanel btnPanel = new JPanel(new GridLayout(3, 1, 0, 4));
         btnPanel.setOpaque(false);
+        btnPanel.setBorder(BorderFactory.createEmptyBorder(0, 8, 6, 8));
+        btnPanel.setPreferredSize(new Dimension(160, 74));
+        btnPanel.setMinimumSize(new Dimension(160, 74));
+        btnPanel.setMaximumSize(new Dimension(160, 74));
         addButtonsForCategory(btnPanel, item, category);
+        while (btnPanel.getComponentCount() < 3) {
+            JPanel filler = new JPanel();
+            filler.setOpaque(false);
+            filler.setPreferredSize(new Dimension(1, 24));
+            btnPanel.add(filler);
+        }
         card.add(btnPanel, BorderLayout.SOUTH);
-        card.setPreferredSize(new Dimension(150, 134));
         return card;
     }
 
@@ -282,6 +371,64 @@ public class POSSystem extends javax.swing.JFrame {
                      : item.getHotPrice() > 0 ? item.getHotPrice()
                      : item.getIcedLargePrice();
         }
+    }
+
+    private Map<String, List<String>> buildCategoryItems() {
+        Map<String, List<String>> categories = new LinkedHashMap<>();
+        for (String category : ORDERING_CATEGORIES) {
+            categories.put(category, new ArrayList<>());
+        }
+
+        for (MenuItem item : Menu.getInstance().getAllItems().values()) {
+            String category = resolveOrderingCategory(item);
+            if (category == null) {
+                continue;
+            }
+            categories.computeIfAbsent(category, ignored -> new ArrayList<>()).add(item.getName());
+        }
+
+        return categories;
+    }
+
+    private String resolveOrderingCategory(MenuItem item) {
+        String itemName = item.getName();
+        if (itemName == null) {
+            return null;
+        }
+
+        if (SPECIALTY_DRINKS.contains(itemName)) {
+            return "Specialty Drinks";
+        }
+        if (TEA_LATTE_ITEMS.contains(itemName)) {
+            return "Tea Latte";
+        }
+        if (NON_COFFEE_ITEMS.contains(itemName)) {
+            return "Non-Coffee";
+        }
+        if (FRUIT_TEA_ITEMS.contains(itemName)) {
+            return "Fruit Tea";
+        }
+        if (HERBAL_TEA_ITEMS.contains(itemName)) {
+            return "Herbal Tea";
+        }
+        if (SANDWICH_ITEMS.contains(itemName)) {
+            return "Sandwiches";
+        }
+        if (PANDESAL_PAIR_ITEMS.contains(itemName)) {
+            return "Pandesal Pairs";
+        }
+        if (PASTRY_ITEMS.contains(itemName)) {
+            return "Pastries";
+        }
+        if (HOUSE_FAVORITES_PRICES.containsKey(itemName)) {
+            return "House Favorites";
+        }
+
+        if ("Coffee".equals(item.getCategory())) {
+            return "Espresso & Coffee";
+        }
+
+        return null;
     }
 
     private void addButtonsForCategory(JPanel panel, MenuItem item, String category) {
@@ -370,11 +517,15 @@ public class POSSystem extends javax.swing.JFrame {
     }
 
     private void styleProdBtn(JButton btn) {
-        btn.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+        btn.setFont(new Font("Segoe UI", Font.PLAIN, 9));
         btn.setBackground(new Color(50, 157, 111));
         btn.setForeground(Color.WHITE);
         btn.setFocusPainted(false);
-        btn.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
+        btn.setPreferredSize(new Dimension(144, 20));
+        btn.setMaximumSize(new Dimension(144, 20));
+        btn.setMinimumSize(new Dimension(144, 20));
+        btn.setMargin(new Insets(0, 6, 0, 6));
+        btn.setBorder(BorderFactory.createEmptyBorder(1, 4, 1, 4));
         btn.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
     }
 
@@ -468,7 +619,10 @@ public class POSSystem extends javax.swing.JFrame {
         receiptPanel.removeAll();
         receiptPanel.setLayout(new BoxLayout(receiptPanel, BoxLayout.Y_AXIS));
         receiptPanel.setBackground(new Color(28, 43, 63));
-        receiptPanel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        receiptPanel.setBorder(BorderFactory.createCompoundBorder(
+            new ui.RoundedLineBorder(new Color(49, 73, 105), ui.AppTheme.BORDER_THICKNESS, ui.AppTheme.BORDER_RADIUS),
+            BorderFactory.createEmptyBorder(6, 8, 6, 8)
+        ));
 
         double totalInclusive = 0;
         for (OrderEntry entry : orderEntries) {
@@ -478,13 +632,13 @@ public class POSSystem extends javax.swing.JFrame {
         double vat = totalInclusive - subTotalExVat;
 
         JLabel orderNumLabel = new JLabel("Order #" + (orderCount + 1));
-        orderNumLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        orderNumLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
         orderNumLabel.setForeground(new Color(245, 248, 252));
         orderNumLabel.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
         receiptPanel.add(orderNumLabel);
 
         JButton clearBtn = new JButton("Clear All");
-        clearBtn.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+        clearBtn.setFont(new Font("Segoe UI", Font.PLAIN, 9));
         clearBtn.setBackground(new Color(180, 60, 60));
         clearBtn.setForeground(Color.WHITE);
         clearBtn.setFocusPainted(false);
@@ -494,10 +648,10 @@ public class POSSystem extends javax.swing.JFrame {
             refreshOrderDisplay();
         });
         receiptPanel.add(clearBtn);
-        receiptPanel.add(Box.createVerticalStrut(10));
+        receiptPanel.add(Box.createVerticalStrut(4));
 
         receiptPanel.add(new JScrollPane(orderPanel, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER));
-        receiptPanel.add(Box.createVerticalStrut(8));
+        receiptPanel.add(Box.createVerticalStrut(4));
 
         JLabel line = new JLabel("─────────────────────");
         line.setForeground(new Color(100, 130, 160));
@@ -508,32 +662,32 @@ public class POSSystem extends javax.swing.JFrame {
         receiptPanel.add(makeReceiptRow("Tax (12%):", String.format("\u20B1%.2f", vat)));
         receiptPanel.add(makeReceiptRow("Total:", String.format("\u20B1%.2f", totalInclusive)));
 
-        receiptPanel.add(Box.createVerticalStrut(6));
+        receiptPanel.add(Box.createVerticalStrut(3));
         receiptPanel.add(makeReceiptRow("Cash:", ""));
 
         JTextField cashField = new JTextField(10);
         cashField.setHorizontalAlignment(JTextField.RIGHT);
         AppTheme.styleSearchField(cashField);
-        cashField.setMaximumSize(new Dimension(120, 26));
+        cashField.setMaximumSize(new Dimension(110, 24));
         cashField.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
         receiptPanel.add(cashField);
 
-        receiptPanel.add(Box.createVerticalStrut(2));
+        receiptPanel.add(Box.createVerticalStrut(1));
         receiptPanel.add(makeReceiptRow("Change:", "\u20B10.00"));
 
-        receiptPanel.add(Box.createVerticalStrut(10));
+        receiptPanel.add(Box.createVerticalStrut(4));
 
         final double fSubTotalExVat = subTotalExVat;
         final double fVat = vat;
         final double fTotal = totalInclusive;
 
         JButton printBtn = new JButton("Print Bills");
-        printBtn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        printBtn.setFont(new Font("Segoe UI", Font.BOLD, 12));
         printBtn.setBackground(new Color(50, 157, 111));
         printBtn.setForeground(Color.WHITE);
         printBtn.setFocusPainted(false);
         printBtn.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
-        printBtn.setMaximumSize(new Dimension(200, 35));
+        printBtn.setMaximumSize(new Dimension(180, 32));
         printBtn.addActionListener(e -> {
             String cashStr = cashField.getText().trim();
             if (cashStr.isEmpty()) {
@@ -561,12 +715,13 @@ public class POSSystem extends javax.swing.JFrame {
     private JPanel makeReceiptRow(String label, String value) {
         JPanel row = new JPanel(new BorderLayout());
         row.setOpaque(false);
+        row.setBorder(BorderFactory.createEmptyBorder(1, 0, 1, 0));
         JLabel lbl = new JLabel(label);
-        lbl.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        lbl.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         lbl.setForeground(new Color(197, 209, 224));
         row.add(lbl, BorderLayout.WEST);
         JLabel val = new JLabel(value);
-        val.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        val.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         val.setForeground(new Color(245, 248, 252));
         row.add(val, BorderLayout.EAST);
         return row;
@@ -669,13 +824,7 @@ public class POSSystem extends javax.swing.JFrame {
         sidebarPanel.setBackground(new Color(23, 36, 54));
         sidebarPanel.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
 
-        String[] categories = {
-            "Espresso & Coffee", "Specialty Drinks", "Tea Latte", "Non-Coffee",
-            "House Favorites", "Fruit Tea", "Herbal Tea",
-            "Sandwiches", "Pandesal Pairs", "Pastries"
-        };
-
-        for (String cat : categories) {
+        for (String cat : ORDERING_CATEGORIES) {
             JButton btn = new JButton(cat);
             btn.setFont(new Font("Segoe UI", Font.PLAIN, 11));
             btn.setBackground(new Color(36, 55, 83));
@@ -688,9 +837,9 @@ public class POSSystem extends javax.swing.JFrame {
         }
 
         // ─── Center panel (pills + search + product grid) ──────
-        centerPanel = new JPanel(new BorderLayout(0, 6));
+        centerPanel = new JPanel(new BorderLayout(0, 10));
         centerPanel.setBackground(new Color(28, 43, 63));
-        centerPanel.setBorder(BorderFactory.createEmptyBorder(6, 8, 8, 8));
+        centerPanel.setBorder(BorderFactory.createEmptyBorder(10, 12, 12, 10));
 
         JPanel centerTopPanel = new JPanel(new BorderLayout(4, 0));
         centerTopPanel.setOpaque(false);
@@ -729,39 +878,67 @@ public class POSSystem extends javax.swing.JFrame {
             }
         });
         searchPanel.add(searchField);
+        sidebarPanel.setPreferredSize(new Dimension(0, 56));
         centerTopPanel.add(sidebarPanel, BorderLayout.NORTH);
         centerTopPanel.add(searchPanel, BorderLayout.SOUTH);
         centerPanel.add(centerTopPanel, BorderLayout.NORTH);
 
-        productGridPanel = new JPanel(new GridLayout(0, 4, 8, 8));
+        productGridPanel = new JPanel();
+        productGridPanel.setLayout(new BoxLayout(productGridPanel, BoxLayout.Y_AXIS));
         productGridPanel.setBackground(new Color(28, 43, 63));
-        centerPanel.add(new JScrollPane(productGridPanel), BorderLayout.CENTER);
+        productGridPanel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        JScrollPane productScroll = new JScrollPane(
+            productGridPanel,
+            JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+            JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED
+        );
+        productScroll.setBorder(BorderFactory.createCompoundBorder(
+            new ui.RoundedLineBorder(new Color(49, 73, 105), ui.AppTheme.BORDER_THICKNESS, ui.AppTheme.BORDER_RADIUS),
+            BorderFactory.createEmptyBorder(2, 2, 2, 2)
+        ));
+        productScroll.getViewport().setBackground(new Color(28, 43, 63));
+        centerPanel.add(productScroll, BorderLayout.CENTER);
 
         // ─── Right sidebar (order summary) ─────────────────────
         orderPanel = new JPanel(new BorderLayout());
         orderPanel.setBackground(new Color(28, 43, 63));
+        orderPanel.setBorder(BorderFactory.createEmptyBorder(0, 6, 0, 0));
 
         receiptPanel = new JPanel();
         receiptPanel.setLayout(new BoxLayout(receiptPanel, BoxLayout.Y_AXIS));
         receiptPanel.setBackground(new Color(28, 43, 63));
-        receiptPanel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        receiptPanel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(49, 73, 105), 1),
+            BorderFactory.createEmptyBorder(10, 10, 10, 10)
+        ));
 
         JScrollPane receiptScroll = new JScrollPane(receiptPanel);
-        receiptScroll.setBorder(null);
-        receiptScroll.setPreferredSize(new Dimension(320, 0));
+        receiptScroll.setBorder(new ui.RoundedLineBorder(new Color(49, 73, 105), ui.AppTheme.BORDER_THICKNESS, ui.AppTheme.BORDER_RADIUS));
+        receiptScroll.getViewport().setBackground(new Color(28, 43, 63));
+        receiptScroll.setPreferredSize(new Dimension(300, 520));
+        receiptScroll.setMaximumSize(new Dimension(300, 520));
+        receiptScroll.setAlignmentY(java.awt.Component.TOP_ALIGNMENT);
 
         // Assemble ordering panel
         JPanel topBar = new JPanel(new BorderLayout());
         topBar.setOpaque(false);
         topBar.add(titleLabel, BorderLayout.WEST);
 
-        JPanel body = new JPanel(new BorderLayout());
+        JPanel body = new JPanel(new BorderLayout(12, 0));
         body.setOpaque(false);
+        body.setBorder(BorderFactory.createEmptyBorder(10, 12, 12, 12));
         body.add(centerPanel, BorderLayout.CENTER);
-        body.add(receiptScroll, BorderLayout.EAST);
+        JPanel receiptHolder = new JPanel();
+        receiptHolder.setOpaque(false);
+        receiptHolder.setLayout(new BoxLayout(receiptHolder, BoxLayout.Y_AXIS));
+        receiptHolder.add(receiptScroll);
+        receiptHolder.add(Box.createVerticalGlue());
+        body.add(receiptHolder, BorderLayout.EAST);
 
         orderingPanel = new JPanel(new BorderLayout());
         orderingPanel.setBackground(new Color(28, 43, 63));
+        orderingPanel.setBorder(BorderFactory.createEmptyBorder(8, 10, 10, 10));
+        topBar.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
         orderingPanel.add(topBar, BorderLayout.NORTH);
         orderingPanel.add(body, BorderLayout.CENTER);
 
@@ -1025,7 +1202,7 @@ public class POSSystem extends javax.swing.JFrame {
         inventoryDetailArea.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
         JScrollPane detailScroll = new JScrollPane(inventoryDetailArea);
-        detailScroll.setBorder(BorderFactory.createLineBorder(new Color(60, 85, 120), 1, true));
+        detailScroll.setBorder(new ui.RoundedLineBorder(new Color(60, 85, 120), ui.AppTheme.BORDER_THICKNESS, ui.AppTheme.BORDER_RADIUS));
         detailScroll.getViewport().setBackground(AppTheme.BG_PRIMARY);
         detailCard.add(detailScroll, BorderLayout.CENTER);
 

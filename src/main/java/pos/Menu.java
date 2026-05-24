@@ -1,6 +1,5 @@
 package pos;
 
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.swing.JOptionPane;
@@ -15,7 +14,7 @@ public class Menu {
 
     private Menu() {
         repository = new SQLiteMenuRepository();
-        menuItems = new HashMap<>();
+        menuItems = new LinkedHashMap<>();
         loadFromRepositoryOrInitializeDefaults();
         ensureExtraItems();
     }
@@ -90,11 +89,17 @@ public class Menu {
     }
 
     private void ensureExtraItems() {
-        Map<String, MenuItem> extra = new HashMap<>();
+        Map<String, MenuItem> extra = new LinkedHashMap<>();
         boolean changed = false;
 
         if (!menuItems.containsKey("Manila Latte")) {
             extra.put(StringUtil.normalizeName("Manila Latte"), new CoffeeItem("Manila Latte", 0, 215, 0));
+        }
+        if (!menuItems.containsKey("Pumpkin Spice Latte")) {
+            extra.put(StringUtil.normalizeName("Pumpkin Spice Latte"), new CoffeeItem("Pumpkin Spice Latte", 0, 220, 0));
+        }
+        if (!menuItems.containsKey("Spiced Cookie Latte")) {
+            extra.put(StringUtil.normalizeName("Spiced Cookie Latte"), new CoffeeItem("Spiced Cookie Latte", 0, 225, 0));
         }
         if (!menuItems.containsKey("Dragon Fruit Coconut Latte")) {
             extra.put(StringUtil.normalizeName("Dragon Fruit Coconut Latte"), new NonCoffeeItem("Dragon Fruit Coconut Latte", 0, 190, 210));

@@ -104,6 +104,18 @@ public class Menu {
         if (!menuItems.containsKey("Dragon Fruit Coconut Latte")) {
             extra.put(StringUtil.normalizeName("Dragon Fruit Coconut Latte"), new NonCoffeeItem("Dragon Fruit Coconut Latte", 0, 190, 210));
         }
+        if (!menuItems.containsKey("Pumpkin Spice Latte")) {
+            extra.put(StringUtil.normalizeName("Pumpkin Spice Latte"), new CoffeeItem("Pumpkin Spice Latte", 0, 220, 0));
+        }
+        if (!menuItems.containsKey("Spiced Cookie Latte")) {
+            extra.put(StringUtil.normalizeName("Spiced Cookie Latte"), new CoffeeItem("Spiced Cookie Latte", 0, 225, 0));
+        }
+        if (!menuItems.containsKey("Hojicha Latte")) {
+            extra.put(StringUtil.normalizeName("Hojicha Latte"), new NonCoffeeItem("Hojicha Latte", 200, 215, 0));
+        }
+        if (!menuItems.containsKey("Chai Latte")) {
+            extra.put(StringUtil.normalizeName("Chai Latte"), new NonCoffeeItem("Chai Latte", 190, 205, 0));
+        }
         if (!menuItems.containsKey("Earl Grey") && menuItems.containsKey("Early Grey")) {
             MenuItem old = menuItems.remove("Early Grey");
             if (old != null) {
@@ -140,6 +152,12 @@ public class Menu {
         }
         if (!menuItems.containsKey("Chocolate Cookies")) {
             extra.put(StringUtil.normalizeName("Chocolate Cookies"), new FoodItem("Chocolate Cookies", "Food", 65));
+        }
+        if (!menuItems.containsKey("S'mores Cookie")) {
+            extra.put(StringUtil.normalizeName("S'mores Cookie"), new FoodItem("S'mores Cookie", "Food", 75));
+        }
+        if (!menuItems.containsKey("Red Velvet Cream Cheese Cookie")) {
+            extra.put(StringUtil.normalizeName("Red Velvet Cream Cheese Cookie"), new FoodItem("Red Velvet Cream Cheese Cookie", "Food", 85));
         }
         if (!menuItems.containsKey("Brownies")) {
             extra.put(StringUtil.normalizeName("Brownies"), new FoodItem("Brownies", "Food", 80));

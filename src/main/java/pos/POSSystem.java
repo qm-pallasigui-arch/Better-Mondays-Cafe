@@ -219,10 +219,8 @@ public class POSSystem extends javax.swing.JFrame {
         monitoring.loadLowStockIngredients();
 
         AppTheme.applyToFrame(this);
-        styleSearchField();
 
-        showCategory("Espresso & Coffee");
-        refreshOrderDisplay();
+        // OrderingPanel handles its own initial category state
     }
 
     @Deprecated
@@ -244,17 +242,18 @@ public class POSSystem extends javax.swing.JFrame {
     }
 
 
-    // ─── Category display ───────────────────────────────────────
+    // ─── Category display (legacy, kept for compatibility) ──────
     private void showCategory(String category) {
         activeCategory = category;
-        for (java.awt.Component c : sidebarPanel.getComponents()) {
-            if (c instanceof JButton b) {
-                boolean active = category.equals(b.getText());
-                b.setBackground(active ? new Color(50, 157, 111) : new Color(36, 55, 83));
-                b.setForeground(active ? Color.WHITE : new Color(245, 248, 252));
+        if (sidebarPanel != null) {
+            for (java.awt.Component c : sidebarPanel.getComponents()) {
+                if (c instanceof JButton b) {
+                    boolean active = category.equals(b.getText());
+                    b.setBackground(active ? new Color(50, 157, 111) : new Color(36, 55, 83));
+                    b.setForeground(active ? Color.WHITE : new Color(245, 248, 252));
+                }
             }
         }
-        rebuildProductGrid(category, searchField.getText());
     }
 
     private void rebuildProductGrid(String category, String search) {
@@ -809,139 +808,13 @@ public class POSSystem extends javax.swing.JFrame {
         contentPanel.setBackground(new Color(28, 43, 63));
 
         // ═══════════════════════════════════════════════════════════
-        //  ORDERING TAB
+        //  ORDERING TAB  (redesigned OrderingPanel)
         // ═══════════════════════════════════════════════════════════
-        jPanelPOS.setBackground(new Color(28, 43, 63));
-        jPanelPOS.setLayout(new BorderLayout());
-
-        JLabel titleLabel = new JLabel("Ordering");
-        titleLabel.setFont(new Font("Segoe UI", Font.PLAIN, 36));
-        titleLabel.setForeground(new Color(255, 255, 255));
-        titleLabel.setBorder(BorderFactory.createEmptyBorder(8, 12, 0, 0));
-
-        // ─── Category pills (horizontal nav) ───────────────────
-        sidebarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 4));
-        sidebarPanel.setBackground(new Color(23, 36, 54));
-        sidebarPanel.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
-
-        for (String cat : ORDERING_CATEGORIES) {
-            JButton btn = new JButton(cat);
-            btn.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-            btn.setBackground(new Color(36, 55, 83));
-            btn.setForeground(new Color(245, 248, 252));
-            btn.setFocusPainted(false);
-            btn.setBorder(ui.AppTheme.inputBorderPill());
-            btn.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-            btn.addActionListener(e -> showCategory(btn.getText()));
-            sidebarPanel.add(btn);
-        }
-
-        // ─── Center panel (pills + search + product grid) ──────
-        centerPanel = new JPanel(new BorderLayout(0, 10));
-        centerPanel.setBackground(new Color(28, 43, 63));
-        centerPanel.setBorder(BorderFactory.createEmptyBorder(10, 12, 12, 10));
-
-        JPanel centerTopPanel = new JPanel(new BorderLayout(4, 0));
-        centerTopPanel.setOpaque(false);
-
-        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        searchPanel.setOpaque(false);
-
-        JLabel searchIcon = new JLabel("\uD83D\uDD0D");
-        searchIcon.setFont(new Font("Segoe UI", Font.PLAIN, 16));
-        searchIcon.setForeground(new Color(100, 130, 160));
-        searchPanel.add(searchIcon);
-
-        searchField = new JTextField("Search a product", 20);
-        AppTheme.styleSearchField(searchField);
-        searchField.setPreferredSize(new Dimension(250, 32));
-        searchField.addFocusListener(new java.awt.event.FocusAdapter() {
-            @Override
-            public void focusGained(java.awt.event.FocusEvent e) {
-                if ("Search a product".equals(searchField.getText())) {
-                    searchField.setText("");
-                    searchField.setForeground(new Color(197, 209, 224));
-                }
-            }
-            @Override
-            public void focusLost(java.awt.event.FocusEvent e) {
-                if (searchField.getText().isEmpty()) {
-                    searchField.setText("Search a product");
-                    searchField.setForeground(new Color(100, 130, 160));
-                }
-            }
+        orderingPanel = new OrderingPanel(() -> {
+            loadInventoryTable();
+            if (monitoring != null) monitoring.loadLowStockIngredients();
         });
-        searchField.addKeyListener(new java.awt.event.KeyAdapter() {
-            @Override
-            public void keyReleased(java.awt.event.KeyEvent e) {
-                rebuildProductGrid(activeCategory, searchField.getText());
-            }
-        });
-        searchPanel.add(searchField);
-        sidebarPanel.setPreferredSize(new Dimension(0, 56));
-        centerTopPanel.add(sidebarPanel, BorderLayout.NORTH);
-        centerTopPanel.add(searchPanel, BorderLayout.SOUTH);
-        centerPanel.add(centerTopPanel, BorderLayout.NORTH);
-
-        productGridPanel = new JPanel();
-        productGridPanel.setLayout(new BoxLayout(productGridPanel, BoxLayout.Y_AXIS));
-        productGridPanel.setBackground(new Color(28, 43, 63));
-        productGridPanel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
-        JScrollPane productScroll = new JScrollPane(
-            productGridPanel,
-            JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-            JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED
-        );
-        productScroll.setBorder(BorderFactory.createCompoundBorder(
-            new ui.RoundedLineBorder(new Color(49, 73, 105), ui.AppTheme.BORDER_THICKNESS, ui.AppTheme.BORDER_RADIUS),
-            BorderFactory.createEmptyBorder(2, 2, 2, 2)
-        ));
-        productScroll.getViewport().setBackground(new Color(28, 43, 63));
-        centerPanel.add(productScroll, BorderLayout.CENTER);
-
-        // ─── Right sidebar (order summary) ─────────────────────
-        orderPanel = new JPanel(new BorderLayout());
-        orderPanel.setBackground(new Color(28, 43, 63));
-        orderPanel.setBorder(BorderFactory.createEmptyBorder(0, 6, 0, 0));
-
-        receiptPanel = new JPanel();
-        receiptPanel.setLayout(new BoxLayout(receiptPanel, BoxLayout.Y_AXIS));
-        receiptPanel.setBackground(new Color(28, 43, 63));
-        receiptPanel.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(49, 73, 105), 1),
-            BorderFactory.createEmptyBorder(10, 10, 10, 10)
-        ));
-
-        JScrollPane receiptScroll = new JScrollPane(receiptPanel);
-        receiptScroll.setBorder(new ui.RoundedLineBorder(new Color(49, 73, 105), ui.AppTheme.BORDER_THICKNESS, ui.AppTheme.BORDER_RADIUS));
-        receiptScroll.getViewport().setBackground(new Color(28, 43, 63));
-        receiptScroll.setPreferredSize(new Dimension(300, 520));
-        receiptScroll.setMaximumSize(new Dimension(300, 520));
-        receiptScroll.setAlignmentY(java.awt.Component.TOP_ALIGNMENT);
-
-        // Assemble ordering panel
-        JPanel topBar = new JPanel(new BorderLayout());
-        topBar.setOpaque(false);
-        topBar.add(titleLabel, BorderLayout.WEST);
-
-        JPanel body = new JPanel(new BorderLayout(12, 0));
-        body.setOpaque(false);
-        body.setBorder(BorderFactory.createEmptyBorder(10, 12, 12, 12));
-        body.add(centerPanel, BorderLayout.CENTER);
-        JPanel receiptHolder = new JPanel();
-        receiptHolder.setOpaque(false);
-        receiptHolder.setLayout(new BoxLayout(receiptHolder, BoxLayout.Y_AXIS));
-        receiptHolder.add(receiptScroll);
-        receiptHolder.add(Box.createVerticalGlue());
-        body.add(receiptHolder, BorderLayout.EAST);
-
-        orderingPanel = new JPanel(new BorderLayout());
         orderingPanel.setBackground(new Color(28, 43, 63));
-        orderingPanel.setBorder(BorderFactory.createEmptyBorder(8, 10, 10, 10));
-        topBar.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
-        orderingPanel.add(topBar, BorderLayout.NORTH);
-        orderingPanel.add(body, BorderLayout.CENTER);
-
         contentPanel.add(orderingPanel, "Ordering");
         contentPanel.add(new SearchModule(), "Search");
 

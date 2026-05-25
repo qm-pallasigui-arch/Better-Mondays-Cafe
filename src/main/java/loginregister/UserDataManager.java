@@ -87,4 +87,22 @@ public class UserDataManager {
             return false;
         }
     }
+
+    public static boolean updateUsername(String currentUsername, String newUsername, String currentPassword) {
+        try {
+            USER_REPOSITORY.updateUsername(currentUsername, newUsername, currentPassword);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public static boolean updatePassword(String username, String currentPassword, String newPassword) {
+        try {
+            USER_REPOSITORY.updatePassword(username, currentPassword, newPassword);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
 }

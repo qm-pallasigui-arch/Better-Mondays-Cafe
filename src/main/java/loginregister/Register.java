@@ -3,6 +3,7 @@ package loginregister;
 
 import ui.AppTheme;
 import util.FieldAssist;
+import java.awt.Dimension;
 import java.util.stream.Collectors;
 
 /**
@@ -16,8 +17,9 @@ public class Register extends javax.swing.JFrame {
      */
     public Register() {
         initComponents();
-        setMinimumSize(new java.awt.Dimension(700, 520));
         setResizable(true);
+        AppTheme.applyResponsiveFrameSize(this, 0.38, 0.55, new Dimension(700, 520));
+        jPanel2.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
         FieldAssist.installAutocomplete(jTextField1, () -> UserDataManager.listUsers().stream()
             .map(UserAccount::getUsername)
             .collect(Collectors.toList()));
@@ -129,14 +131,14 @@ public class Register extends javax.swing.JFrame {
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
                 .addGap(30, 30, 30)
-                .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, 601, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(jPanel2, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addContainerGap(51, Short.MAX_VALUE))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
                 .addGap(30, 30, 30)
-                .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, 417, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(jPanel2, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addContainerGap(61, Short.MAX_VALUE))
         );
 

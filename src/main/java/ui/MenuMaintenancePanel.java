@@ -15,9 +15,11 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.event.ListSelectionEvent;
 import javax.swing.table.DefaultTableModel;
 import persistence.MenuRepository;
 import persistence.sqlite.SQLiteMenuRepository;
@@ -32,6 +34,7 @@ public class MenuMaintenancePanel extends JPanel {
     private final JTable table;
     private final JComboBox<String> categoryFilter;
     private final JTextField searchField;
+    private final JTextArea ingredientDetails;
     private java.util.List<MenuItem> cachedItems = new ArrayList<>();
 
     public MenuMaintenancePanel() throws Exception {
@@ -50,12 +53,23 @@ public class MenuMaintenancePanel extends JPanel {
         table.setFillsViewportHeight(true);
         table.setRowHeight(26);
         AppTheme.applyTableDefaults(table);
+        table.getSelectionModel().addListSelectionListener((ListSelectionEvent e) -> {
+            if (!e.getValueIsAdjusting()) {
+                updateIngredientPanel();
+            }
+        });
 
         FilterRow filterPanel = new FilterRow();
         categoryFilter = new JComboBox<>(new String[]{"All", "Coffee", "Non-Coffee", "Fruit Tea", "Herbal Tea", "Food"});
         searchField = new JTextField(24);
         filterPanel.addLabeled("Category", categoryFilter);
         filterPanel.addLabeled("Search", searchField);
+
+        ingredientDetails = new JTextArea("Select a menu item to see its ingredients.");
+        ingredientDetails.setEditable(false);
+        ingredientDetails.setLineWrap(true);
+        ingredientDetails.setWrapStyleWord(true);
+        ingredientDetails.setOpaque(false);
 
         JPanel buttons = new JPanel();
         JButton add = new JButton("Add");
@@ -79,12 +93,34 @@ public class MenuMaintenancePanel extends JPanel {
         buttons.add(edit);
         buttons.add(delete);
 
+        JPanel tableArea = new JPanel(new BorderLayout(12, 0));
+        tableArea.add(new JScrollPane(table), BorderLayout.CENTER);
+        tableArea.add(buildIngredientPanel(), BorderLayout.EAST);
+
         add(filterPanel, BorderLayout.NORTH);
-        add(new JScrollPane(table), BorderLayout.CENTER);
+        add(tableArea, BorderLayout.CENTER);
         add(buttons, BorderLayout.SOUTH);
 
         reload();
         AppTheme.applyToComponent(this);
+    }
+
+    private JPanel buildIngredientPanel() {
+        JPanel panel = new JPanel(new BorderLayout(0, 8));
+        panel.setPreferredSize(new Dimension(260, 0));
+        panel.setMinimumSize(new Dimension(220, 0));
+        panel.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 8, 0, 0));
+
+        JLabel title = new JLabel("Ingredients");
+        title.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 13));
+
+        JScrollPane scroll = new JScrollPane(ingredientDetails);
+        scroll.setBorder(AppTheme.inputBorderRegular());
+        scroll.setPreferredSize(new Dimension(240, 220));
+
+        panel.add(title, BorderLayout.NORTH);
+        panel.add(scroll, BorderLayout.CENTER);
+        return panel;
     }
 
     private void reload() {
@@ -118,6 +154,12 @@ public class MenuMaintenancePanel extends JPanel {
                 });
             }
         }
+
+        if (model.getRowCount() > 0) {
+            table.setRowSelectionInterval(0, 0);
+        } else {
+            updateIngredientPanel();
+        }
     }
 
     private void onAdd() {
@@ -147,6 +189,44 @@ public class MenuMaintenancePanel extends JPanel {
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Error adding item: " + ex.getMessage());
         }
+    }
+
+    private void updateIngredientPanel() {
+        int row = table.getSelectedRow();
+        if (row < 0 || row >= model.getRowCount()) {
+            ingredientDetails.setText("Select a menu item to see its ingredients.");
+            return;
+        }
+
+        String itemName = String.valueOf(model.getValueAt(row, 0));
+        String normalized = StringUtil.normalizeName(itemName);
+        Optional<MenuItem> selected = cachedItems.stream()
+                .filter(item -> StringUtil.normalizeName(item.getName()).equals(normalized))
+                .findFirst();
+
+        if (selected.isEmpty()) {
+            ingredientDetails.setText("No ingredient details available for the selected item.");
+            return;
+        }
+
+        MenuItem item = selected.get();
+        StringBuilder details = new StringBuilder();
+        details.append("Name: ").append(item.getName()).append('\n');
+        details.append("Category: ").append(item.getCategory()).append('\n');
+        details.append("Hot: ").append(item.getHotPrice()).append('\n');
+        details.append("Iced Regular: ").append(item.getIcedRegularPrice()).append('\n');
+        details.append("Iced Large: ").append(item.getIcedLargePrice()).append('\n');
+        details.append('\n').append("Ingredients:").append('\n');
+
+        if (item.getIngredients().isEmpty()) {
+            details.append("None configured");
+        } else {
+            item.getIngredients().forEach((ingredient, quantity) ->
+                details.append("- ").append(ingredient).append(" : ").append(quantity).append('\n'));
+        }
+
+        ingredientDetails.setText(details.toString());
+        ingredientDetails.setCaretPosition(0);
     }
 
     private void onEdit() {

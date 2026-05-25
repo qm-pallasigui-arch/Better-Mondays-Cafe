@@ -106,4 +106,55 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
             statement.executeUpdate();
         }
     }
+
+    public void updateUsername(String currentUsername, String newUsername, String currentPassword) throws Exception {
+        try (Connection connection = AppDatabase.openConnection();
+             PreparedStatement verify = connection.prepareStatement(
+                     "SELECT password_hash FROM users WHERE username = ?");
+             PreparedStatement update = connection.prepareStatement(
+                     "UPDATE users SET username = ? WHERE username = ?")) {
+            verify.setString(1, currentUsername);
+            try (ResultSet resultSet = verify.executeQuery()) {
+                if (!resultSet.next()) {
+                    throw new IllegalArgumentException("Current user not found");
+                }
+                if (!PasswordHasher.verifyPassword(currentPassword, resultSet.getString("password_hash"))) {
+                    throw new SecurityException("Current password is incorrect");
+                }
+            }
+
+            update.setString(1, newUsername);
+            update.setString(2, currentUsername);
+            int affected = update.executeUpdate();
+            if (affected == 0) {
+                throw new IllegalArgumentException("Unable to update username");
+            }
+        }
+    }
+
+    @Override
+    public void updatePassword(String username, String currentPassword, String newPassword) throws Exception {
+        try (Connection connection = AppDatabase.openConnection();
+             PreparedStatement verify = connection.prepareStatement(
+                     "SELECT password_hash FROM users WHERE username = ?");
+             PreparedStatement update = connection.prepareStatement(
+                     "UPDATE users SET password_hash = ? WHERE username = ?")) {
+            verify.setString(1, username);
+            try (ResultSet resultSet = verify.executeQuery()) {
+                if (!resultSet.next()) {
+                    throw new IllegalArgumentException("Current user not found");
+                }
+                if (!PasswordHasher.verifyPassword(currentPassword, resultSet.getString("password_hash"))) {
+                    throw new SecurityException("Current password is incorrect");
+                }
+            }
+
+            update.setString(1, PasswordHasher.hashPassword(newPassword));
+            update.setString(2, username);
+            int affected = update.executeUpdate();
+            if (affected == 0) {
+                throw new IllegalArgumentException("Unable to update password");
+            }
+        }
+    }
 }

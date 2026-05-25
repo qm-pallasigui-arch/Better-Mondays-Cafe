@@ -15,4 +15,8 @@ public interface UserRepository {
     List<UserAccount> listUsers() throws Exception;
 
     void updateUserRole(String username, Role role) throws Exception;
+
+    void updateUsername(String currentUsername, String newUsername, String currentPassword) throws Exception;
+
+    void updatePassword(String username, String currentPassword, String newPassword) throws Exception;
 }

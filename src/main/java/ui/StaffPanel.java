@@ -86,6 +86,7 @@ public class StaffPanel extends JPanel {
         this.currentRole = currentRole;
 
         initializeUI();
+        styleShiftButtons();
         registerEvents();
         refreshShiftState();
 
@@ -146,6 +147,32 @@ public class StaffPanel extends JPanel {
         } else {
             add(shiftContent, BorderLayout.CENTER);
         }
+    }
+
+    private void styleShiftButtons() {
+        stylePrimaryShiftButton(startBtn, 124, 38, false);
+        stylePrimaryShiftButton(endBtn, 118, 38, true);
+        stylePrimaryShiftButton(refreshShiftBtn, 128, 38, false);
+        stylePrimaryShiftButton(editShiftBtn, 160, 38, false);
+        // Apply same sizing/styling to admin/account-management controls
+        if (currentRole == Role.ADMIN) {
+            stylePrimaryShiftButton(makeAdminBtn, 140, 38, false);
+            stylePrimaryShiftButton(makeStaffBtn, 140, 38, false);
+            stylePrimaryShiftButton(refreshUsersBtn, 128, 38, false);
+            stylePrimaryShiftButton(refreshAllShiftsBtn, 128, 38, false);
+        }
+    }
+
+    private void stylePrimaryShiftButton(JButton button, int width, int height, boolean danger) {
+        if (button == null) {
+            return;
+        }
+        button.putClientProperty("appTheme.variant", danger ? "danger" : "primary");
+        button.setPreferredSize(new Dimension(width, height));
+        button.setMinimumSize(new Dimension(width, height));
+        button.setMaximumSize(new Dimension(width + 30, height + 6));
+        button.setMargin(new Insets(8, 14, 8, 14));
+        button.setFocusPainted(false);
     }
 
     private JPanel createAllShiftsPanel() {

@@ -206,8 +206,9 @@ public class POSSystem extends javax.swing.JFrame {
         categoryItems = buildCategoryItems();
         initComponents();
         setTitle("Better Mondays Coffeee Cafe Management System - " + username);
-        setMinimumSize(new java.awt.Dimension(1280, 720));
         setResizable(true);
+        setMinimumSize(new java.awt.Dimension(1100, 700));
+        setExtendedState(javax.swing.JFrame.MAXIMIZED_BOTH);
         setLocationRelativeTo(null);
 
         loadInventoryTable();
@@ -219,6 +220,10 @@ public class POSSystem extends javax.swing.JFrame {
         monitoring.loadLowStockIngredients();
 
         AppTheme.applyToFrame(this);
+
+        // Re-apply ordering category pill styles after the global theme
+        // because `AppTheme.applyToFrame` overrides JButton backgrounds.
+        if (orderingPanel != null) orderingPanel.refreshCategoryPills();
 
         // OrderingPanel handles its own initial category state
     }
@@ -315,7 +320,7 @@ public class POSSystem extends javax.swing.JFrame {
         card.setLayout(new BorderLayout(0, 6));
         card.setFillColor(ui.AppTheme.BG_SURFACE);
         card.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
-        card.setBorderColor(new Color(60, 85, 120));
+        card.setBorderColor(AppTheme.BORDER);
         card.setPreferredSize(new Dimension(188, 184));
         card.setMinimumSize(new Dimension(188, 184));
         card.setMaximumSize(new Dimension(188, 184));
@@ -323,7 +328,7 @@ public class POSSystem extends javax.swing.JFrame {
         JLabel imgLabel = new JLabel("", SwingConstants.CENTER);
         imgLabel.setPreferredSize(new Dimension(56, 46));
         imgLabel.setOpaque(true);
-        imgLabel.setBackground(new Color(49, 73, 105));
+        imgLabel.setBackground(AppTheme.BG_SURFACE);
         card.add(imgLabel, BorderLayout.NORTH);
 
         double displayPrice = pickDisplayPrice(item, category);
@@ -549,7 +554,7 @@ public class POSSystem extends javax.swing.JFrame {
         orderPanel.removeAll();
         JPanel itemsPanel = new JPanel();
         itemsPanel.setLayout(new BoxLayout(itemsPanel, BoxLayout.Y_AXIS));
-        itemsPanel.setBackground(new Color(28, 43, 63));
+        itemsPanel.setBackground(AppTheme.BG_PRIMARY);
         itemsPanel.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
 
         for (OrderEntry entry : orderEntries) {
@@ -565,7 +570,7 @@ public class POSSystem extends javax.swing.JFrame {
 
     private JPanel createOrderRow(OrderEntry entry) {
         JPanel row = new JPanel(new BorderLayout(6, 0));
-        row.setBackground(new Color(36, 55, 83));
+        row.setBackground(AppTheme.BG_SURFACE);
         row.setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 6));
 
         JLabel nameLabel = new JLabel(entry.displayName());
@@ -578,8 +583,8 @@ public class POSSystem extends javax.swing.JFrame {
 
         JButton minusBtn = new JButton("-");
         minusBtn.setFont(new Font("Segoe UI", Font.BOLD, 11));
-        minusBtn.setBackground(new Color(60, 85, 120));
-        minusBtn.setForeground(Color.WHITE);
+        minusBtn.setBackground(AppTheme.BG_BADGE_BLUE);
+        minusBtn.setForeground(AppTheme.FG_PRIMARY);
         minusBtn.setFocusPainted(false);
         minusBtn.setMargin(new Insets(0, 4, 0, 4));
         minusBtn.addActionListener(e -> {
@@ -599,7 +604,7 @@ public class POSSystem extends javax.swing.JFrame {
 
         JButton plusBtn = new JButton("+");
         plusBtn.setFont(new Font("Segoe UI", Font.BOLD, 11));
-        plusBtn.setBackground(new Color(60, 85, 120));
+        plusBtn.setBackground(AppTheme.ACCENT);
         plusBtn.setForeground(Color.WHITE);
         plusBtn.setFocusPainted(false);
         plusBtn.setMargin(new Insets(0, 4, 0, 4));
@@ -617,9 +622,9 @@ public class POSSystem extends javax.swing.JFrame {
     private void updateReceipt() {
         receiptPanel.removeAll();
         receiptPanel.setLayout(new BoxLayout(receiptPanel, BoxLayout.Y_AXIS));
-        receiptPanel.setBackground(new Color(28, 43, 63));
+        receiptPanel.setBackground(AppTheme.BG_SURFACE);
         receiptPanel.setBorder(BorderFactory.createCompoundBorder(
-            new ui.RoundedLineBorder(new Color(49, 73, 105), ui.AppTheme.BORDER_THICKNESS, ui.AppTheme.BORDER_RADIUS),
+            new ui.RoundedLineBorder(AppTheme.BORDER, ui.AppTheme.BORDER_THICKNESS, ui.AppTheme.BORDER_RADIUS),
             BorderFactory.createEmptyBorder(6, 8, 6, 8)
         ));
 
@@ -802,10 +807,16 @@ public class POSSystem extends javax.swing.JFrame {
 
         sidebar = new SidebarPanel(currentUsername, currentUserRole, page -> {
             cardLayout.show(contentPanel, page);
-        }, this::logoutAndReturnToLogin);
+        }, this::logoutAndReturnToLogin, newUsername -> {
+            currentUsername = newUsername;
+            setTitle("Better Mondays Coffeee Cafe Management System - " + newUsername);
+            if (sidebar != null) {
+                sidebar.setUsername(newUsername);
+            }
+        });
         cardLayout = new CardLayout();
         contentPanel = new JPanel(cardLayout);
-        contentPanel.setBackground(new Color(28, 43, 63));
+        contentPanel.setBackground(AppTheme.BG_PRIMARY);
 
         // ═══════════════════════════════════════════════════════════
         //  ORDERING TAB  (redesigned OrderingPanel)
@@ -814,7 +825,7 @@ public class POSSystem extends javax.swing.JFrame {
             loadInventoryTable();
             if (monitoring != null) monitoring.loadLowStockIngredients();
         });
-        orderingPanel.setBackground(new Color(28, 43, 63));
+        orderingPanel.setBackground(AppTheme.BG_PRIMARY);
         contentPanel.add(orderingPanel, "Ordering");
         contentPanel.add(new SearchModule(), "Search");
 
@@ -1075,7 +1086,7 @@ public class POSSystem extends javax.swing.JFrame {
         inventoryDetailArea.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
         JScrollPane detailScroll = new JScrollPane(inventoryDetailArea);
-        detailScroll.setBorder(new ui.RoundedLineBorder(new Color(60, 85, 120), ui.AppTheme.BORDER_THICKNESS, ui.AppTheme.BORDER_RADIUS));
+        detailScroll.setBorder(new ui.RoundedLineBorder(AppTheme.BORDER, ui.AppTheme.BORDER_THICKNESS, ui.AppTheme.BORDER_RADIUS));
         detailScroll.getViewport().setBackground(AppTheme.BG_PRIMARY);
         detailCard.add(detailScroll, BorderLayout.CENTER);
 
@@ -1134,11 +1145,11 @@ public class POSSystem extends javax.swing.JFrame {
                     .addGroup(jPanelMonitoringLayout.createSequentialGroup()
                         .addGroup(jPanelMonitoringLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(jLabel4)
-                            .addComponent(jScrollPane5, javax.swing.GroupLayout.PREFERRED_SIZE, 725, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addComponent(jScrollPane5, javax.swing.GroupLayout.DEFAULT_SIZE, 725, Short.MAX_VALUE))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 62, Short.MAX_VALUE)
                         .addGroup(jPanelMonitoringLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(jLabel5)
-                            .addComponent(jScrollPane4, javax.swing.GroupLayout.PREFERRED_SIZE, 532, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addComponent(jScrollPane4, javax.swing.GroupLayout.DEFAULT_SIZE, 532, Short.MAX_VALUE))
                         .addGap(48, 48, 48))
                     .addGroup(jPanelMonitoringLayout.createSequentialGroup()
                         .addComponent(jLabel3)
@@ -1153,7 +1164,7 @@ public class POSSystem extends javax.swing.JFrame {
                     .addComponent(jLabel4)
                     .addComponent(jLabel5))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(jPanelMonitoringLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                .addGroup(jPanelMonitoringLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, true)
                     .addComponent(jScrollPane4, javax.swing.GroupLayout.DEFAULT_SIZE, 650, Short.MAX_VALUE)
                     .addComponent(jScrollPane5))
                 .addContainerGap(36, Short.MAX_VALUE)));
@@ -1759,7 +1770,7 @@ public class POSSystem extends javax.swing.JFrame {
     private CardLayout cardLayout;
     private JPanel contentPanel;
     private SidebarPanel sidebar;
-    private JPanel orderingPanel;
+    private OrderingPanel orderingPanel;
     private javax.swing.JTable jTable1;
     private javax.swing.JTable jTableMonitoring;
     private javax.swing.JTable jTableSales;

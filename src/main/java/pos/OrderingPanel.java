@@ -46,35 +46,36 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import inventory.Inventory;
 import monitoring.SalesRecord;
+import ui.AppTheme;
 
 public class OrderingPanel extends JPanel {
 
     // ─── Dark Slate Cafe palette ───
-    private static final Color BG_PRIMARY       = new Color(15, 25, 35);
-    private static final Color BG_SURFACE       = new Color(26, 37, 53);
-    private static final Color BG_CARD          = new Color(26, 37, 53);
-    private static final Color BG_INPUT         = new Color(20, 30, 44);
-    private static final Color FG_PRIMARY       = new Color(232, 213, 176);
-    private static final Color FG_MUTED         = new Color(107, 127, 142);
-    private static final Color ACCENT           = new Color(200, 134, 10);
-    private static final Color ACCENT_HOVER     = new Color(220, 155, 30);
-    private static final Color SUCCESS          = new Color(59, 158, 95);
-    private static final Color SUCCESS_HOVER    = new Color(75, 180, 115);
-    private static final Color INFO             = new Color(58, 122, 191);
-    private static final Color DANGER           = new Color(184, 64, 64);
-    private static final Color BORDER           = new Color(30, 45, 61);
-    private static final Color TEXT_MUTED       = new Color(77, 96, 112);
-    private static final Color LOG_BG           = new Color(15, 25, 35);
+    private static final Color BG_PRIMARY       = AppTheme.BG_PRIMARY;
+    private static final Color BG_SURFACE       = AppTheme.BG_SURFACE;
+    private static final Color BG_CARD          = AppTheme.BG_SURFACE;
+    private static final Color BG_INPUT         = AppTheme.BG_SURFACE;
+    private static final Color FG_PRIMARY       = AppTheme.FG_PRIMARY;
+    private static final Color FG_MUTED         = AppTheme.FG_MUTED;
+    private static final Color ACCENT           = AppTheme.ACCENT;
+    private static final Color ACCENT_HOVER     = AppTheme.ACCENT_DARK;
+    private static final Color SUCCESS          = AppTheme.SUCCESS;
+    private static final Color SUCCESS_HOVER    = new Color(0x059669);
+    private static final Color INFO             = AppTheme.ACCENT;
+    private static final Color DANGER           = AppTheme.DANGER;
+    private static final Color BORDER           = AppTheme.BORDER;
+    private static final Color TEXT_MUTED       = AppTheme.FG_SUBTLE;
+    private static final Color LOG_BG           = AppTheme.BG_PRIMARY;
 
     // Status colors
-    private static final Color ST_WAITING_BG  = new Color(42, 31, 8);
-    private static final Color ST_WAITING_FG  = new Color(200, 134, 10);
-    private static final Color ST_READY_BG    = new Color(10, 32, 21);
-    private static final Color ST_READY_FG    = new Color(59, 158, 95);
-    private static final Color ST_DONE_BG     = new Color(10, 26, 46);
-    private static final Color ST_DONE_FG     = new Color(58, 122, 191);
-    private static final Color ST_CANCEL_BG   = new Color(42, 13, 13);
-    private static final Color ST_CANCEL_FG   = new Color(184, 64, 64);
+    private static final Color ST_WAITING_BG  = AppTheme.BG_BADGE_YELLOW;
+    private static final Color ST_WAITING_FG  = AppTheme.WARNING;
+    private static final Color ST_READY_BG    = AppTheme.BG_BADGE_GREEN;
+    private static final Color ST_READY_FG    = AppTheme.SUCCESS;
+    private static final Color ST_DONE_BG     = AppTheme.BG_BADGE_BLUE;
+    private static final Color ST_DONE_FG     = AppTheme.ACCENT;
+    private static final Color ST_CANCEL_BG   = AppTheme.BG_BADGE_RED;
+    private static final Color ST_CANCEL_FG   = AppTheme.DANGER;
 
     private static final Font FONT_TITLE    = new Font("Segoe UI", Font.BOLD, 16);
     private static final Font FONT_SUBTITLE = new Font("Segoe UI", Font.BOLD, 13);
@@ -303,7 +304,7 @@ public class OrderingPanel extends JPanel {
         col.add(topSection, BorderLayout.NORTH);
 
         // Product grid
-        productGridPanel = new JPanel(new GridLayout(0, 3, 12, 12));
+        productGridPanel = new JPanel(new GridLayout(0, 2, 12, 12));
         productGridPanel.setOpaque(false);
         productGridPanel.setBorder(new EmptyBorder(6, 0, 0, 0));
         JScrollPane gridScroll = new JScrollPane(productGridPanel);
@@ -444,9 +445,11 @@ public class OrderingPanel extends JPanel {
             btn.setFont(FONT_SMALL);
             btn.setFocusPainted(false);
             btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            btn.setBorder(new EmptyBorder(6, 14, 6, 14));
-            btn.setContentAreaFilled(false);
-            btn.setOpaque(false);
+            btn.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(BORDER, 1, true),
+                new EmptyBorder(6, 14, 6, 14)));
+            btn.setContentAreaFilled(true);
+            btn.setOpaque(true);
             updatePillStyle(btn, cat.equals(activeCategory));
             btn.addActionListener(e -> showCategory(cat));
             pillButtons.add(btn);
@@ -463,7 +466,7 @@ public class OrderingPanel extends JPanel {
                 BorderFactory.createLineBorder(ACCENT, 1, true),
                 new EmptyBorder(6, 14, 6, 14)));
         } else {
-            btn.setBackground(BG_PRIMARY);
+            btn.setBackground(BG_SURFACE);
             btn.setForeground(FG_MUTED);
             btn.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(BORDER, 1, true),
@@ -472,12 +475,19 @@ public class OrderingPanel extends JPanel {
     }
 
     private void showCategory(String category) {
-        if (category.equals(activeCategory)) return;
         activeCategory = category;
         for (JButton btn : pillButtons) {
             updatePillStyle(btn, btn.getText().equals(category));
         }
         rebuildProductGrid();
+    }
+
+    /** Re-apply pill button styles (useful after global theming). */
+    public void refreshCategoryPills() {
+        for (JButton btn : pillButtons) {
+            updatePillStyle(btn, btn.getText().equals(activeCategory));
+        }
+        repaint();
     }
 
     // ─── Product Grid ───
@@ -505,35 +515,53 @@ public class OrderingPanel extends JPanel {
     // ─── Product Card ───
     private JPanel createProductCard(ItemSpec spec) {
         JPanel card = new JPanel(new BorderLayout(0, 0));
-        card.setBackground(BG_CARD);
+        card.setBackground(Color.WHITE);
         card.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(BORDER, 1, true),
+            BorderFactory.createLineBorder(new Color(0xE5E7EB), 1, true),
             new EmptyBorder(0, 0, 8, 0)));
+        card.setPreferredSize(new Dimension(0, 160));
+        card.setMinimumSize(new Dimension(260, 160));
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 160));
 
-        JLabel icon = new JLabel("\u2615", SwingConstants.CENTER) {
-            @Override
-            protected void paintComponent(Graphics g) {
-                g.setColor(BG_SURFACE);
-                g.fillRect(0, 0, getWidth(), getHeight());
-                super.paintComponent(g);
-            }
-        };
-        icon.setFont(new Font("Segoe UI", Font.PLAIN, 36));
-        icon.setForeground(FG_MUTED);
-        icon.setPreferredSize(new Dimension(0, 110));
-        icon.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER));
+        JLabel imageLabel = new JLabel("", SwingConstants.CENTER);
+        imageLabel.setPreferredSize(new Dimension(120, 160));
+        imageLabel.setMinimumSize(new Dimension(120, 160));
+        imageLabel.setMaximumSize(new Dimension(120, 160));
+        imageLabel.setOpaque(true);
+        imageLabel.setBackground(BG_SURFACE);
         ImageIcon img = loadProductImage(activeCategory, spec.displayName);
-        if (img != null) { icon.setText(""); icon.setIcon(img); }
-        card.add(icon, BorderLayout.NORTH);
+        if (img != null) {
+            imageLabel.setIcon(new ImageIcon(img.getImage().getScaledInstance(120, 160, java.awt.Image.SCALE_SMOOTH)));
+        } else {
+            imageLabel.setText(spec.displayName == null || spec.displayName.isBlank() ? "?" : spec.displayName.substring(0, 1).toUpperCase());
+            imageLabel.setFont(new Font("Segoe UI", Font.BOLD, 34));
+            imageLabel.setForeground(FG_MUTED);
+        }
+        card.add(imageLabel, BorderLayout.WEST);
 
-        JPanel content = new JPanel(new BorderLayout(0, 4));
+        JPanel content = new JPanel(new BorderLayout(0, 6));
         content.setOpaque(false);
-        content.setBorder(new EmptyBorder(6, 8, 0, 8));
+        content.setBorder(new EmptyBorder(12, 12, 10, 12));
+
+        JPanel header = new JPanel(new BorderLayout(8, 0));
+        header.setOpaque(false);
 
         JLabel nameLbl = new JLabel(spec.displayName);
-        nameLbl.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        nameLbl.setFont(new Font("Segoe UI", Font.BOLD, 13));
         nameLbl.setForeground(FG_PRIMARY);
-        content.add(nameLbl, BorderLayout.NORTH);
+
+        JLabel priceLbl = new JLabel("\u20B1" + String.format("%.0f", spec.price));
+        priceLbl.setFont(FONT_PRICE);
+        priceLbl.setForeground(ACCENT);
+
+        header.add(nameLbl, BorderLayout.WEST);
+        header.add(priceLbl, BorderLayout.EAST);
+        content.add(header, BorderLayout.NORTH);
+
+        JLabel descLbl = new JLabel("Freshly prepared and ready to add.");
+        descLbl.setFont(FONT_XSMALL);
+        descLbl.setForeground(FG_MUTED);
+        content.add(descLbl, BorderLayout.CENTER);
 
         JButton addBtn = new JButton("Add to Cart");
         addBtn.setFont(new Font("Segoe UI", Font.BOLD, 11));
@@ -545,16 +573,11 @@ public class OrderingPanel extends JPanel {
         addBtn.setFocusPainted(false);
         addBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         addBtn.addActionListener(e -> addOrderItem(spec));
-        content.add(addBtn, BorderLayout.CENTER);
-
-        JLabel priceLbl = new JLabel("\u20B1" + String.format("%.0f", spec.price));
-        priceLbl.setFont(FONT_PRICE);
-        priceLbl.setForeground(ACCENT);
-        content.add(priceLbl, BorderLayout.SOUTH);
+        content.add(addBtn, BorderLayout.SOUTH);
 
         JPanel wrap = new JPanel(new BorderLayout());
         wrap.setOpaque(false);
-        wrap.add(content, BorderLayout.NORTH);
+        wrap.add(content, BorderLayout.CENTER);
         card.add(wrap, BorderLayout.CENTER);
         return card;
     }
@@ -566,7 +589,8 @@ public class OrderingPanel extends JPanel {
         col.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(0, 1, 0, 0, BORDER),
             new EmptyBorder(12, 12, 12, 12)));
-        col.setPreferredSize(new Dimension(320, 0));
+        col.setPreferredSize(new Dimension(300, 0));
+        col.setMinimumSize(new Dimension(260, 0));
 
         GridBagConstraints cx = new GridBagConstraints();
         cx.fill = GridBagConstraints.HORIZONTAL;
@@ -807,7 +831,7 @@ public class OrderingPanel extends JPanel {
         JButton minus = new JButton("\u2212");
         minus.setFont(new Font("Segoe UI", Font.BOLD, 12));
         minus.setForeground(FG_PRIMARY);
-        minus.setBackground(new Color(50, 65, 85));
+        minus.setBackground(AppTheme.BG_BADGE_BLUE);
         minus.setPreferredSize(new Dimension(22, 22));
         minus.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(BORDER, 1),
@@ -832,7 +856,7 @@ public class OrderingPanel extends JPanel {
         plus.setBackground(ACCENT);
         plus.setPreferredSize(new Dimension(22, 22));
         plus.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(180, 130, 10), 1),
+            BorderFactory.createLineBorder(AppTheme.ACCENT_DARK, 1),
             new EmptyBorder(0, 4, 0, 4)));
         plus.setFocusPainted(false);
         plus.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));

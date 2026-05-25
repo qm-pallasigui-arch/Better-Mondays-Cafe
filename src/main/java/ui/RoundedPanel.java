@@ -14,8 +14,8 @@ public class RoundedPanel extends JPanel {
 
     private int arcWidth = 20;
     private int arcHeight = 20;
-    private Color fillColor = new Color(36, 55, 83);
-    private Color borderColor = new Color(36, 55, 83);
+    private Color fillColor = AppTheme.BG_SURFACE;
+    private Color borderColor = AppTheme.BORDER;
 
     public RoundedPanel() {
         setOpaque(false);

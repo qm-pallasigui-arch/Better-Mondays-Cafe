@@ -18,14 +18,19 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JPasswordField;
+import javax.swing.JDialog;
 import javax.swing.JLabel;
 import util.FontHelper;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
+import javax.swing.JTextField;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
+import loginregister.UserDataManager;
 
 public class SidebarPanel extends JPanel {
 
@@ -37,12 +42,17 @@ public class SidebarPanel extends JPanel {
         void onLogout();
     }
 
+    public interface ProfileUpdateListener {
+        void onUsernameChanged(String newUsername);
+    }
+
     private static final int EXPANDED_WIDTH = 228;
     private static final int COLLAPSED_WIDTH = 60;
     private static final int NAV_HEIGHT = 40;
 
     private final NavigationListener listener;
     private final LogoutListener logoutListener;
+    private final ProfileUpdateListener profileUpdateListener;
     private final boolean isAdmin;
     private final String username;
     private boolean collapsed = false;
@@ -54,34 +64,28 @@ public class SidebarPanel extends JPanel {
     private final JPanel navPanel;
     private final JPanel headerPanel;
     private JPanel bottomHolder;
+    private JLabel userNameLabel;
 
     public SidebarPanel(String username, Role role, NavigationListener listener) {
-        this(username, role, listener, null);
+        this(username, role, listener, null, null);
     }
 
     public SidebarPanel(String username, Role role, NavigationListener listener, LogoutListener logoutListener) {
+        this(username, role, listener, logoutListener, null);
+    }
+
+    public SidebarPanel(String username, Role role, NavigationListener listener, LogoutListener logoutListener, ProfileUpdateListener profileUpdateListener) {
         this.username = username;
         this.isAdmin = role == Role.ADMIN;
         this.listener = listener;
         this.logoutListener = logoutListener;
+        this.profileUpdateListener = profileUpdateListener;
 
         setLayout(new BorderLayout(0, 0));
         setBackground(AppTheme.BG_PRIMARY);
 
         // create logout button early so toggleCollapse() can reference it
-        logoutBtn = new JButton("Logout");
-        logoutBtn.setFont(new Font("Segoe UI", Font.BOLD, 11));
-        logoutBtn.setForeground(Color.WHITE);
-        logoutBtn.setBackground(new Color(180, 60, 60));
-        logoutBtn.setBorder(BorderFactory.createEmptyBorder(6, 12, 6, 12));
-        logoutBtn.setFocusPainted(false);
-        logoutBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        logoutBtn.setPreferredSize(new Dimension(84, 28));
-        logoutBtn.addActionListener(e -> {
-            if (logoutListener != null) {
-                logoutListener.onLogout();
-            }
-        });
+        logoutBtn = createLogoutButton();
 
         headerPanel = createHeader();
         add(headerPanel, BorderLayout.NORTH);
@@ -93,6 +97,7 @@ public class SidebarPanel extends JPanel {
 
         JScrollPane scroll = new JScrollPane(navPanel);
         scroll.setBorder(null);
+        scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
         scroll.getViewport().setBackground(AppTheme.BG_PRIMARY);
         add(scroll, BorderLayout.CENTER);
@@ -124,10 +129,15 @@ public class SidebarPanel extends JPanel {
         collapseBtn.setText(collapsed ? "\u25B6" : "\u25C0");
         if (logoutBtn != null) {
             logoutBtn.setText(collapsed ? "\u21AA" : "Logout");
-            logoutBtn.setPreferredSize(collapsed ? new Dimension(34, 24) : new Dimension(84, 28));
+            logoutBtn.setPreferredSize(collapsed ? new Dimension(42, 30) : new Dimension(84, 28));
             logoutBtn.setToolTipText(collapsed ? "Logout" : null);
+            logoutBtn.setMargin(collapsed ? new java.awt.Insets(4, 4, 4, 4) : new java.awt.Insets(6, 12, 6, 12));
+            logoutBtn.setFont(new Font("Segoe UI", Font.BOLD, collapsed ? 12 : 11));
             if (bottomHolder != null && bottomHolder.getLayout() instanceof java.awt.FlowLayout) {
                 ((java.awt.FlowLayout) bottomHolder.getLayout()).setAlignment(collapsed ? java.awt.FlowLayout.CENTER : java.awt.FlowLayout.RIGHT);
+            }
+            if (bottomHolder != null) {
+                bottomHolder.setBorder(new EmptyBorder(collapsed ? 4 : 6, collapsed ? 4 : 8, collapsed ? 6 : 8, collapsed ? 4 : 8));
             }
         }
         revalidate();
@@ -164,19 +174,6 @@ public class SidebarPanel extends JPanel {
         collapseBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         collapseBtn.addActionListener(e -> toggleCollapse());
 
-        logoutBtn = new JButton("Logout");
-        logoutBtn.setFont(new Font("Segoe UI", Font.BOLD, 10));
-        logoutBtn.setForeground(Color.WHITE);
-        logoutBtn.setBackground(new Color(180, 60, 60));
-        logoutBtn.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 10));
-        logoutBtn.setFocusPainted(false);
-        logoutBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        logoutBtn.addActionListener(e -> {
-            if (logoutListener != null) {
-                logoutListener.onLogout();
-            }
-        });
-
         JPanel controls = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
         controls.setOpaque(false);
         controls.add(collapseBtn);
@@ -196,18 +193,17 @@ public class SidebarPanel extends JPanel {
             addNavItem("Register Product", "Register Product", this::paintTagIcon);
         }
         addNavItem("Staff", "Staff", this::paintPeopleIcon);
+        addNavItem("Inventory Guide", "Inventory Guide", this::paintBookIcon);
+        addNavItem("About", "About", this::paintInfoIcon);
+        addNavItem("Help", "Help", this::paintHelpIcon);
 
         navPanel.add(Box.createVerticalGlue());
 
         JSeparator sep = new JSeparator(SwingConstants.HORIZONTAL);
-        sep.setForeground(new Color(60, 85, 120));
+        sep.setForeground(AppTheme.BORDER);
         sep.setMaximumSize(new Dimension(Short.MAX_VALUE, 1));
         navPanel.add(sep);
         navPanel.add(Box.createVerticalStrut(4));
-
-        addNavItem("Inventory Guide", "Inventory Guide", this::paintBookIcon);
-        addNavItem("About", "About", this::paintInfoIcon);
-        addNavItem("Help", "Help", this::paintHelpIcon);
     }
 
     private void addNavItem(String pageName, String label, IconPainter painter) {
@@ -217,10 +213,10 @@ public class SidebarPanel extends JPanel {
     }
 
     private JPanel createUserProfile() {
-        JPanel p = new JPanel(new BorderLayout(6, 0));
-        p.setBackground(new Color(28, 43, 63));
+        JPanel p = new JPanel(new BorderLayout(8, 0));
+        p.setBackground(AppTheme.BG_SURFACE);
         p.setBorder(new EmptyBorder(8, 10, 8, 8));
-        p.setPreferredSize(new Dimension(EXPANDED_WIDTH, 50));
+        p.setPreferredSize(new Dimension(EXPANDED_WIDTH, 54));
 
         JLabel userIcon = new JLabel(String.valueOf(Character.toUpperCase(username.charAt(0)))) {
             @Override
@@ -241,7 +237,7 @@ public class SidebarPanel extends JPanel {
         userIcon.setPreferredSize(new Dimension(30, 30));
         userIcon.setHorizontalAlignment(SwingConstants.CENTER);
 
-        JLabel userNameLabel = new JLabel(username);
+        userNameLabel = new JLabel(username);
         userNameLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         userNameLabel.setForeground(AppTheme.FG_PRIMARY);
 
@@ -250,18 +246,10 @@ public class SidebarPanel extends JPanel {
         threeDots.setForeground(AppTheme.FG_MUTED);
         threeDots.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         FontHelper.ensureGlyphs(threeDots, '\u22EE');
-
-        // Show a popup menu (contains logout) when three-dots clicked — useful when collapsed
-        javax.swing.JPopupMenu dotsMenu = new javax.swing.JPopupMenu();
-        javax.swing.JMenuItem logoutItem = new javax.swing.JMenuItem("Logout");
-        logoutItem.addActionListener(ae -> {
-            if (logoutListener != null) logoutListener.onLogout();
-        });
-        dotsMenu.add(logoutItem);
         threeDots.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                dotsMenu.show(threeDots, e.getX(), e.getY());
+                showProfileSettingsDialog();
             }
         });
 
@@ -280,8 +268,188 @@ public class SidebarPanel extends JPanel {
         bottomHolder.add(logoutBtn);
         wrapper.add(bottomHolder, BorderLayout.SOUTH);
 
-        wrapper.setPreferredSize(new Dimension(EXPANDED_WIDTH, 80));
+        wrapper.setPreferredSize(new Dimension(EXPANDED_WIDTH, 116));
         return wrapper;
+    }
+
+    private JButton createLogoutButton() {
+        JButton button = new JButton("Logout");
+        button.putClientProperty("appTheme.variant", "danger");
+        button.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        button.setForeground(Color.WHITE);
+        button.setBackground(AppTheme.DANGER);
+        button.setOpaque(true);
+        button.setContentAreaFilled(true);
+        button.setBorderPainted(true);
+        button.setBorder(BorderFactory.createCompoundBorder(
+                new ui.RoundedLineBorder(AppTheme.DANGER.darker(), 1, AppTheme.BORDER_RADIUS),
+                BorderFactory.createEmptyBorder(6, 12, 6, 12)));
+        button.setFocusPainted(false);
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        button.setPreferredSize(new Dimension(84, 28));
+        button.addActionListener(e -> {
+            if (logoutListener != null) {
+                logoutListener.onLogout();
+            }
+        });
+        return button;
+    }
+
+    private void showProfileSettingsDialog() {
+        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), "User Settings", JDialog.ModalityType.APPLICATION_MODAL);
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+
+        JPanel content = new JPanel();
+        content.setLayout(new java.awt.BorderLayout(0, 14));
+        content.setBorder(new EmptyBorder(16, 16, 16, 16));
+        content.setBackground(AppTheme.BG_SURFACE);
+
+        JPanel summary = new JPanel(new java.awt.GridLayout(0, 1, 0, 4));
+        summary.setOpaque(false);
+        JLabel title = new JLabel("User Settings");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        JLabel current = new JLabel("Current username: " + userNameLabel.getText());
+        current.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        current.setForeground(AppTheme.FG_MUTED);
+        summary.add(title);
+        summary.add(current);
+
+        JPanel actions = new JPanel(new java.awt.GridLayout(0, 1, 0, 8));
+        actions.setOpaque(false);
+
+        JButton checkUsername = new JButton("Check Username");
+        checkUsername.addActionListener(ae -> javax.swing.JOptionPane.showMessageDialog(
+                dialog,
+                "Current username: " + userNameLabel.getText(),
+                "Username",
+                javax.swing.JOptionPane.INFORMATION_MESSAGE));
+
+        JButton editUsername = new JButton("Edit Username");
+        editUsername.addActionListener(ae -> showEditUsernameDialog());
+
+        JButton changePassword = new JButton("Change Password");
+        changePassword.addActionListener(ae -> showChangePasswordDialog());
+
+        JButton close = new JButton("Close");
+        close.addActionListener(ae -> dialog.dispose());
+
+        actions.add(checkUsername);
+        actions.add(editUsername);
+        actions.add(changePassword);
+        actions.add(close);
+
+        content.add(summary, BorderLayout.NORTH);
+        content.add(actions, BorderLayout.CENTER);
+        AppTheme.applyToComponent(content);
+
+        dialog.setContentPane(content);
+        dialog.pack();
+        dialog.setResizable(false);
+        dialog.setLocationRelativeTo(SwingUtilities.getWindowAncestor(this));
+        dialog.setVisible(true);
+    }
+
+    private void showEditUsernameDialog() {
+        JTextField usernameField = new JTextField(userNameLabel.getText(), 18);
+        JPasswordField currentPasswordField = new JPasswordField(18);
+
+        JPanel panel = new JPanel(new java.awt.GridLayout(0, 1, 6, 6));
+        panel.add(new JLabel("New username"));
+        panel.add(usernameField);
+        panel.add(new JLabel("Current password"));
+        panel.add(currentPasswordField);
+
+        int result = javax.swing.JOptionPane.showConfirmDialog(
+                this,
+                panel,
+                "Edit Username",
+                javax.swing.JOptionPane.OK_CANCEL_OPTION,
+                javax.swing.JOptionPane.PLAIN_MESSAGE);
+        if (result != javax.swing.JOptionPane.OK_OPTION) {
+            return;
+        }
+
+        String newUsername = usernameField.getText().trim();
+        String currentPassword = new String(currentPasswordField.getPassword()).trim();
+        if (newUsername.isEmpty() || currentPassword.isEmpty()) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Username and password are required.", "Edit Username", javax.swing.JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        if (newUsername.equals(userNameLabel.getText())) {
+            javax.swing.JOptionPane.showMessageDialog(this, "New username must be different.", "Edit Username", javax.swing.JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        if (UserDataManager.updateUsername(userNameLabel.getText(), newUsername, currentPassword)) {
+            userNameLabel.setText(newUsername);
+            javax.swing.JOptionPane.showMessageDialog(this, "Username updated.", "Edit Username", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+            if (profileUpdateListener != null) {
+                profileUpdateListener.onUsernameChanged(newUsername);
+            }
+        } else {
+            javax.swing.JOptionPane.showMessageDialog(this, "Unable to update username. Check your password or whether the username is already in use.", "Edit Username", javax.swing.JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void showChangePasswordDialog() {
+        JPasswordField currentPasswordField = new JPasswordField(18);
+        JPasswordField newPasswordField = new JPasswordField(18);
+        JPasswordField confirmPasswordField = new JPasswordField(18);
+
+        JPanel panel = new JPanel(new java.awt.GridLayout(0, 1, 6, 6));
+        panel.add(new JLabel("Current password"));
+        panel.add(currentPasswordField);
+        panel.add(new JLabel("New password"));
+        panel.add(newPasswordField);
+        panel.add(new JLabel("Confirm new password"));
+        panel.add(confirmPasswordField);
+
+        int result = javax.swing.JOptionPane.showConfirmDialog(
+                this,
+                panel,
+                "Change Password",
+                javax.swing.JOptionPane.OK_CANCEL_OPTION,
+                javax.swing.JOptionPane.PLAIN_MESSAGE);
+        if (result != javax.swing.JOptionPane.OK_OPTION) {
+            return;
+        }
+
+        String currentPassword = new String(currentPasswordField.getPassword()).trim();
+        String newPassword = new String(newPasswordField.getPassword()).trim();
+        String confirmPassword = new String(confirmPasswordField.getPassword()).trim();
+
+        if (currentPassword.isEmpty() || newPassword.isEmpty()) {
+            javax.swing.JOptionPane.showMessageDialog(this, "All password fields are required.", "Change Password", javax.swing.JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        if (!newPassword.equals(confirmPassword)) {
+            javax.swing.JOptionPane.showMessageDialog(this, "New passwords do not match.", "Change Password", javax.swing.JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        if (!isStrongPassword(newPassword)) {
+            javax.swing.JOptionPane.showMessageDialog(this,
+                    "Password must be at least 8 characters and include a number and a special character.",
+                    "Change Password",
+                    javax.swing.JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        if (UserDataManager.updatePassword(userNameLabel.getText(), currentPassword, newPassword)) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Password updated.", "Change Password", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+        } else {
+            javax.swing.JOptionPane.showMessageDialog(this, "Unable to update password. Check your current password.", "Change Password", javax.swing.JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private boolean isStrongPassword(String password) {
+        return password.length() >= 8 && password.matches(".*\\d.*") && password.matches(".*[!@#$%^&*(),.?\":{}|<>].*");
+    }
+
+    public void setUsername(String username) {
+        if (userNameLabel != null) {
+            userNameLabel.setText(username);
+        }
     }
 
     // ─── Icon painters (minimalist line-art) ─────────────────
@@ -458,7 +626,7 @@ public class SidebarPanel extends JPanel {
             painter.paint(g2, ix, iy, iconSize);
 
             if (!collapsed) {
-                g2.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+                bottomHolder.setBorder(new EmptyBorder(4, 4, 6, 4));
                 g2.setColor(iconColor);
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(label, 44, (h - fm.getHeight()) / 2 + fm.getAscent());

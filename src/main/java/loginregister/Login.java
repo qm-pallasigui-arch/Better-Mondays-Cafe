@@ -3,6 +3,7 @@ package loginregister;
 import pos.POSSystem;
 import ui.AppTheme;
 import util.FieldAssist;
+import java.awt.Dimension;
 import java.util.stream.Collectors;
 
 /**
@@ -13,8 +14,11 @@ public class Login extends javax.swing.JFrame {
 
     public Login() {
         initComponents();
-        setMinimumSize(new java.awt.Dimension(700, 520));
         setResizable(true);
+        AppTheme.applyResponsiveFrameSize(this, 0.38, 0.55, new Dimension(700, 520));
+        jPanel2.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+        stylePrimaryButton(jButton1);
+        stylePrimaryButton(jButton2);
         jButton1.setVisible(false);
         jButton1.setEnabled(false);
         FieldAssist.installAutocomplete(jTextField1, () -> UserDataManager.listUsers().stream()
@@ -87,18 +91,17 @@ public class Login extends javax.swing.JFrame {
                 .addComponent(jLabel3)
                 .addGap(208, 208, 208))
             .addGroup(jPanel2Layout.createSequentialGroup()
-                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(jPanel2Layout.createSequentialGroup()
-                        .addGap(150, 150, 150)
-                        .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(jLabel2)
-                            .addComponent(jLabel1)
-                            .addComponent(jPasswordField1, javax.swing.GroupLayout.DEFAULT_SIZE, 323, Short.MAX_VALUE)
-                            .addComponent(jTextField1)))
-                    .addGroup(jPanel2Layout.createSequentialGroup()
-                        .addGap(275, 275, 275)
-                        .addComponent(jButton2)))
+                .addGap(150, 150, 150)
+                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                    .addComponent(jLabel2)
+                    .addComponent(jLabel1)
+                    .addComponent(jPasswordField1, javax.swing.GroupLayout.DEFAULT_SIZE, 323, Short.MAX_VALUE)
+                    .addComponent(jTextField1))
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+            .addGroup(jPanel2Layout.createSequentialGroup()
+                .addGap(0, 0, Short.MAX_VALUE)
+                .addComponent(jButton2)
+                .addGap(0, 0, Short.MAX_VALUE))
         );
 
         jPanel2Layout.setVerticalGroup(
@@ -125,14 +128,14 @@ public class Login extends javax.swing.JFrame {
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
                 .addGap(30, 30, 30)
-                .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(jPanel2, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addGap(30, 30, 30))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
                 .addGap(30, 30, 30)
-                .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(jPanel2, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addGap(30, 30, 30))
         );
 
@@ -170,6 +173,17 @@ public class Login extends javax.swing.JFrame {
                     "Login Failed", javax.swing.JOptionPane.ERROR_MESSAGE);
         }
     }//GEN-LAST:event_jButton2ActionPerformed
+
+    private void stylePrimaryButton(javax.swing.JButton button) {
+        if (button == null) {
+            return;
+        }
+        button.setPreferredSize(new Dimension(130, 40));
+        button.setMinimumSize(new Dimension(130, 40));
+        button.setMaximumSize(new Dimension(160, 44));
+        button.setMargin(new java.awt.Insets(8, 18, 8, 18));
+        button.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 13));
+    }
 
     /**
      * @param args the command line arguments

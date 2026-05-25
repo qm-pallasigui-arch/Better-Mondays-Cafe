@@ -12,6 +12,8 @@ import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.swing.BorderFactory;
+import ui.RoundedLineBorder;
+import ui.AppTheme;
 import javax.swing.DefaultListModel;
 import javax.swing.JList;
 import javax.swing.JPopupMenu;
@@ -40,7 +42,7 @@ public final class FieldAssist {
         JList<String> list = new JList<>(model);
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         JPopupMenu popup = new JPopupMenu();
-        popup.setBorder(BorderFactory.createLineBorder(new java.awt.Color(0x2E4060)));
+        popup.setBorder(new RoundedLineBorder(new java.awt.Color(0x2E4060), AppTheme.BORDER_THICKNESS, AppTheme.BORDER_RADIUS));
         list.setVisibleRowCount(6);
         list.setFixedCellWidth(Math.max(220, field.getPreferredSize().width));
         popup.add(new JScrollPane(list));

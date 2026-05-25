@@ -796,10 +796,9 @@ public class InventoryRegistrationPanel extends JPanel {
             };
             badge.setBackground(bc[0]);
             badge.setForeground(bc[1]);
-            badge.setBorder(BorderFactory.createCompoundBorder(
-                    BorderFactory.createLineBorder(
-                            new Color(bc[1].getRed(), bc[1].getGreen(), bc[1].getBlue(), 70), 1, true),
-                    new EmptyBorder(3, 6, 3, 6)));
+                badge.setBorder(BorderFactory.createCompoundBorder(
+                new RoundedLineBorder(new Color(bc[1].getRed(), bc[1].getGreen(), bc[1].getBlue(), 70), AppTheme.BORDER_THICKNESS, AppTheme.BORDER_RADIUS),
+                new EmptyBorder(3, 6, 3, 6)));
             return this;
         }
     }
@@ -817,9 +816,8 @@ public class InventoryRegistrationPanel extends JPanel {
             btn.setHorizontalAlignment(SwingConstants.CENTER);
             btn.setBackground(BTN_DEL_BG);
             btn.setForeground(BTN_DEL_FG);
-            btn.setBorder(BorderFactory.createCompoundBorder(
-                    BorderFactory.createLineBorder(
-                            new Color(BTN_DEL_FG.getRed(), BTN_DEL_FG.getGreen(), BTN_DEL_FG.getBlue(), 80), 1, true),
+                btn.setBorder(BorderFactory.createCompoundBorder(
+                    new RoundedLineBorder(new Color(BTN_DEL_FG.getRed(), BTN_DEL_FG.getGreen(), BTN_DEL_FG.getBlue(), 80), AppTheme.BORDER_THICKNESS, AppTheme.BORDER_RADIUS),
                     new EmptyBorder(3, 8, 3, 8)));
             add(btn);
         }
@@ -850,9 +848,8 @@ public class InventoryRegistrationPanel extends JPanel {
             btn.setHorizontalAlignment(SwingConstants.CENTER);
             btn.setBackground(BTN_DEL_HOV_BG);
             btn.setForeground(BTN_DEL_FG);
-            btn.setBorder(BorderFactory.createCompoundBorder(
-                    BorderFactory.createLineBorder(
-                            new Color(BTN_DEL_FG.getRed(), BTN_DEL_FG.getGreen(), BTN_DEL_FG.getBlue(), 80), 1, true),
+                btn.setBorder(BorderFactory.createCompoundBorder(
+                    new RoundedLineBorder(new Color(BTN_DEL_FG.getRed(), BTN_DEL_FG.getGreen(), BTN_DEL_FG.getBlue(), 80), AppTheme.BORDER_THICKNESS, AppTheme.BORDER_RADIUS),
                     new EmptyBorder(3, 8, 3, 8)));
             btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 

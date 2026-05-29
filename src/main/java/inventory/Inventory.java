@@ -1,6 +1,8 @@
 package inventory;
 
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -14,6 +16,7 @@ public class Inventory {
     private final SQLiteInventoryRepository repository;
     private final Map<String, InventoryItem> inventoryItems;
     private static final Logger LOGGER = Logger.getLogger(Inventory.class.getName());
+    private final List<Runnable> changeListeners = new ArrayList<>();
 
     private Inventory() {
         repository = new SQLiteInventoryRepository();
@@ -240,6 +243,7 @@ public class Inventory {
         } else {
             LOGGER.log(Level.WARNING, "Attempted to deduct from unknown inventory item: {0}", name);
         }
+        notifyChangeListeners();
     }
 
     /** Refreshes a single inventory item from the repository (if present). */
@@ -250,6 +254,7 @@ public class Inventory {
             repository.findByName(nn).ifPresent(found -> {
                 inventoryItems.put(nn, found);
             });
+            notifyChangeListeners();
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "refreshItem failed for {0}: {1}", new Object[]{nn, e.getMessage()});
         }
@@ -257,6 +262,20 @@ public class Inventory {
 
     public InventoryItem getItem(String name) {
         return inventoryItems.get(StringUtil.normalizeName(name));
+    }
+
+    public void addChangeListener(Runnable listener) {
+        if (listener == null) return;
+        changeListeners.add(listener);
+    }
+
+    private void notifyChangeListeners() {
+        for (Runnable listener : new ArrayList<>(changeListeners)) {
+            try {
+                listener.run();
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     public Map<String, InventoryItem> getAllItems() {

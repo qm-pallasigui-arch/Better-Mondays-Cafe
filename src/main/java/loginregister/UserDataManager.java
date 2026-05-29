@@ -105,4 +105,13 @@ public class UserDataManager {
             return false;
         }
     }
+
+    public static boolean resetPassword(String username, String newPassword) {
+        try {
+            USER_REPOSITORY.resetPassword(username, newPassword);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
 }

@@ -54,7 +54,7 @@ public class Monitoring {
             for (InventoryItem item : repository.findAll()) {
                 if (item.isLowStock() || item.isOutOfStock()) {
                     foundAlert = true;
-                    String status = item.isOutOfStock() ? "⛔ Out of Stock" : "⚠️ Low Stock";
+                    String status = item.isOutOfStock() ? "Out of Stock" : "Low Stock";
                     monitoringModel.addRow(new Object[]{
                         item.getName(),
                         item.getQuantity(),
@@ -73,7 +73,7 @@ public class Monitoring {
             for (InventoryItem item : inventory.getAllItems().values()) {
                 if (item.isLowStock() || item.isOutOfStock()) {
                     foundAlert = true;
-                    String status = item.isOutOfStock() ? "⛔ Out of Stock" : "⚠️ Low Stock";
+                    String status = item.isOutOfStock() ? "Out of Stock" : "Low Stock";
                     monitoringModel.addRow(new Object[]{
                         item.getName(),
                         item.getQuantity(),
@@ -84,7 +84,7 @@ public class Monitoring {
                 }
             }
             if (!foundAlert) {
-                monitoringModel.addRow(new Object[]{"No alerts", "-", "-", "-", "All inventory above alert level"});
+                monitoringModel.addRow(new Object[]{"No alerts", "-", "-", "-", "Good"});
             }
         }
     }

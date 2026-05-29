@@ -7,6 +7,7 @@ import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontMetrics;
+import java.awt.Image;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -17,7 +18,10 @@ import java.util.List;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.Icon;
 import javax.swing.JButton;
+import javax.swing.ImageIcon;
+import javax.swing.plaf.basic.BasicButtonUI;
 import javax.swing.JPasswordField;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
@@ -49,6 +53,10 @@ public class SidebarPanel extends JPanel {
     private static final int EXPANDED_WIDTH = 228;
     private static final int COLLAPSED_WIDTH = 60;
     private static final int NAV_HEIGHT = 40;
+    private static final Font SIDEBAR_BRAND_FONT = new Font("Segoe UI", Font.BOLD, 13);
+    private static final Font SIDEBAR_NAV_FONT = new Font("Segoe UI", Font.PLAIN, 12);
+    private static final Font SIDEBAR_PROFILE_FONT = new Font("Segoe UI", Font.PLAIN, 12);
+    private static final Dimension PROFILE_AVATAR_SIZE = new Dimension(30, 30);
 
     private final NavigationListener listener;
     private final LogoutListener logoutListener;
@@ -60,6 +68,7 @@ public class SidebarPanel extends JPanel {
     private final List<NavItem> navItems = new ArrayList<>();
     private JLabel brandingText;
     private JButton collapseBtn;
+    private JButton overflowBtn;
     private JButton logoutBtn;
     private final JPanel navPanel;
     private final JPanel headerPanel;
@@ -117,6 +126,11 @@ public class SidebarPanel extends JPanel {
         return collapsed;
     }
 
+    public void refreshChromeStyles() {
+        applyTransparentButtonChrome(collapseBtn);
+        applyTransparentButtonChrome(overflowBtn);
+    }
+
     private void toggleCollapse() {
         collapsed = !collapsed;
         int w = collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH;
@@ -126,7 +140,7 @@ public class SidebarPanel extends JPanel {
             ni.setCollapsed(collapsed);
         }
         brandingText.setVisible(!collapsed);
-        collapseBtn.setText(collapsed ? "\u25B6" : "\u25C0");
+        collapseBtn.setIcon(createCollapseIcon(collapsed));
         if (logoutBtn != null) {
             logoutBtn.setText(collapsed ? "\u21AA" : "Logout");
             logoutBtn.setPreferredSize(collapsed ? new Dimension(42, 30) : new Dimension(84, 28));
@@ -153,24 +167,38 @@ public class SidebarPanel extends JPanel {
         JPanel brand = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 6, 0));
         brand.setOpaque(false);
 
-        JLabel logo = new JLabel("\u2615");
-        logo.setFont(new Font("Segoe UI", Font.PLAIN, 18));
-        logo.setForeground(AppTheme.FG_PRIMARY);
-        FontHelper.ensureGlyphs(logo, '\u2615');
+        JLabel logo = new JLabel();
+        logo.setPreferredSize(new Dimension(22, 22));
+        logo.setMinimumSize(new Dimension(22, 22));
+        logo.setMaximumSize(new Dimension(22, 22));
+        logo.setHorizontalAlignment(SwingConstants.CENTER);
+        logo.setVerticalAlignment(SwingConstants.CENTER);
+        ImageIcon logoIcon = loadSidebarLogoIcon(22, 22);
+        if (logoIcon != null) {
+            logo.setIcon(logoIcon);
+        } else {
+            logo.setForeground(AppTheme.FG_PRIMARY);
+            logo.setFont(new Font("Segoe UI", Font.PLAIN, 18));
+            logo.setText("\u2615");
+            FontHelper.ensureGlyphs(logo, '\u2615');
+        }
 
         brandingText = new JLabel("Better Mondays");
-        brandingText.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        brandingText.setFont(SIDEBAR_BRAND_FONT);
         brandingText.setForeground(AppTheme.FG_PRIMARY);
 
         brand.add(logo);
         brand.add(brandingText);
 
-        collapseBtn = new JButton("\u25C0");
-        collapseBtn.setFont(new Font("Segoe UI", Font.PLAIN, 9));
+        collapseBtn = new JButton();
+        collapseBtn.setIcon(createCollapseIcon(false));
+        collapseBtn.setPreferredSize(new Dimension(22, 22));
         collapseBtn.setForeground(AppTheme.FG_MUTED);
-        collapseBtn.setBackground(AppTheme.BG_PRIMARY);
+        collapseBtn.setBackground(new Color(0, 0, 0, 0));
         collapseBtn.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
         collapseBtn.setFocusPainted(false);
+        collapseBtn.setContentAreaFilled(false);
+        collapseBtn.setOpaque(false);
         collapseBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         collapseBtn.addActionListener(e -> toggleCollapse());
 
@@ -224,7 +252,7 @@ public class SidebarPanel extends JPanel {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(AppTheme.ACCENT);
-                g2.fillOval(0, 0, getWidth(), getHeight());
+                g2.fillOval(0, 0, getWidth() - 1, getHeight() - 1);
                 g2.setColor(Color.WHITE);
                 g2.setFont(new Font("Segoe UI", Font.BOLD, 12));
                 FontMetrics fm = g2.getFontMetrics();
@@ -234,28 +262,29 @@ public class SidebarPanel extends JPanel {
                 g2.dispose();
             }
         };
-        userIcon.setPreferredSize(new Dimension(30, 30));
+        userIcon.setPreferredSize(PROFILE_AVATAR_SIZE);
+        userIcon.setMinimumSize(PROFILE_AVATAR_SIZE);
+        userIcon.setMaximumSize(PROFILE_AVATAR_SIZE);
         userIcon.setHorizontalAlignment(SwingConstants.CENTER);
+        userIcon.setOpaque(false);
+
+        JPanel userIconWrap = new JPanel(new java.awt.GridBagLayout());
+        userIconWrap.setOpaque(false);
+        userIconWrap.setPreferredSize(new Dimension(34, 34));
+        userIconWrap.setMinimumSize(new Dimension(34, 34));
+        userIconWrap.setMaximumSize(new Dimension(34, 34));
+        userIconWrap.add(userIcon);
 
         userNameLabel = new JLabel(username);
-        userNameLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        userNameLabel.setFont(SIDEBAR_PROFILE_FONT);
         userNameLabel.setForeground(AppTheme.FG_PRIMARY);
 
-        JLabel threeDots = new JLabel("\u22EE");
-        threeDots.setFont(new Font("Segoe UI", Font.BOLD, 16));
-        threeDots.setForeground(AppTheme.FG_MUTED);
-        threeDots.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        FontHelper.ensureGlyphs(threeDots, '\u22EE');
-        threeDots.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                showProfileSettingsDialog();
-            }
-        });
+        overflowBtn = createOverflowPreviewButton();
+        overflowBtn.addActionListener(e -> showProfileSettingsDialog());
 
-        p.add(userIcon, BorderLayout.WEST);
+        p.add(userIconWrap, BorderLayout.WEST);
         p.add(userNameLabel, BorderLayout.CENTER);
-        p.add(threeDots, BorderLayout.EAST);
+        p.add(overflowBtn, BorderLayout.EAST);
 
         // wrapper to position profile at top and logout at bottom
         JPanel wrapper = new JPanel(new BorderLayout());
@@ -295,6 +324,32 @@ public class SidebarPanel extends JPanel {
         return button;
     }
 
+    private JButton createOverflowPreviewButton() {
+        JButton button = new JButton();
+        button.setIcon(createOverflowIcon());
+        button.setPreferredSize(new Dimension(22, 22));
+        button.setForeground(AppTheme.FG_MUTED);
+        button.setBackground(new Color(0, 0, 0, 0));
+        button.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
+        button.setFocusPainted(false);
+        button.setContentAreaFilled(false);
+        button.setOpaque(false);
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        return button;
+    }
+
+    private void applyTransparentButtonChrome(JButton button) {
+        if (button == null) {
+            return;
+        }
+        button.setBackground(new Color(0, 0, 0, 0));
+        button.setOpaque(false);
+        button.setContentAreaFilled(false);
+        button.setBorderPainted(false);
+        button.setFocusPainted(false);
+        button.setUI(new BasicButtonUI());
+    }
+
     private void showProfileSettingsDialog() {
         JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), "User Settings", JDialog.ModalityType.APPLICATION_MODAL);
         dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
@@ -314,7 +369,7 @@ public class SidebarPanel extends JPanel {
         summary.add(title);
         summary.add(current);
 
-        JPanel actions = new JPanel(new java.awt.GridLayout(0, 1, 0, 8));
+        JPanel actions = new JPanel(new java.awt.GridLayout(0, 1, 0, 10));
         actions.setOpaque(false);
 
         JButton checkUsername = new JButton("Check Username");
@@ -333,6 +388,11 @@ public class SidebarPanel extends JPanel {
         JButton close = new JButton("Close");
         close.addActionListener(ae -> dialog.dispose());
 
+        styleSettingsButton(checkUsername);
+        styleSettingsButton(editUsername);
+        styleSettingsButton(changePassword);
+        styleSettingsButton(close);
+
         actions.add(checkUsername);
         actions.add(editUsername);
         actions.add(changePassword);
@@ -347,6 +407,18 @@ public class SidebarPanel extends JPanel {
         dialog.setResizable(false);
         dialog.setLocationRelativeTo(SwingUtilities.getWindowAncestor(this));
         dialog.setVisible(true);
+    }
+
+    private void styleSettingsButton(JButton button) {
+        if (button == null) {
+            return;
+        }
+        button.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        button.setPreferredSize(new Dimension(220, 36));
+        button.setMinimumSize(new Dimension(220, 36));
+        button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        button.setFocusPainted(false);
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     }
 
     private void showEditUsernameDialog() {
@@ -529,6 +601,72 @@ public class SidebarPanel extends JPanel {
                 y + (s - fm.getHeight()) / 2 + fm.getAscent() - 1);
     }
 
+    private Icon createCollapseIcon(boolean collapsedState) {
+        return new Icon() {
+            @Override
+            public int getIconWidth() {
+                return 12;
+            }
+
+            @Override
+            public int getIconHeight() {
+                return 12;
+            }
+
+            @Override
+            public void paintIcon(java.awt.Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(AppTheme.FG_MUTED);
+                g2.setStroke(new java.awt.BasicStroke(1.8f,
+                        java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND));
+                if (collapsedState) {
+                    g2.drawLine(x + 4, y + 2, x + 8, y + 6);
+                    g2.drawLine(x + 4, y + 10, x + 8, y + 6);
+                } else {
+                    g2.drawLine(x + 8, y + 2, x + 4, y + 6);
+                    g2.drawLine(x + 8, y + 10, x + 4, y + 6);
+                }
+                g2.dispose();
+            }
+        };
+    }
+
+    private Icon createOverflowIcon() {
+        return new Icon() {
+            @Override
+            public int getIconWidth() {
+                return 10;
+            }
+
+            @Override
+            public int getIconHeight() {
+                return 14;
+            }
+
+            @Override
+            public void paintIcon(java.awt.Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(AppTheme.FG_MUTED);
+                g2.fillOval(x + 3, y + 1, 4, 4);
+                g2.fillOval(x + 3, y + 5, 4, 4);
+                g2.fillOval(x + 3, y + 9, 4, 4);
+                g2.dispose();
+            }
+        };
+    }
+
+    private ImageIcon loadSidebarLogoIcon(int width, int height) {
+        java.net.URL location = getClass().getResource("/images/logo.png");
+        if (location == null) {
+            return null;
+        }
+        ImageIcon original = new ImageIcon(location);
+        Image scaled = original.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
+        return new ImageIcon(scaled);
+    }
+
     // ─── NavItem inner class ────────────────────────────────
 
     private class NavItem extends JPanel {
@@ -628,6 +766,7 @@ public class SidebarPanel extends JPanel {
             if (!collapsed) {
                 bottomHolder.setBorder(new EmptyBorder(4, 4, 6, 4));
                 g2.setColor(iconColor);
+                g2.setFont(SIDEBAR_NAV_FONT);
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(label, 44, (h - fm.getHeight()) / 2 + fm.getAscent());
             }

@@ -19,8 +19,10 @@ public class Login extends javax.swing.JFrame {
         jPanel2.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
         stylePrimaryButton(jButton1);
         stylePrimaryButton(jButton2);
-        jButton1.setVisible(false);
-        jButton1.setEnabled(false);
+        jButton1.setText("Forgot Password");
+        jButton1.setVisible(true);
+        jButton1.setEnabled(true);
+        jButton1.addActionListener(evt -> showForgotPasswordDialog());
         FieldAssist.installAutocomplete(jTextField1, () -> UserDataManager.listUsers().stream()
                 .map(UserAccount::getUsername)
                 .collect(Collectors.toList()));
@@ -70,7 +72,7 @@ public class Login extends javax.swing.JFrame {
         jLabel2.setText("Password");
 
         jButton1.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        jButton1.setText("Sign Up");
+        jButton1.setText("Forgot Password");
 
         jButton2.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
         jButton2.setText("Login");
@@ -100,7 +102,9 @@ public class Login extends javax.swing.JFrame {
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
             .addGroup(jPanel2Layout.createSequentialGroup()
                 .addGap(0, 0, Short.MAX_VALUE)
-                .addComponent(jButton2)
+                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.CENTER)
+                    .addComponent(jButton2)
+                    .addComponent(jButton1))
                 .addGap(0, 0, Short.MAX_VALUE))
         );
 
@@ -119,7 +123,9 @@ public class Login extends javax.swing.JFrame {
                 .addComponent(jPasswordField1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(18, 18, 18)
                 .addComponent(jButton2)
-                .addGap(92, 92, 92))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(jButton1)
+                .addGap(62, 62, 62))
         );
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
@@ -144,11 +150,9 @@ public class Login extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void jTextField1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jTextField1ActionPerformed
-        // TODO add your handling code here:
     }//GEN-LAST:event_jTextField1ActionPerformed
 
     private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
-        // TODO add your handling code here:
         String username = jTextField1.getText().trim();
         String password = new String(jPasswordField1.getPassword()).trim();
 
@@ -183,6 +187,70 @@ public class Login extends javax.swing.JFrame {
         button.setMaximumSize(new Dimension(160, 44));
         button.setMargin(new java.awt.Insets(8, 18, 8, 18));
         button.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 13));
+    }
+
+    private void showForgotPasswordDialog() {
+        javax.swing.JTextField usernameField = new javax.swing.JTextField(20);
+        javax.swing.JPasswordField newPasswordField = new javax.swing.JPasswordField(20);
+        javax.swing.JPasswordField confirmPasswordField = new javax.swing.JPasswordField(20);
+
+        javax.swing.JPanel panel = new javax.swing.JPanel(new java.awt.GridLayout(0, 1, 8, 8));
+        panel.add(new javax.swing.JLabel("Username"));
+        panel.add(usernameField);
+        panel.add(new javax.swing.JLabel("New password"));
+        panel.add(newPasswordField);
+        panel.add(new javax.swing.JLabel("Confirm new password"));
+        panel.add(confirmPasswordField);
+
+        int result = javax.swing.JOptionPane.showConfirmDialog(
+                this,
+                panel,
+                "Forgot Password",
+                javax.swing.JOptionPane.OK_CANCEL_OPTION,
+                javax.swing.JOptionPane.PLAIN_MESSAGE);
+        if (result != javax.swing.JOptionPane.OK_OPTION) {
+            return;
+        }
+
+        String username = usernameField.getText().trim();
+        String newPassword = new String(newPasswordField.getPassword()).trim();
+        String confirmPassword = new String(confirmPasswordField.getPassword()).trim();
+
+        if (username.isEmpty() || newPassword.isEmpty()) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Username and new password are required.", "Forgot Password", javax.swing.JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        if (!newPassword.equals(confirmPassword)) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Passwords do not match.", "Forgot Password", javax.swing.JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        if (!isStrongPassword(newPassword)) {
+            javax.swing.JOptionPane.showMessageDialog(this,
+                    "Password must be at least 8 characters and include a number and a special character.",
+                    "Forgot Password",
+                    javax.swing.JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        boolean userExists = UserDataManager.listUsers().stream()
+                .anyMatch(account -> account.getUsername().equalsIgnoreCase(username));
+        if (!userExists) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Username not found.", "Forgot Password", javax.swing.JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        if (UserDataManager.resetPassword(username, newPassword)) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Password reset successfully.", "Forgot Password", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+        } else {
+            javax.swing.JOptionPane.showMessageDialog(this, "Unable to reset password.", "Forgot Password", javax.swing.JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private boolean isStrongPassword(String password) {
+        return password != null
+                && password.length() >= 8
+                && password.matches(".*\\d.*")
+                && password.matches(".*[!@#$%^&*(),.?\":{}|<>].*");
     }
 
     /**

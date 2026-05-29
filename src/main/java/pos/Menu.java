@@ -5,6 +5,8 @@ import java.util.Map;
 import javax.swing.JOptionPane;
 import persistence.sqlite.SQLiteMenuRepository;
 import util.StringUtil;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Menu {
 
@@ -236,6 +238,7 @@ public class Menu {
                     "Unable to save menu item to database: " + e.getMessage(),
                     "Database", JOptionPane.WARNING_MESSAGE);
         }
+        notifyChangeListeners();
     }
 
     public void removeItem(String name) {
@@ -247,6 +250,21 @@ public class Menu {
             JOptionPane.showMessageDialog(null,
                     "Unable to remove menu item from database: " + e.getMessage(),
                     "Database", JOptionPane.WARNING_MESSAGE);
+        }
+        notifyChangeListeners();
+    }
+
+    // --- Change listener support for UI components that need to refresh on menu changes ---
+    private final List<Runnable> changeListeners = new ArrayList<>();
+
+    public void addChangeListener(Runnable r) {
+        if (r == null) return;
+        changeListeners.add(r);
+    }
+
+    private void notifyChangeListeners() {
+        for (Runnable r : new ArrayList<>(changeListeners)) {
+            try { r.run(); } catch (Exception ignored) {}
         }
     }
 

@@ -157,4 +157,17 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
             }
         }
     }
+
+    public void resetPassword(String username, String newPassword) throws Exception {
+        try (Connection connection = AppDatabase.openConnection();
+             PreparedStatement update = connection.prepareStatement(
+                     "UPDATE users SET password_hash = ? WHERE username = ?")) {
+            update.setString(1, PasswordHasher.hashPassword(newPassword));
+            update.setString(2, username);
+            int affected = update.executeUpdate();
+            if (affected == 0) {
+                throw new IllegalArgumentException("Current user not found");
+            }
+        }
+    }
 }

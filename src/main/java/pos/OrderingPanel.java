@@ -15,6 +15,7 @@ import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.RenderingHints;
+import java.awt.Image;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
@@ -60,8 +61,6 @@ public class OrderingPanel extends JPanel {
     private static final Color ACCENT           = AppTheme.ACCENT;
     private static final Color ACCENT_HOVER     = AppTheme.ACCENT_DARK;
     private static final Color SUCCESS          = AppTheme.SUCCESS;
-    private static final Color SUCCESS_HOVER    = new Color(0x059669);
-    private static final Color INFO             = AppTheme.ACCENT;
     private static final Color DANGER           = AppTheme.DANGER;
     private static final Color BORDER           = AppTheme.BORDER;
     private static final Color TEXT_MUTED       = AppTheme.FG_SUBTLE;
@@ -256,6 +255,7 @@ public class OrderingPanel extends JPanel {
         this.onRefresh = onRefresh;
         setLayout(new BorderLayout());
         setBackground(BG_PRIMARY);
+        syncDynamicMenuItems();
         buildUI();
         rebuildProductGrid();
     }
@@ -484,6 +484,7 @@ public class OrderingPanel extends JPanel {
 
     /** Re-apply pill button styles (useful after global theming). */
     public void refreshCategoryPills() {
+        syncDynamicMenuItems();
         for (JButton btn : pillButtons) {
             updatePillStyle(btn, btn.getText().equals(activeCategory));
         }
@@ -492,6 +493,7 @@ public class OrderingPanel extends JPanel {
 
     // ─── Product Grid ───
     private void rebuildProductGrid() {
+        syncDynamicMenuItems();
         productGridPanel.removeAll();
         List<String> names = CATEGORY_ITEMS.getOrDefault(activeCategory, List.of());
 
@@ -510,6 +512,79 @@ public class OrderingPanel extends JPanel {
 
         productGridPanel.revalidate();
         productGridPanel.repaint();
+    }
+
+    /** Public wrapper to rebuild product grid when external data (Menu) changes. */
+    public void rebuildProducts() {
+        rebuildProductGrid();
+    }
+
+    private void syncDynamicMenuItems() {
+        Map<String, MenuItem> allItems = Menu.getInstance().getAllItems();
+        for (MenuItem item : allItems.values()) {
+            String alreadyInCategory = findExistingCategoryForItem(item.getName());
+            if (alreadyInCategory != null) {
+                continue;
+            }
+
+            String orderingCategory = mapMenuCategoryToOrderingCategory(item.getCategory(), item.getName());
+            List<String> categoryItems = CATEGORY_ITEMS.get(orderingCategory);
+            if (categoryItems == null) {
+                categoryItems = new ArrayList<>();
+                CATEGORY_ITEMS.put(orderingCategory, categoryItems);
+            } else if (!(categoryItems instanceof ArrayList)) {
+                // Static seeds use fixed-size lists; copy them so dynamic menu sync can append safely.
+                categoryItems = new ArrayList<>(categoryItems);
+                CATEGORY_ITEMS.put(orderingCategory, categoryItems);
+            }
+            if (!containsBaseItemName(categoryItems, item.getName())) {
+                categoryItems.add(item.getName());
+            }
+        }
+        if (!CATEGORY_ITEMS.containsKey(activeCategory) && !CATEGORY_ITEMS.isEmpty()) {
+            activeCategory = CATEGORY_ITEMS.keySet().iterator().next();
+        }
+    }
+
+    private String mapMenuCategoryToOrderingCategory(String menuCategory, String itemName) {
+        if (menuCategory == null) return "Espresso & Coffee";
+        return switch (menuCategory.trim()) {
+            case "Coffee" -> "Espresso & Coffee";
+            case "Food" -> mapFoodItemCategory(itemName);
+            default -> menuCategory.trim();
+        };
+    }
+
+    private String mapFoodItemCategory(String itemName) {
+        if (containsBaseItemName(CATEGORY_ITEMS.getOrDefault("Sandwiches", List.of()), itemName)) {
+            return "Sandwiches";
+        }
+        if (containsBaseItemName(CATEGORY_ITEMS.getOrDefault("Pandesal Pairs", List.of()), itemName)) {
+            return "Pandesal Pairs";
+        }
+        return "Pastries";
+    }
+
+    private String findExistingCategoryForItem(String itemName) {
+        for (Map.Entry<String, List<String>> entry : CATEGORY_ITEMS.entrySet()) {
+            if (containsBaseItemName(entry.getValue(), itemName)) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+
+    private boolean containsBaseItemName(List<String> names, String targetBaseName) {
+        if (targetBaseName == null || targetBaseName.isBlank()) return false;
+        String target = NAME_MAP.getOrDefault(targetBaseName, targetBaseName).toLowerCase();
+        for (String existing : names) {
+            String base = existing;
+            if (base.toLowerCase().startsWith("hot ")) base = base.substring(4);
+            else if (base.toLowerCase().startsWith("iced ")) base = base.substring(5);
+            base = NAME_MAP.getOrDefault(base, base).toLowerCase();
+            if (base.equals(target)) return true;
+        }
+        return false;
     }
 
     // ─── Product Card ───
@@ -531,7 +606,7 @@ public class OrderingPanel extends JPanel {
         imageLabel.setBackground(BG_SURFACE);
         ImageIcon img = loadProductImage(activeCategory, spec.displayName);
         if (img != null) {
-            imageLabel.setIcon(new ImageIcon(img.getImage().getScaledInstance(120, 160, java.awt.Image.SCALE_SMOOTH)));
+            imageLabel.setIcon(scaleToFit(img, 120, 160));
         } else {
             imageLabel.setText(spec.displayName == null || spec.displayName.isBlank() ? "?" : spec.displayName.substring(0, 1).toUpperCase());
             imageLabel.setFont(new Font("Segoe UI", Font.BOLD, 34));
@@ -563,15 +638,26 @@ public class OrderingPanel extends JPanel {
         descLbl.setForeground(FG_MUTED);
         content.add(descLbl, BorderLayout.CENTER);
 
+        boolean available = isMenuItemAvailable(spec.baseName);
+        if (!available) {
+            JLabel unavailable = new JLabel("Not available: ingredient stock is missing");
+            unavailable.setFont(FONT_XSMALL);
+            unavailable.setForeground(DANGER);
+            content.add(unavailable, BorderLayout.SOUTH);
+            card.setBackground(new Color(0xF8FAFC));
+        }
+
         JButton addBtn = new JButton("Add to Cart");
         addBtn.setFont(new Font("Segoe UI", Font.BOLD, 11));
         addBtn.setForeground(Color.WHITE);
-        addBtn.setBackground(ACCENT);
+        addBtn.setBackground(available ? ACCENT : new Color(0x9CA3AF));
         addBtn.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(ACCENT, 1, true),
             new EmptyBorder(6, 12, 6, 12)));
         addBtn.setFocusPainted(false);
         addBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        addBtn.setEnabled(available);
+        addBtn.setToolTipText(available ? "Add this item to the order" : "Unavailable because one or more ingredients are out of stock");
         addBtn.addActionListener(e -> addOrderItem(spec));
         content.add(addBtn, BorderLayout.SOUTH);
 
@@ -1000,7 +1086,6 @@ public class OrderingPanel extends JPanel {
         confirm.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         final JDialog dialogRef = dialog;
         final JTextField cashField = cf;
-        final JLabel changeVal = chv;
         confirm.addActionListener(e -> {
             String cs = cashField.getText().trim();
             if (cs.isEmpty()) {
@@ -1325,7 +1410,7 @@ public class OrderingPanel extends JPanel {
                 if (url != null) {
                     BufferedImage img = ImageIO.read(url);
                     if (img != null) {
-                        ImageIcon icon = new ImageIcon(img.getScaledInstance(80, 80, java.awt.Image.SCALE_SMOOTH));
+                        ImageIcon icon = new ImageIcon(img);
                         imageCache.put(key, icon);
                         return icon;
                     }
@@ -1334,6 +1419,49 @@ public class OrderingPanel extends JPanel {
         }
         imageCache.put(key, null);
         return null;
+    }
+
+    private ImageIcon scaleToFit(ImageIcon icon, int targetWidth, int targetHeight) {
+        if (icon == null || icon.getIconWidth() <= 0 || icon.getIconHeight() <= 0) {
+            return icon;
+        }
+
+        double scale = Math.min(
+                (double) targetWidth / icon.getIconWidth(),
+                (double) targetHeight / icon.getIconHeight());
+        int width = Math.max(1, (int) Math.round(icon.getIconWidth() * scale));
+        int height = Math.max(1, (int) Math.round(icon.getIconHeight() * scale));
+
+        Image scaled = icon.getImage().getScaledInstance(width, height, java.awt.Image.SCALE_SMOOTH);
+        BufferedImage canvas = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = canvas.createGraphics();
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        int x = (targetWidth - width) / 2;
+        int y = (targetHeight - height) / 2;
+        g2.drawImage(scaled, x, y, null);
+        g2.dispose();
+        return new ImageIcon(canvas);
+    }
+
+    private boolean isMenuItemAvailable(String baseName) {
+        MenuItem item = Menu.getInstance().getMenuItem(baseName);
+        if (item == null) {
+            return false;
+        }
+        if (item.getIngredients().isEmpty()) {
+            return true;
+        }
+
+        Inventory inventory = Inventory.getInstance();
+        for (Map.Entry<String, Double> ingredient : item.getIngredients().entrySet()) {
+            inventory.InventoryItem stock = inventory.getItem(ingredient.getKey());
+            if (stock == null || stock.getQuantity() < ingredient.getValue()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private String findCategory(String itemName) {

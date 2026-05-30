@@ -372,7 +372,9 @@ public class MonitoringPanel extends JPanel {
 
         try (Connection conn = AppDatabase.openConnection()) {
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT st.id, st.transaction_ref, COALESCE(st.total, 0) as total, "
+                    "SELECT st.id, st.transaction_ref, COALESCE(st.subtotal, 0) as subtotal, "
+                    + "COALESCE(st.tax, 0) as tax, COALESCE(st.total, 0) as total, "
+                    + "COALESCE(st.cash, 0) as cash, COALESCE(st.change_amount, 0) as change_amount, "
                     + "COALESCE(st.created_at, '') as created_at "
                     + "FROM sales_transactions st "
                     + "ORDER BY st.id DESC LIMIT 50");
@@ -380,7 +382,11 @@ public class MonitoringPanel extends JPanel {
                 while (rs.next()) {
                     long txId = rs.getLong("id");
                     String ref = rs.getString("transaction_ref");
+                    double subtotal = rs.getDouble("subtotal");
+                    double tax = rs.getDouble("tax");
                     double total = rs.getDouble("total");
+                    double cash = rs.getDouble("cash");
+                    double change = rs.getDouble("change_amount");
                     String createdAt = rs.getString("created_at");
 
                     List<SalesItem> items = new ArrayList<>();
@@ -398,7 +404,7 @@ public class MonitoringPanel extends JPanel {
                         }
                     }
 
-                    TransactionRow row = new TransactionRow(ref, "Walk-in", total, createdAt, items);
+                    TransactionRow row = new TransactionRow(ref, "Walk-in", subtotal, tax, total, cash, change, createdAt, items);
                     cachedTransactions.add(row);
                     salesTableModel.addRow(new Object[]{
                         "#" + ref.replace("TXN", ""),
@@ -477,40 +483,36 @@ public class MonitoringPanel extends JPanel {
     private void showReceiptModal(int modelRow) {
         if (modelRow < 0 || modelRow >= cachedTransactions.size()) return;
         TransactionRow tr = cachedTransactions.get(modelRow);
-
-        double subTotal = 0;
-        for (SalesItem it : tr.items) subTotal += it.quantity * it.price;
-        double totalInclusive = tr.total;
-        double subExVat = totalInclusive / 1.12;
-        double vat = totalInclusive - subExVat;
-
-        String line = "\u2500".repeat(38);
-        String thin = "\u2500".repeat(38);
+        String line = "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500";
+        String dbl = "\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550";
 
         StringBuilder receipt = new StringBuilder();
-        receipt.append("          \u2615 Better Mondays Cafe \u2615\n");
+        receipt.append("            \u2615 Better Mondays Cafe \u2615\n");
         receipt.append("            123 Main St., Manila\n");
-        receipt.append("           VAT REG TIN: 123-456-789\n");
+        receipt.append("            VAT REG TIN: 123-456-789\n");
+        receipt.append(dbl).append("\n");
+        receipt.append(" Date: ").append(tr.createdAt).append("\n");
+        receipt.append(" Customer: ").append(tr.customer).append("\n");
+        receipt.append(" ").append(tr.ref).append("\n");
+        receipt.append(dbl).append("\n");
+        receipt.append(String.format(" %-16s %2s %8s\n", "ITEM", "QTY", "AMOUNT"));
         receipt.append(line).append("\n");
-        receipt.append("  ").append(tr.createdAt).append("\n");
-        receipt.append("  ").append(tr.ref).append("\n");
-        receipt.append(line).append("\n");
-        receipt.append(String.format("  %-18s %3s %10s\n", "ITEM", "QTY", "AMOUNT"));
-        receipt.append(thin).append("\n");
 
         for (SalesItem it : tr.items) {
-            String name = it.productName.length() > 18 ? it.productName.substring(0, 16) + ".." : it.productName;
-            double lineTotal = it.quantity * it.price;
-            receipt.append(String.format("  %-18s %3d %10.2f\n", name, it.quantity, lineTotal));
+            receipt.append(String.format(" %-16s %2d %8.2f\n",
+                    trunc(it.productName, 16), it.quantity, it.total));
         }
 
-        receipt.append(thin).append("\n");
-        receipt.append(String.format("  %-23s \u20B1%8.2f\n", "Subtotal (excl VAT):", subExVat));
-        receipt.append(String.format("  %-23s \u20B1%8.2f\n", "VAT (12%):", vat));
-        receipt.append(String.format("  %-23s \u20B1%8.2f\n", "TOTAL (incl VAT):", totalInclusive));
-        receipt.append(thin).append("\n");
-        receipt.append("       Thank you! Come again!\n");
-        receipt.append("      *** Have a nice day ***\n");
+        receipt.append(line).append("\n");
+        receipt.append(String.format(" %-22s %8.2f\n", "Subtotal (excl VAT):", tr.subtotal));
+        receipt.append(String.format(" %-22s %8.2f\n", "VAT (12%):", tr.tax));
+        receipt.append(String.format(" %-22s %8.2f\n", "TOTAL (incl VAT):", tr.total));
+        receipt.append(line).append("\n");
+        receipt.append(String.format(" %-22s %8.2f\n", "Cash:", tr.cash));
+        receipt.append(String.format(" %-22s %8.2f\n", "Change:", tr.change));
+        receipt.append(dbl).append("\n");
+        receipt.append("         Thank you! Come again!\n");
+        receipt.append("         *** Have a nice day ***\n");
 
         JTextAreaWithFont textArea = new JTextAreaWithFont(receipt.toString());
         JOptionPane.showMessageDialog(SwingUtilities.windowForComponent(this),
@@ -870,12 +872,24 @@ public class MonitoringPanel extends JPanel {
     private static class TransactionRow {
         String ref;
         String customer;
+        double subtotal;
+        double tax;
         double total;
+        double cash;
+        double change;
         String createdAt;
         List<SalesItem> items;
-        TransactionRow(String ref, String customer, double total, String createdAt, List<SalesItem> items) {
-            this.ref = ref; this.customer = customer; this.total = total;
-            this.createdAt = createdAt; this.items = items;
+        TransactionRow(String ref, String customer, double subtotal, double tax, double total,
+                       double cash, double change, String createdAt, List<SalesItem> items) {
+            this.ref = ref;
+            this.customer = customer;
+            this.subtotal = subtotal;
+            this.tax = tax;
+            this.total = total;
+            this.cash = cash;
+            this.change = change;
+            this.createdAt = createdAt;
+            this.items = items;
         }
     }
 
@@ -919,5 +933,9 @@ public class MonitoringPanel extends JPanel {
             setPreferredSize(new Dimension(380, 400));
             setBorder(null);
         }
+    }
+
+    private String trunc(String s, int len) {
+        return s.length() > len ? s.substring(0, len - 3) + "..." : s;
     }
 }

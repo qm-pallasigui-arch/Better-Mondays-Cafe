@@ -102,7 +102,7 @@ public class InventoryRegistrationPanel extends JPanel {
     private final PlaceholderTextField itemNameField = new PlaceholderTextField("Item Name");
     private final PlaceholderTextField skuField = new PlaceholderTextField("Auto-generated if blank");
     private final PlaceholderTextField qtyField = new PlaceholderTextField("e.g. 100");
-    private final PlaceholderTextField expiryField = new PlaceholderTextField("YYYY-MM-DD");
+    private final PlaceholderTextField expiryField = new PlaceholderTextField("YYYY-MM-DD (or 'none')");
     private final JLabel statusLabel = new JLabel(" ");
     private final JLabel batchCountLabel = new JLabel(" ");
 
@@ -330,7 +330,7 @@ public class InventoryRegistrationPanel extends JPanel {
         }
 
         String finalSku = sku.isEmpty() ? autoSku(name) : sku;
-        InventoryBatch batch = new InventoryBatch(finalSku, qty, normExpiry.isBlank() ? null : normExpiry);
+        InventoryBatch batch = new InventoryBatch(finalSku, qty, (normExpiry == null || normExpiry.isBlank()) ? null : normExpiry);
 
         // 1. Primary: persist to SQLite via repository
         boolean dbOk = false;
@@ -345,7 +345,7 @@ public class InventoryRegistrationPanel extends JPanel {
         String id = batch.getId() != 0
                 ? String.format("INV-%06d", batch.getId())
                 : generateBatchId();
-        String expiryStr = normExpiry.isBlank() ? "" : normExpiry;
+        String expiryStr = (normExpiry == null || normExpiry.isBlank()) ? "" : normExpiry;
         batchCache.add(new String[] { id, name, finalSku, String.valueOf(qty), expiryStr });
         writeJsonFallback();
 

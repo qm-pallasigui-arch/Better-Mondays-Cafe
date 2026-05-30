@@ -151,18 +151,30 @@ public final class AppTheme {
         }
         if (c instanceof JButton button) {
             Object variant = button.getClientProperty("appTheme.variant");
-            if ("danger".equals(variant)) {
+            if ("transparent".equals(variant)) {
+                button.setBackground(new Color(0, 0, 0, 0));
+                button.setForeground(FG_MUTED);
+                button.setOpaque(false);
+                button.setContentAreaFilled(false);
+                button.setBorderPainted(false);
+                button.setFocusPainted(false);
+                button.setUI(new BasicButtonUI());
+            } else if ("danger".equals(variant)) {
                 button.setBackground(DANGER);
             } else {
                 button.setBackground(ACCENT);
             }
-            button.setForeground(Color.WHITE);
+            if (!"transparent".equals(variant)) {
+                button.setForeground(Color.WHITE);
+            }
             button.setFont(BODY);
             button.setFocusPainted(false);
             button.setOpaque(false);
             button.setContentAreaFilled(false);
             button.setBorderPainted(false);
-            button.setUI(new RoundedButtonUI());
+            if (!"transparent".equals(variant)) {
+                button.setUI(new RoundedButtonUI());
+            }
         }
         if (c instanceof JTextField tf) {
             tf.setBackground(Color.WHITE);

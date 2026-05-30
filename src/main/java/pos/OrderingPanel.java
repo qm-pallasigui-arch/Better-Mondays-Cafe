@@ -40,6 +40,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
+import javax.swing.JTextArea;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
@@ -47,6 +48,7 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import inventory.Inventory;
 import monitoring.SalesRecord;
+import persistence.AppDatabase;
 import ui.AppTheme;
 
 public class OrderingPanel extends JPanel {
@@ -86,13 +88,14 @@ public class OrderingPanel extends JPanel {
     private static final Font FONT_PRICE    = new Font("Segoe UI", Font.BOLD, 14);
 
     // ─── Menu Data ───
+    private static final Map<String, List<String>> BASE_CATEGORY_ITEMS = new LinkedHashMap<>();
     private static final Map<String, List<String>> CATEGORY_ITEMS = new LinkedHashMap<>();
     private static final Map<String, String> NAME_MAP = new HashMap<>();
     private static final Map<String, String> IMAGE_MAP = new HashMap<>();
     private static final Map<String, ImageIcon> imageCache = new HashMap<>();
 
     static {
-        CATEGORY_ITEMS.put("Espresso & Coffee", Arrays.asList(
+        BASE_CATEGORY_ITEMS.put("Espresso & Coffee", Arrays.asList(
             "Hot Brewed Coffee",
             "Hot Americano", "Iced Americano",
             "Hot Latte", "Iced Latte",
@@ -102,32 +105,34 @@ public class OrderingPanel extends JPanel {
             "Hot Dark Mocha", "Iced Dark Mocha",
             "Hot White Mocha", "Iced White Mocha",
             "Hot Caramel Macchiato", "Iced Caramel Macchiato"));
-        CATEGORY_ITEMS.put("Specialty Drinks", Arrays.asList(
+        BASE_CATEGORY_ITEMS.put("Specialty Drinks", Arrays.asList(
             "Vietnamese Coffee", "Ube Espresso", "Manila Latte",
             "Iced Pumpkin Spiced Latte", "Iced Spiced Cookie Latte"));
-        CATEGORY_ITEMS.put("Tea Latte", Arrays.asList(
+        BASE_CATEGORY_ITEMS.put("Tea Latte", Arrays.asList(
             "Hot Matcha Latte", "Iced Matcha Latte",
             "Hot Chocolate Matcha", "Iced Chocolate Matcha",
             "Hot Matcha Espresso", "Iced Matcha Espresso",
             "Hot Hojicha Latte", "Iced Hojicha Latte",
             "Hot Chai Latte", "Iced Chai Latte"));
-        CATEGORY_ITEMS.put("Non-Coffee", Arrays.asList(
+        BASE_CATEGORY_ITEMS.put("Non-Coffee", Arrays.asList(
             "Hot Chocolate Latte", "Iced Chocolate Latte",
             "Strawberry Latte", "Iced Mango Latte",
             "Iced Dragon Fruit Coconut Latte", "Ube Latte"));
-        CATEGORY_ITEMS.put("Fruit Tea", Arrays.asList(
+        BASE_CATEGORY_ITEMS.put("Fruit Tea", Arrays.asList(
             "Strawberry Green Tea", "Mango Green Tea",
             "Peach Green Tea", "Passion Fruit Green Tea"));
-        CATEGORY_ITEMS.put("Herbal Tea", Arrays.asList(
+        BASE_CATEGORY_ITEMS.put("Herbal Tea", Arrays.asList(
             "Peppermint", "Chamomile", "Earl Grey", "Cinnamon"));
-        CATEGORY_ITEMS.put("Sandwiches", Arrays.asList(
+        BASE_CATEGORY_ITEMS.put("Sandwiches", Arrays.asList(
             "Signature Ham & Cheese", "Classic Grilled Cheese", "Homestyle Pesto & Cheese"));
-        CATEGORY_ITEMS.put("Pandesal Pairs", Arrays.asList(
+        BASE_CATEGORY_ITEMS.put("Pandesal Pairs", Arrays.asList(
             "Ham & Cheese", "Cheesy Pesto", "Spam & Cheese"));
-        CATEGORY_ITEMS.put("Pastries", Arrays.asList(
+        BASE_CATEGORY_ITEMS.put("Pastries", Arrays.asList(
             "Chocolate Crinkles", "Signature Chocolate Cookies", "S'mores Cookie",
             "Red Velvet Cream Cheese Cookie", "Brownies", "Banana Loaf Slice",
             "Chocolate Tiramisu", "Matcha Tiramisu", "Creamy Spinach", "Blueberry Cheesecake"));
+
+        resetCategoryItemsToSeed();
 
         NAME_MAP.put("Pumpkin Spiced Latte", "Pumpkin Spice Latte");
         NAME_MAP.put("Signature Chocolate Cookies", "Chocolate Cookies");
@@ -234,7 +239,7 @@ public class OrderingPanel extends JPanel {
     private final List<OrderEntry> orderEntries = new ArrayList<>();
     private final List<CompletedOrder> completedOrders = new ArrayList<>();
     private int orderCount = 0;
-    private int transactionCounter = 1000;
+    private int transactionCounter;
     private String activeCategory = "Espresso & Coffee";
     private final List<JButton> pillButtons = new ArrayList<>();
     private final Runnable onRefresh;
@@ -255,9 +260,17 @@ public class OrderingPanel extends JPanel {
         this.onRefresh = onRefresh;
         setLayout(new BorderLayout());
         setBackground(BG_PRIMARY);
+        transactionCounter = loadTransactionCounter();
         syncDynamicMenuItems();
         buildUI();
         rebuildProductGrid();
+        // Listen for inventory changes to update availability immediately
+        try {
+            inventory.Inventory.getInstance().addChangeListener(() -> SwingUtilities.invokeLater(() -> {
+                rebuildProductGrid();
+                refreshOrderDisplay();
+            }));
+        } catch (Exception ignored) {}
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -345,12 +358,36 @@ public class OrderingPanel extends JPanel {
             public void mouseExited(MouseEvent e) { seeAll.setForeground(ACCENT); }
         });
 
+        JButton clearAll = new JButton("Clear All");
+        clearAll.setFont(FONT_SMALL);
+        clearAll.setForeground(Color.WHITE);
+        clearAll.setBackground(DANGER);
+        clearAll.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(DANGER, 1, true),
+            new EmptyBorder(6, 10, 6, 10)));
+        clearAll.setFocusPainted(false);
+        clearAll.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        clearAll.addActionListener(e -> {
+            if (!orderEntries.isEmpty()) {
+                int ok = JOptionPane.showConfirmDialog(this, "Clear all items from the order?", "Confirm",
+                    JOptionPane.YES_NO_OPTION);
+                if (ok == JOptionPane.YES_OPTION) {
+                    orderEntries.clear();
+                    refreshOrderDisplay();
+                }
+            }
+        });
+
         JPanel leftGroup = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         leftGroup.setOpaque(false);
         leftGroup.add(lbl);
         leftGroup.add(orderListHeaderCount);
         hdr.add(leftGroup, BorderLayout.WEST);
-        hdr.add(seeAll, BorderLayout.EAST);
+        JPanel rightHdr = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        rightHdr.setOpaque(false);
+        rightHdr.add(seeAll);
+        rightHdr.add(clearAll);
+        hdr.add(rightHdr, BorderLayout.EAST);
         strip.add(hdr, BorderLayout.NORTH);
 
         // Horizontal scrollable cards
@@ -520,6 +557,7 @@ public class OrderingPanel extends JPanel {
     }
 
     private void syncDynamicMenuItems() {
+        resetCategoryItemsToSeed();
         Map<String, MenuItem> allItems = Menu.getInstance().getAllItems();
         for (MenuItem item : allItems.values()) {
             String alreadyInCategory = findExistingCategoryForItem(item.getName());
@@ -543,6 +581,13 @@ public class OrderingPanel extends JPanel {
         }
         if (!CATEGORY_ITEMS.containsKey(activeCategory) && !CATEGORY_ITEMS.isEmpty()) {
             activeCategory = CATEGORY_ITEMS.keySet().iterator().next();
+        }
+    }
+
+    private static void resetCategoryItemsToSeed() {
+        CATEGORY_ITEMS.clear();
+        for (Map.Entry<String, List<String>> entry : BASE_CATEGORY_ITEMS.entrySet()) {
+            CATEGORY_ITEMS.put(entry.getKey(), new ArrayList<>(entry.getValue()));
         }
     }
 
@@ -657,7 +702,9 @@ public class OrderingPanel extends JPanel {
         addBtn.setFocusPainted(false);
         addBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         addBtn.setEnabled(available);
-        addBtn.setToolTipText(available ? "Add this item to the order" : "Unavailable because one or more ingredients are out of stock");
+        addBtn.setToolTipText(available
+            ? "Add this item to the order"
+            : buildUnavailableIngredientsTooltip(spec.baseName));
         addBtn.addActionListener(e -> addOrderItem(spec));
         content.add(addBtn, BorderLayout.SOUTH);
 
@@ -675,8 +722,8 @@ public class OrderingPanel extends JPanel {
         col.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(0, 1, 0, 0, BORDER),
             new EmptyBorder(12, 12, 12, 12)));
-        col.setPreferredSize(new Dimension(300, 0));
-        col.setMinimumSize(new Dimension(260, 0));
+        col.setPreferredSize(new Dimension(340, 0));
+        col.setMinimumSize(new Dimension(320, 0));
 
         GridBagConstraints cx = new GridBagConstraints();
         cx.fill = GridBagConstraints.HORIZONTAL;
@@ -693,13 +740,37 @@ public class OrderingPanel extends JPanel {
         itemsScroll.setBorder(null);
         itemsScroll.getViewport().setBackground(BG_SURFACE);
         itemsScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        itemsScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+        itemsScroll.setPreferredSize(new Dimension(0, 220));
 
         JPanel orderDetailsSection = new JPanel(new BorderLayout(0, 6));
         orderDetailsSection.setOpaque(false);
+        JPanel odHdrRow = new JPanel(new BorderLayout());
+        odHdrRow.setOpaque(false);
         JLabel odHdr = new JLabel("Order Details");
         odHdr.setFont(FONT_SUBTITLE);
         odHdr.setForeground(FG_PRIMARY);
-        orderDetailsSection.add(odHdr, BorderLayout.NORTH);
+        odHdrRow.add(odHdr, BorderLayout.WEST);
+        JButton clearOrderBtn = new JButton("Clear All");
+        clearOrderBtn.setFont(FONT_SMALL);
+        clearOrderBtn.setForeground(Color.WHITE);
+        clearOrderBtn.setBackground(DANGER);
+        clearOrderBtn.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(DANGER, 1, true), new EmptyBorder(6, 10, 6, 10)));
+        clearOrderBtn.setFocusPainted(false);
+        clearOrderBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        clearOrderBtn.addActionListener(e -> {
+            if (!orderEntries.isEmpty()) {
+                int ok = JOptionPane.showConfirmDialog(this, "Clear all items from the order?", "Confirm",
+                    JOptionPane.YES_NO_OPTION);
+                if (ok == JOptionPane.YES_OPTION) {
+                    orderEntries.clear();
+                    refreshOrderDisplay();
+                }
+            }
+        });
+        odHdrRow.add(clearOrderBtn, BorderLayout.EAST);
+        orderDetailsSection.add(odHdrRow, BorderLayout.NORTH);
         orderDetailsSection.add(itemsScroll, BorderLayout.CENTER);
 
         cx.gridy = 1; cx.fill = GridBagConstraints.BOTH; cx.weighty = 1; cx.insets = new Insets(6, 0, 0, 0);
@@ -845,8 +916,17 @@ public class OrderingPanel extends JPanel {
     // ═══════════════════════════════════════════════════════════════
 
     private void addOrderItem(ItemSpec spec) {
+        // Ensure enough ingredients for one more unit
+        if (!isMenuItemAvailableForQuantity(spec.baseName, 1)) {
+            JOptionPane.showMessageDialog(this, "Insufficient ingredients to add this item.", "Unavailable", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
         for (OrderEntry e : orderEntries) {
             if (e.displayName.equals(spec.displayName) && e.variant.equals(spec.variant)) {
+                if (!isMenuItemAvailableForQuantity(spec.baseName, e.quantity + 1)) {
+                    JOptionPane.showMessageDialog(this, "Insufficient ingredients to increase quantity.", "Unavailable", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
                 e.quantity++;
                 refreshOrderDisplay();
                 return;
@@ -880,7 +960,7 @@ public class OrderingPanel extends JPanel {
         row.setBackground(BG_INPUT);
         row.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(BORDER, 1, true),
-            new EmptyBorder(6, 8, 6, 8)));
+            new EmptyBorder(5, 6, 5, 6)));
 
         // Thumbnail
         JLabel thumb = new JLabel("\u2615", SwingConstants.CENTER);
@@ -911,17 +991,19 @@ public class OrderingPanel extends JPanel {
         row.add(np, BorderLayout.CENTER);
 
         // Quantity controls
-        JPanel qp = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
+        JPanel qp = new JPanel(new FlowLayout(FlowLayout.RIGHT, 1, 0));
         qp.setOpaque(false);
+        qp.setPreferredSize(new Dimension(82, 26));
+        qp.setBorder(new EmptyBorder(0, 0, 0, 2));
 
         JButton minus = new JButton("\u2212");
         minus.setFont(new Font("Segoe UI", Font.BOLD, 12));
         minus.setForeground(FG_PRIMARY);
         minus.setBackground(AppTheme.BG_BADGE_BLUE);
-        minus.setPreferredSize(new Dimension(22, 22));
+        minus.setPreferredSize(new Dimension(18, 18));
         minus.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(BORDER, 1),
-            new EmptyBorder(0, 4, 0, 4)));
+            new EmptyBorder(0, 2, 0, 2)));
         minus.setFocusPainted(false);
         minus.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         minus.addActionListener(e -> {
@@ -930,23 +1012,63 @@ public class OrderingPanel extends JPanel {
             refreshOrderDisplay();
         });
 
-        JLabel ql = new JLabel(String.valueOf(entry.quantity));
+        JTextField ql = new JTextField(String.valueOf(entry.quantity), 3);
         ql.setFont(FONT_BOLD_SM);
         ql.setForeground(FG_PRIMARY);
-        ql.setPreferredSize(new Dimension(14, 20));
         ql.setHorizontalAlignment(SwingConstants.CENTER);
+        ql.setPreferredSize(new Dimension(26, 18));
+        ql.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(BORDER, 1, true),
+            new EmptyBorder(0, 2, 0, 2)));
+        // Allow typed quantities with live validation
+        ql.getDocument().addDocumentListener(new DocumentListener() {
+            private void apply() {
+                String txt = ql.getText().trim();
+                if (txt.isEmpty()) return;
+                try {
+                    int v = Integer.parseInt(txt);
+                    if (v <= 0) {
+                        // remove item
+                        orderEntries.remove(entry);
+                        refreshOrderDisplay();
+                        return;
+                    }
+                    if (!isMenuItemAvailableForQuantity(entry.baseName, v)) {
+                        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(row,
+                            "Insufficient ingredients for requested quantity.", "Unavailable", JOptionPane.WARNING_MESSAGE));
+                        // revert
+                        ql.setText(String.valueOf(entry.quantity));
+                        return;
+                    }
+                    entry.quantity = v;
+                    refreshOrderDisplay();
+                } catch (NumberFormatException ex) {
+                    // ignore until valid
+                }
+            }
+            public void insertUpdate(DocumentEvent e) { apply(); }
+            public void removeUpdate(DocumentEvent e) { apply(); }
+            public void changedUpdate(DocumentEvent e) { apply(); }
+        });
 
         JButton plus = new JButton("+");
         plus.setFont(new Font("Segoe UI", Font.BOLD, 12));
         plus.setForeground(Color.WHITE);
         plus.setBackground(ACCENT);
-        plus.setPreferredSize(new Dimension(22, 22));
+        plus.setPreferredSize(new Dimension(18, 18));
         plus.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(AppTheme.ACCENT_DARK, 1),
-            new EmptyBorder(0, 4, 0, 4)));
+            new EmptyBorder(0, 2, 0, 2)));
         plus.setFocusPainted(false);
         plus.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        plus.addActionListener(e -> { entry.quantity++; refreshOrderDisplay(); });
+        plus.addActionListener(e -> {
+            if (!isMenuItemAvailableForQuantity(entry.baseName, entry.quantity + 1)) {
+                JOptionPane.showMessageDialog(row, "Insufficient ingredients to increase quantity.", "Unavailable", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            entry.quantity++;
+            refreshOrderDisplay();
+        });
 
         qp.add(minus); qp.add(ql); qp.add(plus);
         row.add(qp, BorderLayout.EAST);
@@ -1132,7 +1254,7 @@ public class OrderingPanel extends JPanel {
     private void completeTransaction(String customerName, double totalInclusive, double cash, double change) {
         double subtotal = totalInclusive / 1.12;
         double vat = totalInclusive - subtotal;
-        String txnRef = "TXN" + String.format("%06d", ++transactionCounter);
+        String txnRef = nextTransactionRef();
 
         Inventory inv = Inventory.getInstance();
         Menu menu = Menu.getInstance();
@@ -1206,8 +1328,58 @@ public class OrderingPanel extends JPanel {
         sb.append("         Thank you! Come again!\n");
         sb.append("         *** Have a nice day ***\n");
 
-        JOptionPane.showMessageDialog(this, sb.toString(),
-            "\u2705 RECEIPT - " + txnRef, JOptionPane.INFORMATION_MESSAGE);
+        // Show receipt in a dialog with Print option
+        JDialog rd = new JDialog(SwingUtilities.getWindowAncestor(this), "RECEIPT - " + txnRef,
+            JDialog.ModalityType.APPLICATION_MODAL);
+        rd.getContentPane().setBackground(BG_PRIMARY);
+        JPanel panel = new JPanel(new BorderLayout(0, 8));
+        panel.setBackground(BG_PRIMARY);
+        panel.setBorder(new EmptyBorder(12, 12, 12, 12));
+        JTextArea ta = new JTextArea(sb.toString());
+        ta.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        ta.setEditable(false);
+        JScrollPane sp = new JScrollPane(ta);
+        sp.setPreferredSize(new Dimension(480, 360));
+        panel.add(sp, BorderLayout.CENTER);
+
+        JPanel bp = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 0));
+        bp.setOpaque(false);
+        JButton print = new JButton("Print");
+        print.setFont(FONT_BODY);
+        print.setForeground(Color.WHITE);
+        print.setBackground(ACCENT);
+        print.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(ACCENT, 1, true), new EmptyBorder(8, 20, 8, 20)));
+        print.setFocusPainted(false);
+        print.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        print.addActionListener(ev -> {
+            try {
+                boolean ok = ta.print();
+                if (!ok) {
+                    JOptionPane.showMessageDialog(rd, "Printer cancelled or failed.", "Print", JOptionPane.WARNING_MESSAGE);
+                }
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(rd, "Print error: " + ex.getMessage(), "Print", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        JButton close = new JButton("Close");
+        close.setFont(FONT_BODY);
+        close.setForeground(Color.WHITE);
+        close.setBackground(ACCENT);
+        close.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(ACCENT, 1, true), new EmptyBorder(8, 20, 8, 20)));
+        close.setFocusPainted(false);
+        close.addActionListener(ev -> rd.dispose());
+
+        bp.add(print); bp.add(close);
+        panel.add(bp, BorderLayout.SOUTH);
+        rd.add(panel);
+        rd.pack();
+        java.awt.Window win = SwingUtilities.getWindowAncestor(this);
+        if (win != null) rd.setLocationRelativeTo(win);
+        else rd.setLocationRelativeTo(null);
+        rd.setVisible(true);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -1464,6 +1636,77 @@ public class OrderingPanel extends JPanel {
         return true;
     }
 
+    private boolean isMenuItemAvailableForQuantity(String baseName, int qty) {
+        if (qty <= 0) return false;
+        MenuItem item = Menu.getInstance().getMenuItem(baseName);
+        if (item == null) return false;
+        if (item.getIngredients().isEmpty()) return true;
+
+        Inventory inventory = Inventory.getInstance();
+        for (Map.Entry<String, Double> ingredient : item.getIngredients().entrySet()) {
+            inventory.InventoryItem stock = inventory.getItem(ingredient.getKey());
+            double required = (ingredient.getValue() == null ? 0.0 : ingredient.getValue()) * qty;
+            if (stock == null || stock.getQuantity() < required) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private String buildUnavailableIngredientsTooltip(String baseName) {
+        MenuItem item = Menu.getInstance().getMenuItem(baseName);
+        if (item == null) {
+            return htmlTooltip("Item not found in menu.");
+        }
+
+        Inventory inventory = Inventory.getInstance();
+        StringBuilder details = new StringBuilder();
+        for (Map.Entry<String, Double> ingredient : item.getIngredients().entrySet()) {
+            inventory.InventoryItem stock = inventory.getItem(ingredient.getKey());
+            double required = ingredient.getValue() == null ? 0.0 : ingredient.getValue();
+            double available = stock == null ? 0.0 : stock.getQuantity();
+            if (stock == null || available < required) {
+                if (details.length() > 0) {
+                    details.append("<br>");
+                }
+                details.append("<b>")
+                        .append(escapeHtml(ingredient.getKey()))
+                        .append("</b>: need ")
+                        .append(formatAmount(required))
+                        .append(", have ")
+                        .append(formatAmount(available));
+                if (stock == null) {
+                    details.append(" (missing)");
+                }
+            }
+        }
+
+        if (details.length() == 0) {
+            return htmlTooltip("Unavailable because ingredient stock is insufficient.");
+        }
+
+        return htmlTooltip("Unavailable ingredients:<br>" + details);
+    }
+
+    private String htmlTooltip(String body) {
+        return "<html><div style='width:320px; font-family:Segoe UI; font-size:12px;'>" + body + "</div></html>";
+    }
+
+    private String escapeHtml(String text) {
+        return text == null ? "" : text
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
+    }
+
+    private String formatAmount(double amount) {
+        if (Math.abs(amount - Math.rint(amount)) < 0.0001) {
+            return String.valueOf((long) Math.rint(amount));
+        }
+        return String.format("%.2f", amount);
+    }
+
     private String findCategory(String itemName) {
         for (Map.Entry<String, List<String>> e : CATEGORY_ITEMS.entrySet()) {
             for (String n : e.getValue()) {
@@ -1475,6 +1718,36 @@ public class OrderingPanel extends JPanel {
 
     private static String fmtOrder(int id) {
         return String.format("#%05d", id);
+    }
+
+    private int loadTransactionCounter() {
+        try (java.sql.Connection conn = AppDatabase.openConnection();
+             java.sql.PreparedStatement ps = conn.prepareStatement(
+                     "SELECT transaction_ref FROM sales_transactions ORDER BY id DESC LIMIT 1");
+             java.sql.ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                String ref = rs.getString(1);
+                return parseTransactionNumber(ref);
+            }
+        } catch (Exception ignored) {
+        }
+        return 1000;
+    }
+
+    private int parseTransactionNumber(String ref) {
+        if (ref == null) return 1000;
+        String digits = ref.replaceAll("\\D", "");
+        if (digits.isEmpty()) return 1000;
+        try {
+            return Integer.parseInt(digits);
+        } catch (NumberFormatException ex) {
+            return 1000;
+        }
+    }
+
+    private String nextTransactionRef() {
+        transactionCounter = Math.max(transactionCounter, loadTransactionCounter()) + 1;
+        return "TXN" + String.format("%06d", transactionCounter);
     }
 
     private String trunc(String s, int len) {

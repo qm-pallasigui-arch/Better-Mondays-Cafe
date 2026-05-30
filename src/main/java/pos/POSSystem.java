@@ -2,6 +2,7 @@ package pos;
 
 import inventory.Inventory;
 import inventory.InventoryItem;
+import pos.Menu;
 import java.util.Map;
 import javax.swing.JButton;
 import javax.swing.JOptionPane;
@@ -28,6 +29,9 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Insets;
 import java.awt.RenderingHints;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import javax.swing.AbstractCellEditor;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -828,6 +832,13 @@ public class POSSystem extends javax.swing.JFrame {
         contentPanel.add(orderingPanel, "Ordering");
         contentPanel.add(new SearchModule(), "Search");
 
+        Menu.getInstance().addChangeListener(() -> javax.swing.SwingUtilities.invokeLater(() -> {
+            if (orderingPanel != null) {
+                orderingPanel.refreshCategoryPills();
+                orderingPanel.rebuildProducts();
+            }
+        }));
+
         // ═══════════════════════════════════════════════════════════
         //  INVENTORY TAB - Card-on-Canvas Design
         // ═══════════════════════════════════════════════════════════
@@ -1283,7 +1294,7 @@ public class POSSystem extends javax.swing.JFrame {
         if (option == JOptionPane.YES_OPTION) System.exit(0);
     }
 
-    private static int transactionCounter = 1000;
+    private static int transactionCounter = loadTransactionCounter();
 
     private String truncate(String s, int len) {
         return s.length() > len ? s.substring(0, len - 3) + "..." : s;
@@ -1318,12 +1329,10 @@ public class POSSystem extends javax.swing.JFrame {
             subTotal += lineTotal;
             salesList.add(new SalesRecord(name, qty, lineTotal / qty, lineTotal));
         }
-        monitoringPanel.refreshData();
-
         double cash = Double.parseDouble(cashpayment.getText().replace("\u20B1", "").replace("P", "").trim());
         double change = Double.parseDouble(jTextFieldChange.getText().replace("\u20B1", "").replace("P", "").trim());
 
-        String transactionRef = "TXN" + String.format("%06d", transactionCounter);
+        String transactionRef = nextTransactionRef();
         try {
             if (orderController == null) orderController = new OrderController(new SQLiteSalesRepository());
             orderController.persistCompletedTransaction(transactionRef, salesList, subTotal, cash, change);
@@ -1334,7 +1343,7 @@ public class POSSystem extends javax.swing.JFrame {
         String lineSep = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
         String receiptStr = " ☕ Better Mondays Cafe ☕\n 123 Main St., Manila\n VAT REG TIN: 123-456-789\n" + lineSep
             + "Date: " + new SimpleDateFormat("MM/dd/yyyy HH:mm").format(new Date()) + "\n"
-            + "Txn #: TXN" + String.format("%06d", ++transactionCounter) + "\n" + lineSep
+            + "Txn #: " + transactionRef + "\n" + lineSep
             + String.format("%-15s %3s %8s\n", "ITEM", "QTY", "AMOUNT") + "───────────────────────────────\n";
         for (SalesRecord s : salesList) {
             receiptStr += String.format("%-15s %3d %8.2f\n", truncate(s.getProductName(), 15), s.getQuantity(), s.getTotal());
@@ -1347,7 +1356,7 @@ public class POSSystem extends javax.swing.JFrame {
             + String.format("%-23s %8.2f\n", "Change:", change) + lineSep
             + " Thank you! Come again!\n *** Have a nice day ***\n";
 
-        JOptionPane.showMessageDialog(this, receiptStr, "✅ RECEIPT - TXN" + String.format("%06d", transactionCounter), JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(this, receiptStr, "✅ RECEIPT - " + transactionRef, JOptionPane.INFORMATION_MESSAGE);
 
         orderModel.setRowCount(0);
         jTextFieldChange.setText("");
@@ -1358,6 +1367,36 @@ public class POSSystem extends javax.swing.JFrame {
 
         loadInventoryTable();
         monitoringPanel.refreshData();
+    }
+
+    private static int loadTransactionCounter() {
+        try (Connection conn = persistence.AppDatabase.openConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT transaction_ref FROM sales_transactions ORDER BY id DESC LIMIT 1");
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                String ref = rs.getString(1);
+                return parseTransactionNumber(ref);
+            }
+        } catch (Exception ignored) {
+        }
+        return 1000;
+    }
+
+    private static int parseTransactionNumber(String ref) {
+        if (ref == null) return 1000;
+        String digits = ref.replaceAll("\\D", "");
+        if (digits.isEmpty()) return 1000;
+        try {
+            return Integer.parseInt(digits);
+        } catch (NumberFormatException ex) {
+            return 1000;
+        }
+    }
+
+    private static String nextTransactionRef() {
+        transactionCounter = Math.max(transactionCounter, loadTransactionCounter()) + 1;
+        return "TXN" + String.format("%06d", transactionCounter);
     }
 
     private void filterInventoryTable(String query) {

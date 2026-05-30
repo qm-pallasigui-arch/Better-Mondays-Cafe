@@ -114,6 +114,7 @@ public class SidebarPanel extends JPanel {
         add(createUserProfile(), BorderLayout.SOUTH);
 
         setPreferredSize(new Dimension(EXPANDED_WIDTH, 0));
+        refreshChromeStyles();
     }
 
     public void setActivePage(String page) {
@@ -192,6 +193,7 @@ public class SidebarPanel extends JPanel {
 
         collapseBtn = new JButton();
         collapseBtn.setIcon(createCollapseIcon(false));
+        collapseBtn.putClientProperty("appTheme.variant", "transparent");
         collapseBtn.setPreferredSize(new Dimension(22, 22));
         collapseBtn.setForeground(AppTheme.FG_MUTED);
         collapseBtn.setBackground(new Color(0, 0, 0, 0));
@@ -326,6 +328,7 @@ public class SidebarPanel extends JPanel {
 
     private JButton createOverflowPreviewButton() {
         JButton button = new JButton();
+        button.putClientProperty("appTheme.variant", "transparent");
         button.setIcon(createOverflowIcon());
         button.setPreferredSize(new Dimension(22, 22));
         button.setForeground(AppTheme.FG_MUTED);

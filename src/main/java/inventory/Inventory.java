@@ -181,6 +181,7 @@ public class Inventory {
                     "Unable to save inventory item to database: " + e.getMessage(),
                     "Database", JOptionPane.WARNING_MESSAGE);
         }
+        notifyChangeListeners();
     }
 
     public void updateItem(String originalName, InventoryItem item) {
@@ -201,6 +202,7 @@ public class Inventory {
                     "Unable to update inventory item in database: " + e.getMessage(),
                     "Database", JOptionPane.WARNING_MESSAGE);
         }
+        notifyChangeListeners();
     }
 
     public void removeItem(String name) {
@@ -213,6 +215,7 @@ public class Inventory {
                     "Unable to remove inventory item from database: " + e.getMessage(),
                     "Database", JOptionPane.WARNING_MESSAGE);
         }
+        notifyChangeListeners();
     }
 
     public void deductIngredient(String name, double amount) {

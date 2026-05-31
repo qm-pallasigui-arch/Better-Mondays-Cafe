@@ -1,6 +1,5 @@
 package ui;
 
-import inventory.InventoryItem;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -27,7 +26,10 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import javax.swing.AbstractCellEditor;
 import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -43,23 +45,15 @@ import persistence.AppDatabase;
 
 public class MonitoringPanel extends JPanel {
 
-    // ─── Global Refresh Listener (Option 2 & 3: event-based) ────────────────
-    /**
-     * Call MonitoringPanel.notifyRefresh() from anywhere in the app (e.g. after
-     * a sale is saved) to trigger all active MonitoringPanel instances to reload.
-     *
-     * Example usage in your POS/checkout panel after saving a transaction:
-     * MonitoringPanel.notifyRefresh();
-     */
+    // ─── Global Refresh Listener ─────────────────────────────────────────────
     private static final CopyOnWriteArrayList<Runnable> REFRESH_LISTENERS = new CopyOnWriteArrayList<>();
 
     public static void notifyRefresh() {
-        for (Runnable r : REFRESH_LISTENERS) {
+        for (Runnable r : REFRESH_LISTENERS)
             SwingUtilities.invokeLater(r);
-        }
     }
 
-    // ─── Fonts ───────────────────────────────────────────────────
+    // ─── Fonts ───────────────────────────────────────────────────────────────
     private static final Font TITLE_FONT = new Font("Segoe UI", Font.BOLD, 28);
     private static final Font SUB_FONT = new Font("Segoe UI", Font.PLAIN, 13);
     private static final Font BODY_FONT = new Font("Segoe UI", Font.PLAIN, 13);
@@ -67,9 +61,8 @@ public class MonitoringPanel extends JPanel {
     private static final Font CARD_NUM_FONT = new Font("Segoe UI", Font.BOLD, 26);
     private static final Font CARD_LABEL_FONT = new Font("Segoe UI", Font.PLAIN, 12);
     private static final Font SMALL_FONT = new Font("Segoe UI", Font.PLAIN, 10);
-    private static final Font MONO_FONT = new Font("Consolas", Font.PLAIN, 11);
 
-    // ─── Card Config ─────────────────────────────────────────────
+    // ─── Card Config ─────────────────────────────────────────────────────────
     private static final Color[] CARD_TINTS = {
             AppTheme.ACCENT, AppTheme.WARNING, AppTheme.DANGER, new Color(0x4B5563)
     };
@@ -80,19 +73,16 @@ public class MonitoringPanel extends JPanel {
             "\uD83D\uDCE6", "\u26A0\uFE0F", "\uD83D\uDD25", "\u274C"
     };
 
-    // ─── State ───────────────────────────────────────────────────
+    // ─── State ───────────────────────────────────────────────────────────────
     private JLabel[] cardCountLabels = new JLabel[4];
     private JLabel[] cardSubtextLabels = new JLabel[4];
     private JTable salesTable;
     private DefaultTableModel salesTableModel;
     private BarChartPanel barChart;
     private LineChartPanel lineChart;
-
-    /** Auto-refresh timer (Option 1: periodic polling every 30 s). */
     private javax.swing.Timer autoRefreshTimer;
 
-    // ─── Constructor ─────────────────────────────────────────────
-
+    // ─── Constructor ─────────────────────────────────────────────────────────
     public MonitoringPanel() {
         setLayout(new BorderLayout(0, 16));
         setBackground(AppTheme.BG_PRIMARY);
@@ -100,17 +90,13 @@ public class MonitoringPanel extends JPanel {
         buildUI();
         refreshData();
 
-        // ── Option 1: Periodic auto-refresh every 30 seconds ──────────────────
         autoRefreshTimer = new javax.swing.Timer(1_000, e -> refreshData());
         autoRefreshTimer.setRepeats(true);
         autoRefreshTimer.start();
 
-        // ── Option 2 / 3: Event-based refresh via static listener ─────────────
-        // Register this instance; it will be called by MonitoringPanel.notifyRefresh()
         Runnable myRefresh = this::refreshData;
         REFRESH_LISTENERS.add(myRefresh);
 
-        // Clean up when panel is removed from the UI hierarchy so there are no leaks
         addHierarchyListener(e -> {
             if ((e.getChangeFlags() & java.awt.event.HierarchyEvent.DISPLAYABILITY_CHANGED) != 0
                     && !isDisplayable()) {
@@ -120,8 +106,7 @@ public class MonitoringPanel extends JPanel {
         });
     }
 
-    // ─── Public API ──────────────────────────────────────────────
-
+    // ─── Public API ──────────────────────────────────────────────────────────
     public void refreshData() {
         loadSummaryCards();
         loadSalesTable();
@@ -129,8 +114,7 @@ public class MonitoringPanel extends JPanel {
         lineChart.refreshData();
     }
 
-    // ─── UI Construction ─────────────────────────────────────────
-
+    // ─── UI Construction ─────────────────────────────────────────────────────
     private void buildUI() {
         add(buildHeader(), BorderLayout.NORTH);
 
@@ -146,6 +130,7 @@ public class MonitoringPanel extends JPanel {
         add(contentBody, BorderLayout.CENTER);
     }
 
+    // ─── Header ──────────────────────────────────────────────────────────────
     private JPanel buildHeader() {
         JPanel header = new JPanel(new BorderLayout());
         header.setOpaque(false);
@@ -157,10 +142,8 @@ public class MonitoringPanel extends JPanel {
         JLabel subtitle = new JLabel();
         subtitle.setFont(SUB_FONT);
         subtitle.setForeground(AppTheme.FG_MUTED);
-        new javax.swing.Timer(1000,
-                e -> subtitle
-                        .setText("As of " + new SimpleDateFormat("EEEE, MM/dd/yyyy hh:mm:ss a").format(new Date())))
-                .start();
+        new javax.swing.Timer(1000, e -> subtitle.setText(
+                "As of " + new SimpleDateFormat("EEEE, MM/dd/yyyy hh:mm:ss a").format(new Date()))).start();
 
         JPanel stack = new JPanel(new BorderLayout(0, 2));
         stack.setOpaque(false);
@@ -168,7 +151,6 @@ public class MonitoringPanel extends JPanel {
         stack.add(subtitle, BorderLayout.SOUTH);
         header.add(stack, BorderLayout.WEST);
 
-        // ── Sales Report button (replaces old Refresh button) ─────────────────
         JButton reportBtn = new JButton("\uD83D\uDCCA Sales Report");
         reportBtn.setFont(BOLD_FONT);
         reportBtn.setForeground(Color.WHITE);
@@ -176,14 +158,174 @@ public class MonitoringPanel extends JPanel {
         reportBtn.setBorder(BorderFactory.createEmptyBorder(8, 18, 8, 18));
         reportBtn.setFocusPainted(false);
         reportBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        reportBtn.addActionListener(e -> showSalesReportModal());
+        // Opens the chooser modal (Weekly / Monthly)
+        reportBtn.addActionListener(e -> showReportChooserModal());
         header.add(reportBtn, BorderLayout.EAST);
 
         return header;
     }
 
-    // ─── Summary Cards ───────────────────────────────────────────
+    // ─── Report Chooser Modal ────────────────────────────────────────────────
+    /**
+     * Shows a small dialog with two card-style buttons:
+     * • Weekly Report → SalesReportGenerator.generateWeekly()
+     * • Monthly Report → SalesReportGenerator.generateMonthly()
+     */
+    private void showReportChooserModal() {
+        JDialog dialog = new JDialog(
+                SwingUtilities.getWindowAncestor(this),
+                "Generate Sales Report",
+                java.awt.Dialog.ModalityType.APPLICATION_MODAL);
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        dialog.setResizable(false);
 
+        JPanel root = new JPanel(new BorderLayout(0, 0));
+        root.setBackground(AppTheme.BG_SURFACE);
+
+        // ── Banner ────────────────────────────────────────────────
+        JPanel banner = new JPanel(new BorderLayout());
+        banner.setBackground(AppTheme.ACCENT);
+        banner.setBorder(BorderFactory.createEmptyBorder(18, 24, 18, 24));
+
+        JLabel bannerIcon = new JLabel("\uD83D\uDCCA");
+        bannerIcon.setFont(new Font("Segoe UI", Font.PLAIN, 32));
+        bannerIcon.setForeground(Color.WHITE);
+        bannerIcon.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 14));
+
+        JPanel bannerText = new JPanel(new BorderLayout(0, 3));
+        bannerText.setOpaque(false);
+
+        JLabel bannerTitle = new JLabel("Sales Report");
+        bannerTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        bannerTitle.setForeground(Color.WHITE);
+
+        JLabel bannerSub = new JLabel("Choose the report period you want to generate");
+        bannerSub.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        bannerSub.setForeground(new Color(255, 255, 255, 200));
+
+        bannerText.add(bannerTitle, BorderLayout.NORTH);
+        bannerText.add(bannerSub, BorderLayout.SOUTH);
+        banner.add(bannerIcon, BorderLayout.WEST);
+        banner.add(bannerText, BorderLayout.CENTER);
+
+        // ── Two card buttons ──────────────────────────────────────
+        JPanel btnRow = new JPanel(new GridLayout(1, 2, 16, 0));
+        btnRow.setBackground(AppTheme.BG_SURFACE);
+        btnRow.setBorder(BorderFactory.createEmptyBorder(24, 28, 20, 28));
+
+        JButton weeklyBtn = makeReportTypeButton(
+                "\uD83D\uDCC5", "Weekly Report",
+                "Current week breakdown\nby day & category",
+                new Color(0x2563EB));
+
+        JButton monthlyBtn = makeReportTypeButton(
+                "\uD83D\uDCC6", "Monthly Report",
+                "4-week summary for\nthe current month",
+                new Color(0x059669));
+
+        weeklyBtn.addActionListener(e -> {
+            dialog.dispose();
+            SalesReportGenerator.generateWeekly(MonitoringPanel.this);
+        });
+        monthlyBtn.addActionListener(e -> {
+            dialog.dispose();
+            SalesReportGenerator.generateMonthly(MonitoringPanel.this);
+        });
+
+        btnRow.add(weeklyBtn);
+        btnRow.add(monthlyBtn);
+
+        // ── Cancel link ───────────────────────────────────────────
+        JPanel footer = new JPanel();
+        footer.setBackground(AppTheme.BG_SURFACE);
+        footer.setBorder(BorderFactory.createEmptyBorder(0, 0, 16, 0));
+        JLabel cancelLbl = new JLabel("Cancel");
+        cancelLbl.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        cancelLbl.setForeground(AppTheme.FG_MUTED);
+        cancelLbl.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        cancelLbl.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                dialog.dispose();
+            }
+
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                cancelLbl.setForeground(AppTheme.ACCENT);
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                cancelLbl.setForeground(AppTheme.FG_MUTED);
+            }
+        });
+        footer.add(cancelLbl);
+
+        root.add(banner, BorderLayout.NORTH);
+        root.add(btnRow, BorderLayout.CENTER);
+        root.add(footer, BorderLayout.SOUTH);
+
+        dialog.setContentPane(root);
+        dialog.pack();
+        dialog.setMinimumSize(new Dimension(440, dialog.getHeight()));
+        dialog.setLocationRelativeTo(SwingUtilities.getWindowAncestor(this));
+        dialog.setVisible(true);
+    }
+
+    /** Card-style button used in the report chooser. */
+    private JButton makeReportTypeButton(String icon, String label, String desc, Color accent) {
+        JButton btn = new JButton() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                Color bg = getModel().isRollover() ? accent.brighter()
+                        : getModel().isPressed() ? accent.darker()
+                                : AppTheme.BG_PRIMARY;
+                g2.setColor(bg);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 14, 14);
+                g2.setColor(accent);
+                g2.setStroke(new java.awt.BasicStroke(2f));
+                g2.drawRoundRect(1, 1, getWidth() - 2, getHeight() - 2, 14, 14);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        btn.setLayout(new BoxLayout(btn, BoxLayout.Y_AXIS));
+        btn.setOpaque(false);
+        btn.setContentAreaFilled(false);
+        btn.setBorderPainted(false);
+        btn.setFocusPainted(false);
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setBorder(BorderFactory.createEmptyBorder(20, 16, 20, 16));
+        btn.setPreferredSize(new Dimension(170, 130));
+
+        JLabel iconLbl = new JLabel(icon, SwingConstants.CENTER);
+        iconLbl.setFont(new Font("Segoe UI", Font.PLAIN, 30));
+        iconLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel nameLbl = new JLabel(label, SwingConstants.CENTER);
+        nameLbl.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        nameLbl.setForeground(accent);
+        nameLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel descLbl = new JLabel(
+                "<html><div style='text-align:center;color:#6B7280;font-size:10px;'>"
+                        + desc.replace("\n", "<br>") + "</div></html>",
+                SwingConstants.CENTER);
+        descLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        btn.add(Box.createVerticalGlue());
+        btn.add(iconLbl);
+        btn.add(Box.createVerticalStrut(6));
+        btn.add(nameLbl);
+        btn.add(Box.createVerticalStrut(4));
+        btn.add(descLbl);
+        btn.add(Box.createVerticalGlue());
+        return btn;
+    }
+
+    // ─── Summary Cards ────────────────────────────────────────────────────────
     private JPanel buildSummaryRow() {
         JPanel row = new JPanel(new GridLayout(1, 4, 16, 0));
         row.setOpaque(false);
@@ -248,7 +390,8 @@ public class MonitoringPanel extends JPanel {
     private void loadSummaryCards() {
         int totalItems = 0, lowStock = 0, expired = 0, outOfStock = 0;
         try (Connection conn = AppDatabase.openConnection()) {
-            try (PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM inventory_items")) {
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT COUNT(*) FROM inventory_items")) {
                 ResultSet rs = ps.executeQuery();
                 if (rs.next())
                     totalItems = rs.getInt(1);
@@ -298,9 +441,10 @@ public class MonitoringPanel extends JPanel {
         try (Connection conn = AppDatabase.openConnection()) {
             String sql = switch (idx) {
                 case 0 -> "SELECT name, quantity, unit FROM inventory_items ORDER BY name";
-                case 1 ->
-                    "SELECT name, quantity, unit, alert_level FROM inventory_items WHERE quantity > 0 AND quantity <= alert_level ORDER BY name";
-                case 2 -> "SELECT ii.name, ib.sku, ib.quantity, ib.expiry_date FROM inventory_batches ib "
+                case 1 -> "SELECT name, quantity, unit, alert_level FROM inventory_items "
+                        + "WHERE quantity > 0 AND quantity <= alert_level ORDER BY name";
+                case 2 -> "SELECT ii.name, ib.sku, ib.quantity, ib.expiry_date "
+                        + "FROM inventory_batches ib "
                         + "JOIN inventory_items ii ON ii.id = ib.inventory_item_id "
                         + "WHERE ib.expiry_date < date('now') AND ib.quantity > 0 ORDER BY ib.expiry_date";
                 case 3 -> "SELECT name, unit FROM inventory_items WHERE quantity <= 0 ORDER BY name";
@@ -310,9 +454,8 @@ public class MonitoringPanel extends JPanel {
                     ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     List<String> cols = new ArrayList<>();
-                    for (int c = 1; c <= rs.getMetaData().getColumnCount(); c++) {
+                    for (int c = 1; c <= rs.getMetaData().getColumnCount(); c++)
                         cols.add(rs.getString(c) == null ? "" : rs.getString(c));
-                    }
                     rows.add(cols.toArray(new String[0]));
                 }
             }
@@ -357,251 +500,7 @@ public class MonitoringPanel extends JPanel {
                 content, title, JOptionPane.PLAIN_MESSAGE);
     }
 
-    // ─── Sales Report Modal ──────────────────────────────────────
-
-    /**
-     * Shows a full sales report dialog with:
-     * • Summary totals (revenue, transactions, avg order)
-     * • Date-range breakdown table
-     * • Top-selling products
-     */
-    private void showSalesReportModal() {
-        // ── Load data ─────────────────────────────────────────────
-        double totalRevenue = 0, totalTax = 0;
-        int totalTransactions = 0;
-        List<String[]> dailyRows = new ArrayList<>();
-        List<String[]> productRows = new ArrayList<>();
-
-        try (Connection conn = AppDatabase.openConnection()) {
-
-            // Overall totals
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT COUNT(*) as cnt, COALESCE(SUM(total),0) as rev, "
-                            + "COALESCE(SUM(tax),0) as tax FROM sales_transactions")) {
-                ResultSet rs = ps.executeQuery();
-                if (rs.next()) {
-                    totalTransactions = rs.getInt("cnt");
-                    totalRevenue = rs.getDouble("rev");
-                    totalTax = rs.getDouble("tax");
-                }
-            }
-
-            // Daily breakdown (last 30 days)
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT DATE(created_at) as day, COUNT(*) as txns, "
-                            + "COALESCE(SUM(subtotal),0) as subtotal, "
-                            + "COALESCE(SUM(tax),0) as tax, "
-                            + "COALESCE(SUM(total),0) as total "
-                            + "FROM sales_transactions "
-                            + "WHERE created_at >= date('now','-30 days') "
-                            + "GROUP BY DATE(created_at) ORDER BY day DESC")) {
-                ResultSet rs = ps.executeQuery();
-                while (rs.next()) {
-                    dailyRows.add(new String[] {
-                            rs.getString("day"),
-                            String.valueOf(rs.getInt("txns")),
-                            String.format("\u20B1%.2f", rs.getDouble("subtotal")),
-                            String.format("\u20B1%.2f", rs.getDouble("tax")),
-                            String.format("\u20B1%.2f", rs.getDouble("total"))
-                    });
-                }
-            }
-
-            // Top products (all time)
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT product_name, SUM(quantity) as qty, SUM(total) as rev "
-                            + "FROM sales_transaction_items "
-                            + "GROUP BY product_name ORDER BY rev DESC LIMIT 10")) {
-                ResultSet rs = ps.executeQuery();
-                while (rs.next()) {
-                    productRows.add(new String[] {
-                            rs.getString("product_name"),
-                            String.valueOf(rs.getInt("qty")),
-                            String.format("\u20B1%.2f", rs.getDouble("rev"))
-                    });
-                }
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        double avgOrder = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
-
-        // ── Build UI ──────────────────────────────────────────────
-        JPanel root = new JPanel(new BorderLayout(0, 16));
-        root.setBackground(AppTheme.BG_SURFACE);
-        root.setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
-
-        // Title
-        JLabel titleLbl = new JLabel("\uD83D\uDCCA Sales Report");
-        titleLbl.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        titleLbl.setForeground(AppTheme.FG_PRIMARY);
-        root.add(titleLbl, BorderLayout.NORTH);
-
-        JPanel body = new JPanel();
-        body.setOpaque(false);
-        body.setLayout(new BoxLayoutPanel()); // helper below
-        root.add(new JScrollPane(body) {
-            {
-                setBorder(null);
-                setPreferredSize(new Dimension(640, 520));
-                getViewport().setOpaque(false);
-            }
-        }, BorderLayout.CENTER);
-
-        // ── Summary cards row ─────────────────────────────────────
-        JPanel summaryRow = new JPanel(new GridLayout(1, 3, 12, 0));
-        summaryRow.setOpaque(false);
-        summaryRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 70));
-        addMiniCard(summaryRow, "Total Revenue", String.format("\u20B1%.2f", totalRevenue), AppTheme.ACCENT);
-        addMiniCard(summaryRow, "Transactions", String.valueOf(totalTransactions), AppTheme.SUCCESS);
-        addMiniCard(summaryRow, "Avg Order Value", String.format("\u20B1%.2f", avgOrder), AppTheme.WARNING);
-        body.add(summaryRow);
-        body.add(vGap(14));
-
-        // ── Daily breakdown (last 30 days) ────────────────────────
-        JLabel dailyTitle = sectionLabel("Daily Breakdown — Last 30 Days");
-        body.add(dailyTitle);
-        body.add(vGap(6));
-
-        String[] dailyCols = { "Date", "Transactions", "Subtotal", "VAT", "Total" };
-        DefaultTableModel dailyModel = new DefaultTableModel(dailyCols, 0) {
-            public boolean isCellEditable(int r, int c) {
-                return false;
-            }
-        };
-        for (String[] row : dailyRows)
-            dailyModel.addRow(row);
-        if (dailyRows.isEmpty())
-            dailyModel.addRow(new String[] { "No data", "-", "-", "-", "-" });
-
-        JTable dailyTable = new JTable(dailyModel);
-        AppTheme.applyTableDefaults(dailyTable);
-        dailyTable.setRowHeight(24);
-        JScrollPane dailyScroll = new JScrollPane(dailyTable);
-        dailyScroll.setBorder(BorderFactory.createLineBorder(AppTheme.BORDER));
-        dailyScroll.setPreferredSize(new Dimension(600, Math.min(200, dailyRows.size() * 26 + 30)));
-        dailyScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 200));
-        body.add(dailyScroll);
-        body.add(vGap(14));
-
-        // ── Top products ─────────────────────────────────────────
-        body.add(sectionLabel("Top-Selling Products (All Time)"));
-        body.add(vGap(6));
-
-        String[] prodCols = { "Product", "Units Sold", "Revenue" };
-        DefaultTableModel prodModel = new DefaultTableModel(prodCols, 0) {
-            public boolean isCellEditable(int r, int c) {
-                return false;
-            }
-        };
-        for (String[] row : productRows)
-            prodModel.addRow(row);
-        if (productRows.isEmpty())
-            prodModel.addRow(new String[] { "No data", "-", "-" });
-
-        JTable prodTable = new JTable(prodModel);
-        AppTheme.applyTableDefaults(prodTable);
-        prodTable.setRowHeight(24);
-        JScrollPane prodScroll = new JScrollPane(prodTable);
-        prodScroll.setBorder(BorderFactory.createLineBorder(AppTheme.BORDER));
-        prodScroll.setPreferredSize(new Dimension(600, Math.min(220, productRows.size() * 26 + 30)));
-        prodScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 220));
-        body.add(prodScroll);
-
-        JOptionPane.showMessageDialog(
-                SwingUtilities.windowForComponent(this),
-                root, "Sales Report", JOptionPane.PLAIN_MESSAGE);
-    }
-
-    // ─── Sales Report Helpers ─────────────────────────────────────
-
-    private void addMiniCard(JPanel parent, String label, String value, Color accent) {
-        JPanel card = new JPanel(new BorderLayout(0, 4));
-        card.setBackground(AppTheme.BG_SURFACE);
-        card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(AppTheme.BORDER),
-                BorderFactory.createEmptyBorder(10, 12, 10, 12)));
-
-        JLabel valLbl = new JLabel(value);
-        valLbl.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        valLbl.setForeground(accent);
-
-        JLabel lblLbl = new JLabel(label);
-        lblLbl.setFont(CARD_LABEL_FONT);
-        lblLbl.setForeground(AppTheme.FG_MUTED);
-
-        card.add(valLbl, BorderLayout.CENTER);
-        card.add(lblLbl, BorderLayout.SOUTH);
-        parent.add(card);
-    }
-
-    private JLabel sectionLabel(String text) {
-        JLabel lbl = new JLabel(text);
-        lbl.setFont(BOLD_FONT);
-        lbl.setForeground(AppTheme.FG_PRIMARY);
-        lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
-        return lbl;
-    }
-
-    private JPanel vGap(int height) {
-        JPanel gap = new JPanel();
-        gap.setOpaque(false);
-        gap.setMaximumSize(new Dimension(Integer.MAX_VALUE, height));
-        gap.setPreferredSize(new Dimension(0, height));
-        return gap;
-    }
-
-    /**
-     * Simple vertical BoxLayout wrapper so we can use add() idiomatically.
-     */
-    private static class BoxLayoutPanel implements java.awt.LayoutManager2 {
-        // Delegates layout to a BoxLayout (Y_AXIS) set on the target panel.
-        // We set it by calling setLayout on the panel after construction.
-        // This class is intentionally empty — see usage site.
-        public void addLayoutComponent(String n, Component c) {
-        }
-
-        public void addLayoutComponent(Component c, Object o) {
-        }
-
-        public void removeLayoutComponent(Component c) {
-        }
-
-        public Dimension preferredLayoutSize(java.awt.Container p) {
-            return p.getPreferredSize();
-        }
-
-        public Dimension minimumLayoutSize(java.awt.Container p) {
-            return p.getMinimumSize();
-        }
-
-        public Dimension maximumLayoutSize(java.awt.Container p) {
-            return p.getMaximumSize();
-        }
-
-        public float getLayoutAlignmentX(java.awt.Container p) {
-            return 0.5f;
-        }
-
-        public float getLayoutAlignmentY(java.awt.Container p) {
-            return 0.5f;
-        }
-
-        public void invalidateLayout(java.awt.Container p) {
-        }
-
-        public void layoutContainer(java.awt.Container p) {
-            // Ensure BoxLayout is installed the first time
-            if (!(p.getLayout() instanceof javax.swing.BoxLayout)) {
-                p.setLayout(new javax.swing.BoxLayout(p, javax.swing.BoxLayout.Y_AXIS));
-            }
-        }
-    }
-
-    // ─── Recent Sales Table ──────────────────────────────────────
-
+    // ─── Recent Sales Table ───────────────────────────────────────────────────
     private JPanel buildSalesCard() {
         CardPanel card = new CardPanel(16, AppTheme.BG_SURFACE);
         card.setLayout(new BorderLayout(0, 12));
@@ -609,6 +508,7 @@ public class MonitoringPanel extends JPanel {
 
         JPanel topBar = new JPanel(new BorderLayout(12, 0));
         topBar.setOpaque(false);
+
         JLabel titleLbl = new JLabel("Recent Sales");
         titleLbl.setFont(new Font("Segoe UI", Font.BOLD, 20));
         titleLbl.setForeground(AppTheme.FG_PRIMARY);
@@ -668,57 +568,59 @@ public class MonitoringPanel extends JPanel {
         cachedTransactions.clear();
         salesTableModel.setRowCount(0);
 
-        try (Connection conn = AppDatabase.openConnection()) {
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT st.id, st.transaction_ref, COALESCE(st.subtotal,0) as subtotal, "
-                            + "COALESCE(st.tax,0) as tax, COALESCE(st.total,0) as total, "
-                            + "COALESCE(st.cash,0) as cash, COALESCE(st.change_amount,0) as change_amount, "
-                            + "COALESCE(st.created_at,'') as created_at "
-                            + "FROM sales_transactions st ORDER BY st.id DESC LIMIT 50");
-                    ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    long txId = rs.getLong("id");
-                    String ref = rs.getString("transaction_ref");
-                    double subtotal = rs.getDouble("subtotal");
-                    double tax = rs.getDouble("tax");
-                    double total = rs.getDouble("total");
-                    double cash = rs.getDouble("cash");
-                    double change = rs.getDouble("change_amount");
-                    String createdAt = rs.getString("created_at");
+        try (Connection conn = AppDatabase.openConnection();
+                PreparedStatement ps = conn.prepareStatement(
+                        "SELECT st.id, st.transaction_ref, "
+                                + "COALESCE(st.subtotal,0)      AS subtotal, "
+                                + "COALESCE(st.tax,0)           AS tax, "
+                                + "COALESCE(st.total,0)         AS total, "
+                                + "COALESCE(st.cash,0)          AS cash, "
+                                + "COALESCE(st.change_amount,0) AS change_amount, "
+                                + "COALESCE(st.created_at,'')   AS created_at "
+                                + "FROM sales_transactions st "
+                                + "ORDER BY st.id DESC LIMIT 50");
+                ResultSet rs = ps.executeQuery()) {
 
-                    List<SalesItem> items = new ArrayList<>();
-                    try (PreparedStatement ps2 = conn.prepareStatement(
-                            "SELECT product_name, quantity, price, total "
-                                    + "FROM sales_transaction_items WHERE transaction_id = ?")) {
-                        ps2.setLong(1, txId);
-                        ResultSet rs2 = ps2.executeQuery();
-                        while (rs2.next()) {
-                            items.add(new SalesItem(
-                                    rs2.getString("product_name"),
-                                    rs2.getInt("quantity"),
-                                    rs2.getDouble("price"),
-                                    rs2.getDouble("total")));
-                        }
-                    }
+            while (rs.next()) {
+                long txId = rs.getLong("id");
+                String ref = rs.getString("transaction_ref");
+                double subtotal = rs.getDouble("subtotal");
+                double tax = rs.getDouble("tax");
+                double total = rs.getDouble("total");
+                double cash = rs.getDouble("cash");
+                double change = rs.getDouble("change_amount");
+                String createdAt = rs.getString("created_at");
 
-                    cachedTransactions.add(
-                            new TransactionRow(ref, "Walk-in", subtotal, tax, total, cash, change, createdAt, items));
-                    salesTableModel.addRow(new Object[] {
-                            "#" + ref.replace("TXN", ""),
-                            "Walk-in",
-                            "\u25BC Details",
-                            String.format("\u20B1%.2f", total),
-                            "\uD83D\uDCC4"
-                    });
+                List<SalesItem> items = new ArrayList<>();
+                try (PreparedStatement ps2 = conn.prepareStatement(
+                        "SELECT product_name, quantity, price, total "
+                                + "FROM sales_transaction_items WHERE transaction_id = ?")) {
+                    ps2.setLong(1, txId);
+                    ResultSet rs2 = ps2.executeQuery();
+                    while (rs2.next())
+                        items.add(new SalesItem(
+                                rs2.getString("product_name"),
+                                rs2.getInt("quantity"),
+                                rs2.getDouble("price"),
+                                rs2.getDouble("total")));
                 }
+
+                cachedTransactions.add(
+                        new TransactionRow(ref, "Walk-in", subtotal, tax, total, cash, change, createdAt, items));
+                salesTableModel.addRow(new Object[] {
+                        "#" + ref.replace("TXN", ""),
+                        "Walk-in",
+                        "\u25BC Details",
+                        String.format("\u20B1%.2f", total),
+                        "\uD83D\uDCC4"
+                });
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        if (cachedTransactions.isEmpty()) {
+        if (cachedTransactions.isEmpty())
             salesTableModel.addRow(new Object[] { "No sales yet", "-", "-", "-", "-" });
-        }
     }
 
     private void applySalesFilter(JTextField searchField) {
@@ -737,9 +639,8 @@ public class MonitoringPanel extends JPanel {
                     "\uD83D\uDCC4"
             });
         }
-        if (salesTableModel.getRowCount() == 0) {
+        if (salesTableModel.getRowCount() == 0)
             salesTableModel.addRow(new Object[] { "No matching sales", "-", "-", "-", "-" });
-        }
     }
 
     private void showTransactionDetails(int modelRow) {
@@ -761,13 +662,11 @@ public class MonitoringPanel extends JPanel {
                 + "<td align='center'>Qty</td><td align='right'>Price</td>"
                 + "<td align='right'>Subtotal</td></tr>");
         sb.append("<tr><td colspan='4'><hr></td></tr>");
-        for (SalesItem it : tr.items) {
-            double lineTotal = it.quantity * it.price;
+        for (SalesItem it : tr.items)
             sb.append(String.format(
                     "<tr><td align='left'>%s</td><td align='center'>x%d</td>"
                             + "<td align='right'>\u20B1%.2f</td><td align='right'>\u20B1%.2f</td></tr>",
-                    it.productName, it.quantity, it.price, lineTotal));
-        }
+                    it.productName, it.quantity, it.price, it.quantity * it.price));
         sb.append("<tr><td colspan='4'><hr></td></tr>");
         sb.append(String.format(
                 "<tr style='font-weight:bold;'><td colspan='3' align='right'>Total:</td>"
@@ -776,7 +675,6 @@ public class MonitoringPanel extends JPanel {
         sb.append("</table></html>");
 
         panel.add(new JLabel(sb.toString()), BorderLayout.CENTER);
-
         JOptionPane.showMessageDialog(SwingUtilities.windowForComponent(this),
                 panel, tr.ref + " - Items", JOptionPane.PLAIN_MESSAGE);
     }
@@ -799,10 +697,9 @@ public class MonitoringPanel extends JPanel {
         receipt.append(dbl).append("\n");
         receipt.append(String.format(" %-16s %2s %8s\n", "ITEM", "QTY", "AMOUNT"));
         receipt.append(line).append("\n");
-        for (SalesItem it : tr.items) {
+        for (SalesItem it : tr.items)
             receipt.append(String.format(" %-16s %2d %8.2f\n",
                     trunc(it.productName, 16), it.quantity, it.total));
-        }
         receipt.append(line).append("\n");
         receipt.append(String.format(" %-22s %8.2f\n", "Subtotal (excl VAT):", tr.subtotal));
         receipt.append(String.format(" %-22s %8.2f\n", "VAT (12%):", tr.tax));
@@ -819,8 +716,7 @@ public class MonitoringPanel extends JPanel {
                 "\u2705 RECEIPT - " + tr.ref, JOptionPane.PLAIN_MESSAGE);
     }
 
-    // ─── Charts ──────────────────────────────────────────────────
-
+    // ─── Charts ───────────────────────────────────────────────────────────────
     private JPanel buildChartsRow() {
         JPanel row = new JPanel(new GridLayout(1, 2, 16, 0));
         row.setOpaque(false);
@@ -850,8 +746,7 @@ public class MonitoringPanel extends JPanel {
         return row;
     }
 
-    // ─── Bar Chart ───────────────────────────────────────────────
-
+    // ─── Bar Chart ────────────────────────────────────────────────────────────
     private class BarChartPanel extends JPanel {
         private List<BarData> data = new ArrayList<>();
 
@@ -864,16 +759,13 @@ public class MonitoringPanel extends JPanel {
             data.clear();
             try (Connection conn = AppDatabase.openConnection();
                     PreparedStatement ps = conn.prepareStatement(
-                            "SELECT product_name, SUM(quantity) as total_qty, SUM(total) as total_revenue "
+                            "SELECT product_name, SUM(quantity) AS total_qty, SUM(total) AS total_revenue "
                                     + "FROM sales_transaction_items "
                                     + "GROUP BY product_name ORDER BY total_qty DESC LIMIT 5");
                     ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    data.add(new BarData(
-                            rs.getString("product_name"),
-                            rs.getInt("total_qty"),
-                            rs.getDouble("total_revenue")));
-                }
+                while (rs.next())
+                    data.add(new BarData(rs.getString("product_name"),
+                            rs.getInt("total_qty"), rs.getDouble("total_revenue")));
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -938,8 +830,7 @@ public class MonitoringPanel extends JPanel {
         }
     }
 
-    // ─── Line / Area Chart ───────────────────────────────────────
-
+    // ─── Line / Area Chart ────────────────────────────────────────────────────
     private class LineChartPanel extends JPanel {
         private List<DailyPoint> thisWeek = new ArrayList<>();
         private List<DailyPoint> lastWeek = new ArrayList<>();
@@ -955,7 +846,7 @@ public class MonitoringPanel extends JPanel {
             Map<String, Double> dailyMap = new LinkedHashMap<>();
             try (Connection conn = AppDatabase.openConnection();
                     PreparedStatement ps = conn.prepareStatement(
-                            "SELECT DATE(created_at) as d, SUM(total) as rev "
+                            "SELECT DATE(created_at) AS d, SUM(total) AS rev "
                                     + "FROM sales_transactions "
                                     + "WHERE created_at >= date('now','-14 days') "
                                     + "GROUP BY DATE(created_at) ORDER BY d");
@@ -1030,7 +921,6 @@ public class MonitoringPanel extends JPanel {
                 g2.setColor(AppTheme.FG_MUTED);
             }
 
-            // Legend
             g2.setFont(new Font("Segoe UI", Font.PLAIN, 9));
             g2.setColor(new Color(0x3B82F6));
             g2.fillRect(w - 120, padT - 8, 10, 10);
@@ -1041,10 +931,10 @@ public class MonitoringPanel extends JPanel {
             g2.setColor(AppTheme.FG_PRIMARY);
             g2.drawString("Last Week", w - 46, padT);
 
-            drawLineSeries(g2, lastWeek, maxRev, padL, padT, chartW, chartH, new Color(0x94A3B8), new Color(0xE2E8F0),
-                    false);
-            drawLineSeries(g2, thisWeek, maxRev, padL, padT, chartW, chartH, new Color(0x3B82F6), new Color(0xDBEAFE),
-                    true);
+            drawLineSeries(g2, lastWeek, maxRev, padL, padT, chartW, chartH,
+                    new Color(0x94A3B8), new Color(0xE2E8F0), false);
+            drawLineSeries(g2, thisWeek, maxRev, padL, padT, chartW, chartH,
+                    new Color(0x3B82F6), new Color(0xDBEAFE), true);
 
             g2.dispose();
         }
@@ -1055,8 +945,7 @@ public class MonitoringPanel extends JPanel {
             if (points.isEmpty())
                 return;
             int n = points.size();
-            int[] xs = new int[n];
-            int[] ys = new int[n];
+            int[] xs = new int[n], ys = new int[n];
             for (int i = 0; i < n; i++) {
                 xs[i] = padL + (int) ((i + 0.5) * chartW / n);
                 ys[i] = padT + chartH - (int) ((points.get(i).revenue / maxRev) * chartH);
@@ -1100,8 +989,7 @@ public class MonitoringPanel extends JPanel {
         }
     }
 
-    // ─── Renderers & Editors ─────────────────────────────────────
-
+    // ─── Renderers & Editors ──────────────────────────────────────────────────
     private class DropdownRenderer extends DefaultTableCellRenderer {
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value,
@@ -1155,8 +1043,7 @@ public class MonitoringPanel extends JPanel {
         }
     }
 
-    // ─── Data Classes ────────────────────────────────────────────
-
+    // ─── Data Classes ─────────────────────────────────────────────────────────
     private static class TransactionRow {
         String ref, customer, createdAt;
         double subtotal, tax, total, cash, change;

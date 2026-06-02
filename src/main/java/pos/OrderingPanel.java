@@ -47,6 +47,7 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import inventory.Inventory;
+import inventory.InventoryItem;
 import monitoring.SalesRecord;
 import persistence.AppDatabase;
 import ui.AppTheme;
@@ -953,6 +954,7 @@ public class OrderingPanel extends JPanel {
         updateSummary();
         orderItemsPanel.revalidate();
         orderItemsPanel.repaint();
+        rebuildProductGrid();
     }
 
     private JPanel createOrderRow(OrderEntry entry) {
@@ -1090,7 +1092,8 @@ public class OrderingPanel extends JPanel {
 
     private void updateProcessBtnState() {
         processBtn.setEnabled(!orderEntries.isEmpty()
-            && !customerNameField.getText().trim().isEmpty());
+            && !customerNameField.getText().trim().isEmpty()
+            && isCartFulfillable());
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -1275,7 +1278,7 @@ public class OrderingPanel extends JPanel {
         try {
             controller.OrderController oc = new controller.OrderController(
                 new persistence.sqlite.SQLiteSalesRepository());
-            oc.persistCompletedTransaction(txnRef, sales, totalInclusive, cash, change);
+            oc.persistCompletedTransaction(txnRef, sales, totalInclusive, cash, change, customerName);
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Save error: " + ex.getMessage(),
                 "Database", JOptionPane.WARNING_MESSAGE);
@@ -1617,23 +1620,42 @@ public class OrderingPanel extends JPanel {
         return new ImageIcon(canvas);
     }
 
-    private boolean isMenuItemAvailable(String baseName) {
-        MenuItem item = Menu.getInstance().getMenuItem(baseName);
-        if (item == null) {
-            return false;
-        }
-        if (item.getIngredients().isEmpty()) {
-            return true;
-        }
-
-        Inventory inventory = Inventory.getInstance();
-        for (Map.Entry<String, Double> ingredient : item.getIngredients().entrySet()) {
-            inventory.InventoryItem stock = inventory.getItem(ingredient.getKey());
-            if (stock == null || stock.getQuantity() < ingredient.getValue()) {
-                return false;
+    private Map<String, Double> computeCommittedIngredients() {
+        Map<String, Double> committed = new LinkedHashMap<>();
+        Menu menu = Menu.getInstance();
+        for (OrderEntry entry : orderEntries) {
+            MenuItem mi = menu.getMenuItem(entry.baseName);
+            if (mi == null) continue;
+            for (Map.Entry<String, Double> ing : mi.getIngredients().entrySet()) {
+                committed.merge(ing.getKey(), ing.getValue() * entry.quantity, Double::sum);
             }
         }
+        return committed;
+    }
+
+    private Map<String, Double> computeRemainingStock() {
+        Map<String, Double> committed = computeCommittedIngredients();
+        Inventory inventory = Inventory.getInstance();
+        Map<String, Double> remaining = new LinkedHashMap<>();
+        for (Map.Entry<String, InventoryItem> e : inventory.getAllItems().entrySet()) {
+            remaining.put(e.getKey(), e.getValue().getQuantity());
+        }
+        for (Map.Entry<String, Double> e : committed.entrySet()) {
+            remaining.merge(e.getKey(), -e.getValue(), Double::sum);
+        }
+        return remaining;
+    }
+
+    private boolean isCartFulfillable() {
+        Map<String, Double> remaining = computeRemainingStock();
+        for (double v : remaining.values()) {
+            if (v < 0) return false;
+        }
         return true;
+    }
+
+    private boolean isMenuItemAvailable(String baseName) {
+        return isMenuItemAvailableForQuantity(baseName, 1);
     }
 
     private boolean isMenuItemAvailableForQuantity(String baseName, int qty) {
@@ -1642,13 +1664,12 @@ public class OrderingPanel extends JPanel {
         if (item == null) return false;
         if (item.getIngredients().isEmpty()) return true;
 
-        Inventory inventory = Inventory.getInstance();
+        Map<String, Double> remaining = computeRemainingStock();
         for (Map.Entry<String, Double> ingredient : item.getIngredients().entrySet()) {
-            inventory.InventoryItem stock = inventory.getItem(ingredient.getKey());
-            double required = (ingredient.getValue() == null ? 0.0 : ingredient.getValue()) * qty;
-            if (stock == null || stock.getQuantity() < required) {
-                return false;
-            }
+            if (!remaining.containsKey(ingredient.getKey())) continue;
+            double available = remaining.get(ingredient.getKey());
+            double needed = (ingredient.getValue() == null ? 0.0 : ingredient.getValue()) * qty;
+            if (available < needed) return false;
         }
         return true;
     }
@@ -1659,13 +1680,12 @@ public class OrderingPanel extends JPanel {
             return htmlTooltip("Item not found in menu.");
         }
 
-        Inventory inventory = Inventory.getInstance();
+        Map<String, Double> remaining = computeRemainingStock();
         StringBuilder details = new StringBuilder();
         for (Map.Entry<String, Double> ingredient : item.getIngredients().entrySet()) {
-            inventory.InventoryItem stock = inventory.getItem(ingredient.getKey());
+            double available = remaining.getOrDefault(ingredient.getKey(), 0.0);
             double required = ingredient.getValue() == null ? 0.0 : ingredient.getValue();
-            double available = stock == null ? 0.0 : stock.getQuantity();
-            if (stock == null || available < required) {
+            if (available < required) {
                 if (details.length() > 0) {
                     details.append("<br>");
                 }
@@ -1674,10 +1694,7 @@ public class OrderingPanel extends JPanel {
                         .append("</b>: need ")
                         .append(formatAmount(required))
                         .append(", have ")
-                        .append(formatAmount(available));
-                if (stock == null) {
-                    details.append(" (missing)");
-                }
+                        .append(formatAmount(Math.max(0, available)));
             }
         }
 

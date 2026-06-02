@@ -788,7 +788,7 @@ public class POSSystem extends javax.swing.JFrame {
 
         String transactionRef = "TXN" + String.format("%06d", transactionCounter);
         try {
-            orderController.persistCompletedTransaction(transactionRef, salesList, subTotal, cash, change);
+            orderController.persistCompletedTransaction(transactionRef, salesList, subTotal, cash, change, "");
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this,
                     "Unable to save sales to database: " + e.getMessage(),
@@ -1335,7 +1335,7 @@ public class POSSystem extends javax.swing.JFrame {
         String transactionRef = nextTransactionRef();
         try {
             if (orderController == null) orderController = new OrderController(new SQLiteSalesRepository());
-            orderController.persistCompletedTransaction(transactionRef, salesList, subTotal, cash, change);
+            orderController.persistCompletedTransaction(transactionRef, salesList, subTotal, cash, change, "");
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Unable to save sales to database: " + e.getMessage(), "Database", JOptionPane.WARNING_MESSAGE);
         }

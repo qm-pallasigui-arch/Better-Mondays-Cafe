@@ -8,7 +8,7 @@ public interface SalesRepository {
     List<SalesRecord> findAll() throws Exception;
 
     void saveAll(String transactionRef, List<SalesRecord> records, double subtotal, double tax, double total,
-            double cash, double changeAmount, String customerName) throws Exception;
+            double cash, double changeAmount) throws Exception;
 
     void updateOrderStatus(String transactionRef, String status) throws Exception;
 }

@@ -16,8 +16,7 @@ public class OrderController {
                                             List<SalesRecord> salesList,
                                             double subTotal,
                                             double cash,
-                                            double change,
-                                            String customerName) throws Exception {
+                                            double change) throws Exception {
         salesRepository.saveAll(
                 transactionRef,
                 salesList,
@@ -25,8 +24,7 @@ public class OrderController {
                 subTotal * 0.12 / 1.12,
                 subTotal,
                 cash,
-                change,
-                customerName
+                change
         );
         salesRepository.updateOrderStatus(transactionRef, "COMPLETED");
     }

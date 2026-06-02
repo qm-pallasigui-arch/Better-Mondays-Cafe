@@ -29,7 +29,6 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
-import javax.swing.JComboBox;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -82,39 +81,6 @@ public class MonitoringPanel extends JPanel {
     private BarChartPanel barChart;
     private LineChartPanel lineChart;
     private javax.swing.Timer autoRefreshTimer;
-    private JComboBox<String> barCategoryCombo;
-    private String barCategory = "All Categories";
-
-    private static final String[] BAR_CATEGORIES = {
-        "All Categories", "Espresso & Coffee", "Specialty Drinks", "Tea Latte",
-        "Non-Coffee", "Fruit Tea", "Herbal Tea", "Food"
-    };
-
-    private static final java.util.Map<String, java.util.List<String>> CATEGORY_PRODUCTS =
-        Map.ofEntries(
-            Map.entry("Espresso & Coffee", List.of(
-                "Americano", "Latte", "Cappuccino", "Salted Cream Latte", "Spanish Latte",
-                "Dark Mocha", "White Mocha", "Caramel Macchiato", "Brewed Coffee")),
-            Map.entry("Specialty Drinks", List.of(
-                "Vietnamese Coffee", "Ube Espresso", "Manila Latte",
-                "Pumpkin Spice Latte", "Spiced Cookie Latte")),
-            Map.entry("Tea Latte", List.of(
-                "Matcha Latte", "Chocolate Matcha", "Matcha Espresso",
-                "Hojicha Latte", "Chai Latte")),
-            Map.entry("Non-Coffee", List.of(
-                "Chocolate Latte", "Strawberry Latte", "Mango Latte", "Ube Latte",
-                "Dragon Fruit Coconut Latte")),
-            Map.entry("Fruit Tea", List.of(
-                "Strawberry Green Tea", "Mango Green Tea", "Peach Green Tea", "Passion Fruit Green Tea")),
-            Map.entry("Herbal Tea", List.of(
-                "Peppermint", "Chamomile", "Earl Grey", "Cinnamon")),
-            Map.entry("Food", List.of(
-                "Signature Ham & Cheese", "Classic Grilled Cheese", "Homestyle Pesto & Cheese",
-                "Ham & Cheese", "Cheesy Pesto", "Spam & Cheese",
-                "Chocolate Crinkles", "Chocolate Cookies", "S'mores Cookie",
-                "Red Velvet Cream Cheese Cookie", "Brownies", "Banana Bread",
-                "Chocolate Tiramisu", "Matcha Tiramisu", "Creamy Spinach", "Blueberry Cheesecake"))
-        );
 
     // ─── Constructor ─────────────────────────────────────────────────────────
     public MonitoringPanel() {
@@ -548,19 +514,6 @@ public class MonitoringPanel extends JPanel {
         titleLbl.setForeground(AppTheme.FG_PRIMARY);
         topBar.add(titleLbl, BorderLayout.WEST);
 
-        JPanel filterPanel = new JPanel(new BorderLayout(8, 0));
-        filterPanel.setOpaque(false);
-
-        JComboBox<String> timeCombo = new JComboBox<>(TIME_FILTERS);
-        timeCombo.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        timeCombo.setBackground(AppTheme.BG_SURFACE);
-        timeCombo.setForeground(AppTheme.FG_PRIMARY);
-        timeCombo.addActionListener(e -> {
-            timeFilter = (String) timeCombo.getSelectedItem();
-            loadSalesTable();
-        });
-        filterPanel.add(timeCombo, BorderLayout.WEST);
-
         JTextField searchField = new JTextField(18);
         AppTheme.styleSearchField(searchField);
         searchField.putClientProperty("JTextField.roundPlaceholder", true);
@@ -577,8 +530,7 @@ public class MonitoringPanel extends JPanel {
                 applySalesFilter(searchField);
             }
         });
-        filterPanel.add(searchField, BorderLayout.EAST);
-        topBar.add(filterPanel, BorderLayout.EAST);
+        topBar.add(searchField, BorderLayout.EAST);
         card.add(topBar, BorderLayout.NORTH);
 
         salesTableModel = new DefaultTableModel(
@@ -611,31 +563,14 @@ public class MonitoringPanel extends JPanel {
     }
 
     private List<TransactionRow> cachedTransactions = new ArrayList<>();
-    private String timeFilter = "Today";
-    private static final String[] TIME_FILTERS = { "Today", "Yesterday", "This Week" };
-
-    private String buildTimeFilter(String filter) {
-        if ("Yesterday".equals(filter))
-            return "WHERE DATE(created_at) = DATE('now', '-1 day') ";
-        if ("This Week".equals(filter)) {
-            Calendar cal = Calendar.getInstance();
-            cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
-            String monday = new SimpleDateFormat("yyyy-MM-dd").format(cal.getTime());
-            return "WHERE created_at >= '" + monday + "' ";
-        }
-        return "WHERE DATE(created_at) = DATE('now') ";
-    }
 
     private void loadSalesTable() {
         cachedTransactions.clear();
         salesTableModel.setRowCount(0);
 
-        String whereClause = buildTimeFilter(timeFilter);
-
         try (Connection conn = AppDatabase.openConnection();
                 PreparedStatement ps = conn.prepareStatement(
                         "SELECT st.id, st.transaction_ref, "
-                                + "COALESCE(st.customer_name,'') AS customer_name, "
                                 + "COALESCE(st.subtotal,0)      AS subtotal, "
                                 + "COALESCE(st.tax,0)           AS tax, "
                                 + "COALESCE(st.total,0)         AS total, "
@@ -643,15 +578,12 @@ public class MonitoringPanel extends JPanel {
                                 + "COALESCE(st.change_amount,0) AS change_amount, "
                                 + "COALESCE(st.created_at,'')   AS created_at "
                                 + "FROM sales_transactions st "
-                                + whereClause
-                                + " ORDER BY st.id DESC LIMIT 50");
+                                + "ORDER BY st.id DESC LIMIT 50");
                 ResultSet rs = ps.executeQuery()) {
 
             while (rs.next()) {
                 long txId = rs.getLong("id");
                 String ref = rs.getString("transaction_ref");
-                String customerName = rs.getString("customer_name");
-                if (customerName.isEmpty()) customerName = "Walk-in";
                 double subtotal = rs.getDouble("subtotal");
                 double tax = rs.getDouble("tax");
                 double total = rs.getDouble("total");
@@ -674,10 +606,10 @@ public class MonitoringPanel extends JPanel {
                 }
 
                 cachedTransactions.add(
-                        new TransactionRow(ref, customerName, subtotal, tax, total, cash, change, createdAt, items));
+                        new TransactionRow(ref, "Walk-in", subtotal, tax, total, cash, change, createdAt, items));
                 salesTableModel.addRow(new Object[] {
                         "#" + ref.replace("TXN", ""),
-                        customerName,
+                        "Walk-in",
                         "\u25BC Details",
                         String.format("\u20B1%.2f", total),
                         "\uD83D\uDCC4"
@@ -701,7 +633,7 @@ public class MonitoringPanel extends JPanel {
                 continue;
             salesTableModel.addRow(new Object[] {
                     "#" + tr.ref.replace("TXN", ""),
-                    tr.customer,
+                    "Walk-in",
                     "\u25BC Details",
                     String.format("\u20B1%.2f", tr.total),
                     "\uD83D\uDCC4"
@@ -792,24 +724,10 @@ public class MonitoringPanel extends JPanel {
         CardPanel barCard = new CardPanel(16, AppTheme.BG_SURFACE);
         barCard.setLayout(new BorderLayout(0, 8));
         barCard.setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
-        JPanel barTop = new JPanel(new BorderLayout(8, 0));
-        barTop.setOpaque(false);
         JLabel barTitle = new JLabel("Top-Selling Products");
         barTitle.setFont(new Font("Segoe UI", Font.BOLD, 16));
         barTitle.setForeground(AppTheme.FG_PRIMARY);
-        barTop.add(barTitle, BorderLayout.WEST);
-
-        barCategoryCombo = new JComboBox<>(BAR_CATEGORIES);
-        barCategoryCombo.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        barCategoryCombo.setBackground(AppTheme.BG_SURFACE);
-        barCategoryCombo.setForeground(AppTheme.FG_PRIMARY);
-
-        barCategoryCombo.addActionListener(e -> {
-            barCategory = (String) barCategoryCombo.getSelectedItem();
-            barChart.refreshData();
-        });
-        barTop.add(barCategoryCombo, BorderLayout.EAST);
-        barCard.add(barTop, BorderLayout.NORTH);
+        barCard.add(barTitle, BorderLayout.NORTH);
         barChart = new BarChartPanel();
         barCard.add(barChart, BorderLayout.CENTER);
 
@@ -828,16 +746,9 @@ public class MonitoringPanel extends JPanel {
         return row;
     }
 
-    // ─── Horizontal Bar Chart ─────────────────────────────────────────────────
+    // ─── Bar Chart ────────────────────────────────────────────────────────────
     private class BarChartPanel extends JPanel {
         private List<BarData> data = new ArrayList<>();
-        private static final Color[] RAINBOW = {
-            new Color(0xFFADAD),
-            new Color(0xFFD6A5),
-            new Color(0xFDFFB6),
-            new Color(0xCAFFBF),
-            new Color(0xA0C4FF),
-        };
 
         BarChartPanel() {
             setOpaque(false);
@@ -846,32 +757,15 @@ public class MonitoringPanel extends JPanel {
 
         void refreshData() {
             data.clear();
-            String stripSuffix = "TRIM(SUBSTR(product_name, 1, "
-                    + "CASE WHEN INSTR(product_name, ' (') > 0 "
-                    + "THEN INSTR(product_name, ' (') - 1 ELSE LENGTH(product_name) END))";
-            String baseExpr = "TRIM(CASE "
-                    + "WHEN " + stripSuffix + " LIKE 'Hot %' THEN SUBSTR(" + stripSuffix + ", 5) "
-                    + "WHEN " + stripSuffix + " LIKE 'Iced %' THEN SUBSTR(" + stripSuffix + ", 6) "
-                    + "ELSE " + stripSuffix + " END)";
-            StringBuilder sql = new StringBuilder(
-                    "SELECT " + baseExpr + " AS base_name, SUM(quantity) AS total_qty, SUM(total) AS total_revenue "
-                    + "FROM sales_transaction_items");
-            java.util.List<String> products = barCategory != null ? CATEGORY_PRODUCTS.get(barCategory) : null;
-            if (products != null && !products.isEmpty()) {
-                sql.append(" WHERE ").append(baseExpr).append(" IN (");
-                for (int i = 0; i < products.size(); i++) {
-                    if (i > 0) sql.append(",");
-                    sql.append("'").append(products.get(i).replace("'", "''")).append("'");
-                }
-                sql.append(")");
-            }
-            sql.append(" GROUP BY ").append(baseExpr).append(" ORDER BY total_qty DESC LIMIT 5");
             try (Connection conn = AppDatabase.openConnection();
-                    PreparedStatement ps = conn.prepareStatement(sql.toString());
+                    PreparedStatement ps = conn.prepareStatement(
+                            "SELECT product_name, SUM(quantity) AS total_qty, SUM(total) AS total_revenue "
+                                    + "FROM sales_transaction_items "
+                                    + "GROUP BY product_name ORDER BY total_qty DESC LIMIT 5");
                     ResultSet rs = ps.executeQuery()) {
-                    while (rs.next())
-                        data.add(new BarData(rs.getString("base_name"),
-                                rs.getInt("total_qty"), rs.getDouble("total_revenue")));
+                while (rs.next())
+                    data.add(new BarData(rs.getString("product_name"),
+                            rs.getInt("total_qty"), rs.getDouble("total_revenue")));
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -886,7 +780,7 @@ public class MonitoringPanel extends JPanel {
             g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
             int w = getWidth(), h = getHeight();
-            int padR = 50, padT = 10, padB = 10;
+            int padL = 50, padR = 20, padT = 20, padB = 50;
 
             if (data.isEmpty()) {
                 g2.setFont(BODY_FONT);
@@ -898,40 +792,39 @@ public class MonitoringPanel extends JPanel {
                 return;
             }
 
+            int chartW = w - padL - padR;
+            int chartH = h - padT - padB;
             int barCount = data.size();
-            int barGap = 8;
-            int barH = Math.min(28, (h - padT - padB - barGap * (barCount - 1)) / barCount);
-            int totalBarH = barCount * barH + (barCount - 1) * barGap;
-            int startY = padT + ((h - padT - padB) - totalBarH) / 2;
-
+            int barGap = 6;
+            int barW = Math.min(40, (chartW - barGap * (barCount + 1)) / barCount);
+            int totalBarW = barCount * barW + (barCount + 1) * barGap;
+            int startX = padL + (chartW - totalBarW) / 2;
             int maxQty = data.stream().mapToInt(d -> d.qty).max().orElse(1);
 
-            g2.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-            FontMetrics nameFm = g2.getFontMetrics();
-            int nameLabelWidth = data.stream().mapToInt(d -> nameFm.stringWidth(d.name)).max().orElse(0);
-            int padL = Math.max(85, nameLabelWidth + 14);
-
-            int chartW = w - padL - padR;
-
+            g2.setFont(SMALL_FONT);
             for (int i = 0; i < barCount; i++) {
                 BarData bd = data.get(i);
-                int barW = Math.max(4, (int) ((double) bd.qty / maxQty * chartW));
-                int y = startY + i * (barH + barGap);
+                int barH = (int) ((double) bd.qty / maxQty * chartH);
+                int x = startX + i * (barW + barGap) + barGap;
+                int y = padT + chartH - barH;
+                Color barColor = i == 0 ? Color.decode("#2563EB")
+                        : i == 1 ? Color.decode("#3B82F6")
+                                : i == 2 ? Color.decode("#60A5FA")
+                                        : Color.decode("#93C5FD");
 
-                g2.setColor(RAINBOW[i]);
-                g2.fillRoundRect(padL, y, barW, barH, 4, 4);
+                g2.setColor(barColor);
+                g2.fillRoundRect(x, y, barW, barH, 4, 4);
 
                 g2.setColor(AppTheme.FG_PRIMARY);
-                g2.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-                g2.drawString(bd.name, padL - 8 - nameFm.stringWidth(bd.name),
-                        y + barH / 2 + nameFm.getAscent() / 2 - 2);
+                String numLabel = String.valueOf(bd.qty);
+                FontMetrics fm = g2.getFontMetrics();
+                g2.drawString(numLabel, x + (barW - fm.stringWidth(numLabel)) / 2, y - 4);
 
-                g2.setFont(new Font("Segoe UI", Font.BOLD, 11));
-                FontMetrics qtyFm = g2.getFontMetrics();
-                String qtyLabel = String.valueOf(bd.qty);
-                g2.setColor(AppTheme.FG_PRIMARY);
-                g2.drawString(qtyLabel, padL + barW + 6,
-                        y + barH / 2 + qtyFm.getAscent() / 2 - 2);
+                g2.setFont(new Font("Segoe UI", Font.PLAIN, 9));
+                g2.setColor(AppTheme.FG_MUTED);
+                String nameLabel = bd.name.length() > 12 ? bd.name.substring(0, 10) + ".." : bd.name;
+                fm = g2.getFontMetrics();
+                g2.drawString(nameLabel, x + (barW - fm.stringWidth(nameLabel)) / 2, padT + chartH + 14);
             }
             g2.dispose();
         }

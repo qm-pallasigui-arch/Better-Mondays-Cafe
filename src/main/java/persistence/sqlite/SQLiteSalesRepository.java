@@ -31,7 +31,7 @@ public class SQLiteSalesRepository implements SalesRepository {
 
     @Override
     public void saveAll(String transactionRef, List<SalesRecord> records, double subtotal, double tax, double total,
-            double cash, double changeAmount, String customerName) throws Exception {
+            double cash, double changeAmount) throws Exception {
         try (Connection connection = AppDatabase.openConnection()) {
             connection.setAutoCommit(false);
             try {
@@ -40,9 +40,8 @@ public class SQLiteSalesRepository implements SalesRepository {
                 // ✅ FIXED: ON CONFLICT DO UPDATE prevents the SQLITE_CONSTRAINT_UNIQUE crash
                 // when saveAll() is called more than once with the same transaction_ref.
                 try (PreparedStatement transaction = connection.prepareStatement(
-                        "INSERT INTO sales_transactions(transaction_ref, customer_name, subtotal, tax, total, cash, change_amount) VALUES (?, ?, ?, ?, ?, ?, ?) "
+                        "INSERT INTO sales_transactions(transaction_ref, subtotal, tax, total, cash, change_amount) VALUES (?, ?, ?, ?, ?, ?) "
                                 + "ON CONFLICT(transaction_ref) DO UPDATE SET "
-                                + "  customer_name = excluded.customer_name, "
                                 + "  subtotal      = excluded.subtotal, "
                                 + "  tax           = excluded.tax, "
                                 + "  total         = excluded.total, "
@@ -50,12 +49,11 @@ public class SQLiteSalesRepository implements SalesRepository {
                                 + "  change_amount = excluded.change_amount",
                         PreparedStatement.RETURN_GENERATED_KEYS)) {
                     transaction.setString(1, transactionRef);
-                    transaction.setString(2, customerName);
-                    transaction.setDouble(3, subtotal);
-                    transaction.setDouble(4, tax);
-                    transaction.setDouble(5, total);
-                    transaction.setDouble(6, cash);
-                    transaction.setDouble(7, changeAmount);
+                    transaction.setDouble(2, subtotal);
+                    transaction.setDouble(3, tax);
+                    transaction.setDouble(4, total);
+                    transaction.setDouble(5, cash);
+                    transaction.setDouble(6, changeAmount);
                     transaction.executeUpdate();
                     try (ResultSet keys = transaction.getGeneratedKeys()) {
                         if (!keys.next()) {

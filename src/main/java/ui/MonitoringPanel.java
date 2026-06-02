@@ -24,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.AbstractCellEditor;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -38,6 +39,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
+import javax.swing.SwingWorker;
 import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
@@ -502,35 +504,77 @@ public class MonitoringPanel extends JPanel {
         summaryLbl.setForeground(AppTheme.FG_MUTED);
         summaryLbl.setBorder(BorderFactory.createEmptyBorder(4, 24, 0, 24));
 
+        AtomicInteger archiveLoadVersion = new AtomicInteger();
+
         // Runnable to reload the archive table
         Runnable reloadArchive = () -> {
-            archiveModel.setRowCount(0);
             String view = (String) viewCombo.getSelectedItem();
             int month = monthCombo.getSelectedIndex() + 1; // 1-12
             int year = (Integer) yearCombo.getSelectedItem();
+            int loadVersion = archiveLoadVersion.incrementAndGet();
 
-            if ("Weekly".equals(view)) {
-                loadWeeklyArchive(archiveModel, month, year);
-            } else {
-                loadMonthlyArchive(archiveModel, year);
-            }
+            summaryLbl.setText("  Loading archive data…");
 
-            // Compute grand total for summary
-            double grandTotal = 0;
-            int grandTx = 0;
-            for (int r = 0; r < archiveModel.getRowCount(); r++) {
-                try {
-                    String txStr = archiveModel.getValueAt(r, 1).toString().replace(",", "");
-                    String revStr = archiveModel.getValueAt(r, 2).toString()
-                            .replace("₱", "").replace(",", "").trim();
-                    grandTx += Integer.parseInt(txStr);
-                    grandTotal += Double.parseDouble(revStr);
-                } catch (Exception ignored) {
+            SwingWorker<DefaultTableModel, Void> worker = new SwingWorker<>() {
+                @Override
+                protected DefaultTableModel doInBackground() {
+                    DefaultTableModel tempModel = new DefaultTableModel(
+                            new String[] { "Period", "Transactions", "Total Revenue", "Avg. Order" }, 0) {
+                        @Override
+                        public boolean isCellEditable(int r, int c) {
+                            return false;
+                        }
+                    };
+
+                    if ("Weekly".equals(view)) {
+                        loadWeeklyArchive(tempModel, month, year);
+                    } else {
+                        loadMonthlyArchive(tempModel, year);
+                    }
+                    return tempModel;
                 }
-            }
-            summaryLbl.setText(String.format(
-                    "  %d period(s) found  ·  %d total transactions  ·  Grand total: ₱%,.2f",
-                    archiveModel.getRowCount(), grandTx, grandTotal));
+
+                @Override
+                protected void done() {
+                    if (loadVersion != archiveLoadVersion.get()) {
+                        return;
+                    }
+
+                    archiveModel.setRowCount(0);
+                    try {
+                        DefaultTableModel loadedModel = get();
+                        for (int r = 0; r < loadedModel.getRowCount(); r++) {
+                            archiveModel.addRow(new Object[] {
+                                    loadedModel.getValueAt(r, 0),
+                                    loadedModel.getValueAt(r, 1),
+                                    loadedModel.getValueAt(r, 2),
+                                    loadedModel.getValueAt(r, 3)
+                            });
+                        }
+
+                        // Ignore non-numeric placeholders like "—" in empty/archive rows.
+                        double grandTotal = 0;
+                        int grandTx = 0;
+                        for (int r = 0; r < archiveModel.getRowCount(); r++) {
+                            try {
+                                String txStr = archiveModel.getValueAt(r, 1).toString().replace(",", "");
+                                String revStr = archiveModel.getValueAt(r, 2).toString()
+                                        .replace("₱", "").replace(",", "").trim();
+                                grandTx += Integer.parseInt(txStr);
+                                grandTotal += Double.parseDouble(revStr);
+                            } catch (NumberFormatException ignored) {
+                            }
+                        }
+                        summaryLbl.setText(String.format(
+                                "  %d period(s) found  ·  %d total transactions  ·  Grand total: ₱%,.2f",
+                                archiveModel.getRowCount(), grandTx, grandTotal));
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        summaryLbl.setText("  Failed to load archive data.");
+                    }
+                }
+            };
+            worker.execute();
         };
 
         // Wire filters
@@ -566,13 +610,9 @@ public class MonitoringPanel extends JPanel {
                         "No Selection", JOptionPane.WARNING_MESSAGE);
                 return;
             }
-            String periodLabel = archiveModel.getValueAt(selectedRow, 0).toString();
             String view = (String) viewCombo.getSelectedItem();
             dialog.dispose();
-            generateArchiveReport(view, periodLabel,
-                    monthCombo.getSelectedIndex() + 1,
-                    (Integer) yearCombo.getSelectedItem(),
-                    selectedRow);
+            generateArchiveReport(view);
         });
 
         JButton closeBtn = new JButton("Close");
@@ -615,14 +655,13 @@ public class MonitoringPanel extends JPanel {
 
     /**
      * Loads weekly rows for a given month+year into archiveModel.
-     * Each row = one ISO-week that falls within the selected month.
+     * Each row = one ISO-week range that overlaps the selected month.
      */
     private void loadWeeklyArchive(DefaultTableModel model, int month, int year) {
         // Build week ranges that overlap the chosen month
         List<long[]> weeks = getWeeksForMonth(month, year); // [startEpoch, endEpoch]
 
         SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy");
-        String[] cols = { "Period", "Transactions", "Total Revenue", "Avg. Order" };
 
         try (Connection conn = AppDatabase.openConnection()) {
             for (long[] range : weeks) {
@@ -704,7 +743,7 @@ public class MonitoringPanel extends JPanel {
 
     /**
      * Returns a list of [mondayEpoch, sundayEpoch] pairs for all weeks
-     * whose Monday falls within the given month/year.
+     * that overlap the given month/year.
      */
     private List<long[]> getWeeksForMonth(int month, int year) {
         List<long[]> result = new ArrayList<>();
@@ -732,24 +771,13 @@ public class MonitoringPanel extends JPanel {
     }
 
     /**
-     * Delegates to SalesReportGenerator for the selected archive period.
-     * For weekly: finds the exact week index; for monthly: uses the month number.
+     * Delegates to SalesReportGenerator using the selected archive view mode.
      */
-    private void generateArchiveReport(String view, String periodLabel,
-            int month, int year, int rowIndex) {
+    private void generateArchiveReport(String view) {
         if ("Weekly".equals(view)) {
-            List<long[]> weeks = getWeeksForMonth(month, year);
-            if (rowIndex >= 0 && rowIndex < weeks.size()) {
-                long[] range = weeks.get(rowIndex);
-                SalesReportGenerator.generateWeeklyForRange(
-                        MonitoringPanel.this,
-                        new Date(range[0]),
-                        new Date(range[1]),
-                        periodLabel);
-            }
+            SalesReportGenerator.generateWeekly(MonitoringPanel.this);
         } else {
-            SalesReportGenerator.generateMonthlyForYear(
-                    MonitoringPanel.this, rowIndex + 1, year, periodLabel);
+            SalesReportGenerator.generateMonthly(MonitoringPanel.this);
         }
     }
 

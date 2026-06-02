@@ -84,7 +84,6 @@ public final class SchemaInitializer {
                         statement.execute("CREATE TABLE IF NOT EXISTS sales_transactions ("
                                         + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
                                         + "transaction_ref TEXT NOT NULL UNIQUE, "
-                                        + "customer_name TEXT NOT NULL DEFAULT '', "
                                         + "subtotal REAL NOT NULL, "
                                         + "tax REAL NOT NULL, "
                                         + "total REAL NOT NULL, "
@@ -92,11 +91,6 @@ public final class SchemaInitializer {
                                         + "change_amount REAL NOT NULL, "
                                         + "created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
                                         + ")");
-                        // Migration: add customer_name to existing databases that predate this column
-                        try {
-                            statement.execute("ALTER TABLE sales_transactions ADD COLUMN customer_name TEXT NOT NULL DEFAULT ''");
-                        } catch (SQLException ignored) {
-                        }
                         // Order status table stores status for transactions (PENDING, COMPLETED,
                         // CANCELLED, etc.)
                         statement.execute("CREATE TABLE IF NOT EXISTS sales_order_status ("

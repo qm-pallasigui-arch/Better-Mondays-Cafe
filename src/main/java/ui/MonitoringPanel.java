@@ -65,13 +65,15 @@ public class MonitoringPanel extends JPanel {
 
     // ─── Card Config ─────────────────────────────────────────────────────────
     private static final Color[] CARD_TINTS = {
-            AppTheme.ACCENT, AppTheme.WARNING, AppTheme.DANGER, new Color(0x4B5563)
+            new Color(0xDBEAFE), new Color(0xFEF3C7),
+            new Color(0xFEE2E2), new Color(0xF3F4F6)
+    };
+    private static final Color[] CARD_ICON_COLORS = {
+            new Color(0x2563EB), new Color(0xD97706),
+            new Color(0xDC2626), new Color(0x6B7280)
     };
     private static final String[] CARD_TITLES = {
             "Total Items", "Low Stock", "Expired", "Out of Stock"
-    };
-    private static final String[] CARD_ICONS = {
-            "\uD83D\uDCE6", "\u26A0\uFE0F", "\uD83D\uDD25", "\u274C"
     };
 
     // ─── State ───────────────────────────────────────────────────────────────
@@ -86,35 +88,33 @@ public class MonitoringPanel extends JPanel {
     private String barCategory = "All Categories";
 
     private static final String[] BAR_CATEGORIES = {
-        "All Categories", "Espresso & Coffee", "Specialty Drinks", "Tea Latte",
-        "Non-Coffee", "Fruit Tea", "Herbal Tea", "Food"
+            "All Categories", "Espresso & Coffee", "Specialty Drinks", "Tea Latte",
+            "Non-Coffee", "Fruit Tea", "Herbal Tea", "Food"
     };
 
-    private static final java.util.Map<String, java.util.List<String>> CATEGORY_PRODUCTS =
-        Map.ofEntries(
+    private static final java.util.Map<String, java.util.List<String>> CATEGORY_PRODUCTS = Map.ofEntries(
             Map.entry("Espresso & Coffee", List.of(
-                "Americano", "Latte", "Cappuccino", "Salted Cream Latte", "Spanish Latte",
-                "Dark Mocha", "White Mocha", "Caramel Macchiato", "Brewed Coffee")),
+                    "Americano", "Latte", "Cappuccino", "Salted Cream Latte", "Spanish Latte",
+                    "Dark Mocha", "White Mocha", "Caramel Macchiato", "Brewed Coffee")),
             Map.entry("Specialty Drinks", List.of(
-                "Vietnamese Coffee", "Ube Espresso", "Manila Latte",
-                "Pumpkin Spice Latte", "Spiced Cookie Latte")),
+                    "Vietnamese Coffee", "Ube Espresso", "Manila Latte",
+                    "Pumpkin Spice Latte", "Spiced Cookie Latte")),
             Map.entry("Tea Latte", List.of(
-                "Matcha Latte", "Chocolate Matcha", "Matcha Espresso",
-                "Hojicha Latte", "Chai Latte")),
+                    "Matcha Latte", "Chocolate Matcha", "Matcha Espresso",
+                    "Hojicha Latte", "Chai Latte")),
             Map.entry("Non-Coffee", List.of(
-                "Chocolate Latte", "Strawberry Latte", "Mango Latte", "Ube Latte",
-                "Dragon Fruit Coconut Latte")),
+                    "Chocolate Latte", "Strawberry Latte", "Mango Latte", "Ube Latte",
+                    "Dragon Fruit Coconut Latte")),
             Map.entry("Fruit Tea", List.of(
-                "Strawberry Green Tea", "Mango Green Tea", "Peach Green Tea", "Passion Fruit Green Tea")),
+                    "Strawberry Green Tea", "Mango Green Tea", "Peach Green Tea", "Passion Fruit Green Tea")),
             Map.entry("Herbal Tea", List.of(
-                "Peppermint", "Chamomile", "Earl Grey", "Cinnamon")),
+                    "Peppermint", "Chamomile", "Earl Grey", "Cinnamon")),
             Map.entry("Food", List.of(
-                "Signature Ham & Cheese", "Classic Grilled Cheese", "Homestyle Pesto & Cheese",
-                "Ham & Cheese", "Cheesy Pesto", "Spam & Cheese",
-                "Chocolate Crinkles", "Chocolate Cookies", "S'mores Cookie",
-                "Red Velvet Cream Cheese Cookie", "Brownies", "Banana Bread",
-                "Chocolate Tiramisu", "Matcha Tiramisu", "Creamy Spinach", "Blueberry Cheesecake"))
-        );
+                    "Signature Ham & Cheese", "Classic Grilled Cheese", "Homestyle Pesto & Cheese",
+                    "Ham & Cheese", "Cheesy Pesto", "Spam & Cheese",
+                    "Chocolate Crinkles", "Chocolate Cookies", "S'mores Cookie",
+                    "Red Velvet Cream Cheese Cookie", "Brownies", "Banana Bread",
+                    "Chocolate Tiramisu", "Matcha Tiramisu", "Creamy Spinach", "Blueberry Cheesecake")));
 
     // ─── Constructor ─────────────────────────────────────────────────────────
     public MonitoringPanel() {
@@ -192,19 +192,13 @@ public class MonitoringPanel extends JPanel {
         reportBtn.setBorder(BorderFactory.createEmptyBorder(8, 18, 8, 18));
         reportBtn.setFocusPainted(false);
         reportBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        // Opens the chooser modal (Weekly / Monthly)
         reportBtn.addActionListener(e -> showReportChooserModal());
         header.add(reportBtn, BorderLayout.EAST);
 
         return header;
     }
 
-    // ─── Report Chooser Modal ────────────────────────────────────────────────
-    /**
-     * Shows a small dialog with two card-style buttons:
-     * • Weekly Report → SalesReportGenerator.generateWeekly()
-     * • Monthly Report → SalesReportGenerator.generateMonthly()
-     */
+    // ─── Report Chooser Modal ─────────────────────────────────────────────────
     private void showReportChooserModal() {
         JDialog dialog = new JDialog(
                 SwingUtilities.getWindowAncestor(this),
@@ -216,7 +210,7 @@ public class MonitoringPanel extends JPanel {
         JPanel root = new JPanel(new BorderLayout(0, 0));
         root.setBackground(AppTheme.BG_SURFACE);
 
-        // ── Banner ────────────────────────────────────────────────
+        // Banner
         JPanel banner = new JPanel(new BorderLayout());
         banner.setBackground(AppTheme.ACCENT);
         banner.setBorder(BorderFactory.createEmptyBorder(18, 24, 18, 24));
@@ -242,7 +236,7 @@ public class MonitoringPanel extends JPanel {
         banner.add(bannerIcon, BorderLayout.WEST);
         banner.add(bannerText, BorderLayout.CENTER);
 
-        // ── Two card buttons ──────────────────────────────────────
+        // Two card buttons
         JPanel btnRow = new JPanel(new GridLayout(1, 2, 16, 0));
         btnRow.setBackground(AppTheme.BG_SURFACE);
         btnRow.setBorder(BorderFactory.createEmptyBorder(24, 28, 20, 28));
@@ -269,7 +263,7 @@ public class MonitoringPanel extends JPanel {
         btnRow.add(weeklyBtn);
         btnRow.add(monthlyBtn);
 
-        // ── Cancel link ───────────────────────────────────────────
+        // Cancel link
         JPanel footer = new JPanel();
         footer.setBackground(AppTheme.BG_SURFACE);
         footer.setBorder(BorderFactory.createEmptyBorder(0, 0, 16, 0));
@@ -306,7 +300,6 @@ public class MonitoringPanel extends JPanel {
         dialog.setVisible(true);
     }
 
-    /** Card-style button used in the report chooser. */
     private JButton makeReportTypeButton(String icon, String label, String desc, Color accent) {
         JButton btn = new JButton() {
             @Override
@@ -366,6 +359,7 @@ public class MonitoringPanel extends JPanel {
 
         for (int i = 0; i < 4; i++) {
             final int idx = i;
+
             CardPanel card = new CardPanel(16, AppTheme.BG_SURFACE);
             card.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
             card.setLayout(new BorderLayout(14, 0));
@@ -377,23 +371,87 @@ public class MonitoringPanel extends JPanel {
                 }
             });
 
+            // ── Custom-drawn icon box ──────────────────────────────────────
             JPanel iconBox = new JPanel() {
                 @Override
                 protected void paintComponent(Graphics g) {
                     Graphics2D g2 = (Graphics2D) g.create();
                     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+
+                    int w = getWidth(), h = getHeight();
+
+                    // Rounded-square background
                     g2.setColor(CARD_TINTS[idx]);
-                    g2.fillRoundRect(0, 0, 48, 48, 12, 12);
+                    g2.fillRoundRect(0, 0, w, h, 12, 12);
+
+                    // Icon stroke
+                    g2.setColor(CARD_ICON_COLORS[idx]);
+                    g2.setStroke(new java.awt.BasicStroke(1.7f,
+                            java.awt.BasicStroke.CAP_ROUND,
+                            java.awt.BasicStroke.JOIN_ROUND));
+
+                    int cx = w / 2, cy = h / 2;
+
+                    switch (idx) {
+                        case 0 -> {
+                            // Clipboard with plus — Total Items
+                            // Body
+                            g2.drawRoundRect(cx - 8, cy - 10, 16, 18, 3, 3);
+                            // Clip tab at top
+                            g2.drawRoundRect(cx - 4, cy - 13, 8, 5, 2, 2);
+                            // Plus sign
+                            g2.drawLine(cx, cy - 3, cx, cy + 5);
+                            g2.drawLine(cx - 4, cy + 1, cx + 4, cy + 1);
+                        }
+                        case 1 -> {
+                            // Warning triangle — Low Stock
+                            int[] tx = { cx, cx - 10, cx + 10 };
+                            int[] ty = { cy - 10, cy + 8, cy + 8 };
+                            g2.drawPolygon(tx, ty, 3);
+                            // Exclamation stem
+                            g2.drawLine(cx, cy - 4, cx, cy + 1);
+                            // Exclamation dot
+                            g2.setStroke(new java.awt.BasicStroke(2f,
+                                    java.awt.BasicStroke.CAP_ROUND,
+                                    java.awt.BasicStroke.JOIN_ROUND));
+                            g2.drawLine(cx, cy + 4, cx, cy + 4);
+                        }
+                        case 2 -> {
+                            // Trash bin — Expired
+                            // Lid
+                            g2.drawLine(cx - 9, cy - 7, cx + 9, cy - 7);
+                            // Handle on lid
+                            g2.drawRoundRect(cx - 4, cy - 11, 8, 4, 2, 2);
+                            // Body
+                            g2.drawRoundRect(cx - 7, cy - 7, 14, 15, 2, 2);
+                            // Three vertical lines inside
+                            g2.setStroke(new java.awt.BasicStroke(1.4f,
+                                    java.awt.BasicStroke.CAP_ROUND,
+                                    java.awt.BasicStroke.JOIN_ROUND));
+                            g2.drawLine(cx - 3, cy - 4, cx - 3, cy + 5);
+                            g2.drawLine(cx, cy - 4, cx, cy + 5);
+                            g2.drawLine(cx + 3, cy - 4, cx + 3, cy + 5);
+                        }
+                        case 3 -> {
+                            // Box / briefcase with minus — Out of Stock
+                            // Box body
+                            g2.drawRoundRect(cx - 9, cy - 4, 18, 13, 3, 3);
+                            // Handle (arch at top)
+                            g2.drawLine(cx - 5, cy - 4, cx - 5, cy - 8);
+                            g2.drawLine(cx - 5, cy - 8, cx + 5, cy - 8);
+                            g2.drawLine(cx + 5, cy - 8, cx + 5, cy - 4);
+                            // Minus line inside box
+                            g2.drawLine(cx - 4, cy + 2, cx + 4, cy + 2);
+                        }
+                    }
                     g2.dispose();
                 }
             };
             iconBox.setPreferredSize(new Dimension(48, 48));
             iconBox.setOpaque(false);
-            iconBox.setLayout(new BorderLayout());
-            JLabel iconLbl = new JLabel(CARD_ICONS[idx], SwingConstants.CENTER);
-            iconLbl.setFont(new Font("Segoe UI", Font.PLAIN, 20));
-            iconBox.add(iconLbl, BorderLayout.CENTER);
 
+            // ── Text stack ────────────────────────────────────────────────
             JPanel textStack = new JPanel(new BorderLayout(0, 2));
             textStack.setOpaque(false);
 
@@ -461,10 +519,13 @@ public class MonitoringPanel extends JPanel {
 
         cardSubtextLabels[0].setText("In inventory");
         cardSubtextLabels[0].setForeground(AppTheme.SUCCESS);
+
         cardSubtextLabels[1].setText(lowStock > 0 ? "Needs restocking" : "All stocked");
         cardSubtextLabels[1].setForeground(lowStock > 0 ? AppTheme.WARNING : AppTheme.SUCCESS);
+
         cardSubtextLabels[2].setText(expired > 0 ? "Dispose immediately" : "All fresh");
         cardSubtextLabels[2].setForeground(expired > 0 ? AppTheme.DANGER : AppTheme.SUCCESS);
+
         cardSubtextLabels[3].setText(outOfStock > 0 ? "Unavailable" : "All available");
         cardSubtextLabels[3].setForeground(outOfStock > 0 ? new Color(0x4B5563) : AppTheme.SUCCESS);
     }
@@ -651,7 +712,8 @@ public class MonitoringPanel extends JPanel {
                 long txId = rs.getLong("id");
                 String ref = rs.getString("transaction_ref");
                 String customerName = rs.getString("customer_name");
-                if (customerName.isEmpty()) customerName = "Walk-in";
+                if (customerName.isEmpty())
+                    customerName = "Walk-in";
                 double subtotal = rs.getDouble("subtotal");
                 double tax = rs.getDouble("tax");
                 double total = rs.getDouble("total");
@@ -789,6 +851,7 @@ public class MonitoringPanel extends JPanel {
         JPanel row = new JPanel(new GridLayout(1, 2, 16, 0));
         row.setOpaque(false);
 
+        // Bar chart card
         CardPanel barCard = new CardPanel(16, AppTheme.BG_SURFACE);
         barCard.setLayout(new BorderLayout(0, 8));
         barCard.setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
@@ -803,7 +866,6 @@ public class MonitoringPanel extends JPanel {
         barCategoryCombo.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         barCategoryCombo.setBackground(AppTheme.BG_SURFACE);
         barCategoryCombo.setForeground(AppTheme.FG_PRIMARY);
-
         barCategoryCombo.addActionListener(e -> {
             barCategory = (String) barCategoryCombo.getSelectedItem();
             barChart.refreshData();
@@ -813,6 +875,7 @@ public class MonitoringPanel extends JPanel {
         barChart = new BarChartPanel();
         barCard.add(barChart, BorderLayout.CENTER);
 
+        // Line chart card
         CardPanel lineCard = new CardPanel(16, AppTheme.BG_SURFACE);
         lineCard.setLayout(new BorderLayout(0, 8));
         lineCard.setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
@@ -832,11 +895,11 @@ public class MonitoringPanel extends JPanel {
     private class BarChartPanel extends JPanel {
         private List<BarData> data = new ArrayList<>();
         private static final Color[] RAINBOW = {
-            new Color(0xFFADAD),
-            new Color(0xFFD6A5),
-            new Color(0xFDFFB6),
-            new Color(0xCAFFBF),
-            new Color(0xA0C4FF),
+                new Color(0xFFADAD),
+                new Color(0xFFD6A5),
+                new Color(0xFDFFB6),
+                new Color(0xCAFFBF),
+                new Color(0xA0C4FF),
         };
 
         BarChartPanel() {
@@ -850,17 +913,18 @@ public class MonitoringPanel extends JPanel {
                     + "CASE WHEN INSTR(product_name, ' (') > 0 "
                     + "THEN INSTR(product_name, ' (') - 1 ELSE LENGTH(product_name) END))";
             String baseExpr = "TRIM(CASE "
-                    + "WHEN " + stripSuffix + " LIKE 'Hot %' THEN SUBSTR(" + stripSuffix + ", 5) "
+                    + "WHEN " + stripSuffix + " LIKE 'Hot %'  THEN SUBSTR(" + stripSuffix + ", 5) "
                     + "WHEN " + stripSuffix + " LIKE 'Iced %' THEN SUBSTR(" + stripSuffix + ", 6) "
                     + "ELSE " + stripSuffix + " END)";
             StringBuilder sql = new StringBuilder(
                     "SELECT " + baseExpr + " AS base_name, SUM(quantity) AS total_qty, SUM(total) AS total_revenue "
-                    + "FROM sales_transaction_items");
+                            + "FROM sales_transaction_items");
             java.util.List<String> products = barCategory != null ? CATEGORY_PRODUCTS.get(barCategory) : null;
             if (products != null && !products.isEmpty()) {
                 sql.append(" WHERE ").append(baseExpr).append(" IN (");
                 for (int i = 0; i < products.size(); i++) {
-                    if (i > 0) sql.append(",");
+                    if (i > 0)
+                        sql.append(",");
                     sql.append("'").append(products.get(i).replace("'", "''")).append("'");
                 }
                 sql.append(")");
@@ -869,9 +933,9 @@ public class MonitoringPanel extends JPanel {
             try (Connection conn = AppDatabase.openConnection();
                     PreparedStatement ps = conn.prepareStatement(sql.toString());
                     ResultSet rs = ps.executeQuery()) {
-                    while (rs.next())
-                        data.add(new BarData(rs.getString("base_name"),
-                                rs.getInt("total_qty"), rs.getDouble("total_revenue")));
+                while (rs.next())
+                    data.add(new BarData(rs.getString("base_name"),
+                            rs.getInt("total_qty"), rs.getDouble("total_revenue")));
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -903,14 +967,12 @@ public class MonitoringPanel extends JPanel {
             int barH = Math.min(28, (h - padT - padB - barGap * (barCount - 1)) / barCount);
             int totalBarH = barCount * barH + (barCount - 1) * barGap;
             int startY = padT + ((h - padT - padB) - totalBarH) / 2;
-
             int maxQty = data.stream().mapToInt(d -> d.qty).max().orElse(1);
 
             g2.setFont(new Font("Segoe UI", Font.PLAIN, 11));
             FontMetrics nameFm = g2.getFontMetrics();
             int nameLabelWidth = data.stream().mapToInt(d -> nameFm.stringWidth(d.name)).max().orElse(0);
             int padL = Math.max(85, nameLabelWidth + 14);
-
             int chartW = w - padL - padR;
 
             for (int i = 0; i < barCount; i++) {
@@ -923,7 +985,8 @@ public class MonitoringPanel extends JPanel {
 
                 g2.setColor(AppTheme.FG_PRIMARY);
                 g2.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-                g2.drawString(bd.name, padL - 8 - nameFm.stringWidth(bd.name),
+                g2.drawString(bd.name,
+                        padL - 8 - nameFm.stringWidth(bd.name),
                         y + barH / 2 + nameFm.getAscent() / 2 - 2);
 
                 g2.setFont(new Font("Segoe UI", Font.BOLD, 11));
@@ -1028,6 +1091,7 @@ public class MonitoringPanel extends JPanel {
                 g2.setColor(AppTheme.FG_MUTED);
             }
 
+            // Legend
             g2.setFont(new Font("Segoe UI", Font.PLAIN, 9));
             g2.setColor(new Color(0x3B82F6));
             g2.fillRect(w - 120, padT - 8, 10, 10);

@@ -236,8 +236,8 @@ public class MonitoringPanel extends JPanel {
         banner.add(bannerIcon, BorderLayout.WEST);
         banner.add(bannerText, BorderLayout.CENTER);
 
-        // Two card buttons
-        JPanel btnRow = new JPanel(new GridLayout(1, 2, 16, 0));
+        // Three card buttons (Weekly / Monthly / Archive)
+        JPanel btnRow = new JPanel(new GridLayout(1, 3, 16, 0));
         btnRow.setBackground(AppTheme.BG_SURFACE);
         btnRow.setBorder(BorderFactory.createEmptyBorder(24, 28, 20, 28));
 
@@ -251,6 +251,11 @@ public class MonitoringPanel extends JPanel {
                 "4-week summary for\nthe current month",
                 new Color(0x059669));
 
+        JButton archiveBtn = makeReportTypeButton(
+                "\uD83D\uDDC4", "Archive",
+                "Browse & export past\nweekly / monthly reports",
+                new Color(0x7C3AED));
+
         weeklyBtn.addActionListener(e -> {
             dialog.dispose();
             SalesReportGenerator.generateWeekly(MonitoringPanel.this);
@@ -259,9 +264,14 @@ public class MonitoringPanel extends JPanel {
             dialog.dispose();
             SalesReportGenerator.generateMonthly(MonitoringPanel.this);
         });
+        archiveBtn.addActionListener(e -> {
+            dialog.dispose();
+            showArchiveModal();
+        });
 
         btnRow.add(weeklyBtn);
         btnRow.add(monthlyBtn);
+        btnRow.add(archiveBtn);
 
         // Cancel link
         JPanel footer = new JPanel();
@@ -295,7 +305,7 @@ public class MonitoringPanel extends JPanel {
 
         dialog.setContentPane(root);
         dialog.pack();
-        dialog.setMinimumSize(new Dimension(440, dialog.getHeight()));
+        dialog.setMinimumSize(new Dimension(560, dialog.getHeight()));
         dialog.setLocationRelativeTo(SwingUtilities.getWindowAncestor(this));
         dialog.setVisible(true);
     }
@@ -352,6 +362,397 @@ public class MonitoringPanel extends JPanel {
         return btn;
     }
 
+    // ─── Archive Modal ────────────────────────────────────────────────────────
+
+    /**
+     * Displays the Sales Archive browser.
+     *
+     * Layout:
+     * ┌──────────────────────────────────────────────────┐
+     * │ Banner (purple) │
+     * ├──────────────────────────────────────────────────┤
+     * │ [Weekly ▼] [Month picker ▼] [Year picker ▼] │ ← filter bar
+     * ├──────────────────────────────────────────────────┤
+     * │ JTable — Period | Transactions | Total Revenue │
+     * ├──────────────────────────────────────────────────┤
+     * │ [ Generate Report ] [ Close ] │
+     * └──────────────────────────────────────────────────┘
+     */
+    private void showArchiveModal() {
+        JDialog dialog = new JDialog(
+                SwingUtilities.getWindowAncestor(this),
+                "Sales Archive",
+                java.awt.Dialog.ModalityType.APPLICATION_MODAL);
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        dialog.setResizable(true);
+
+        JPanel root = new JPanel(new BorderLayout(0, 0));
+        root.setBackground(AppTheme.BG_SURFACE);
+
+        // ── Banner ──────────────────────────────────────────────────────────
+        JPanel banner = new JPanel(new BorderLayout());
+        banner.setBackground(new Color(0x7C3AED));
+        banner.setBorder(BorderFactory.createEmptyBorder(16, 24, 16, 24));
+
+        JLabel bannerIcon = new JLabel("\uD83D\uDDC4");
+        bannerIcon.setFont(new Font("Segoe UI", Font.PLAIN, 28));
+        bannerIcon.setForeground(Color.WHITE);
+        bannerIcon.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 14));
+
+        JPanel bannerText = new JPanel(new BorderLayout(0, 3));
+        bannerText.setOpaque(false);
+        JLabel bannerTitle = new JLabel("Sales Archive");
+        bannerTitle.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        bannerTitle.setForeground(Color.WHITE);
+        JLabel bannerSub = new JLabel("Browse past periods and generate archived reports");
+        bannerSub.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        bannerSub.setForeground(new Color(255, 255, 255, 200));
+        bannerText.add(bannerTitle, BorderLayout.NORTH);
+        bannerText.add(bannerSub, BorderLayout.SOUTH);
+
+        banner.add(bannerIcon, BorderLayout.WEST);
+        banner.add(bannerText, BorderLayout.CENTER);
+
+        // ── Filter Bar ──────────────────────────────────────────────────────
+        JPanel filterBar = new JPanel();
+        filterBar.setBackground(AppTheme.BG_SURFACE);
+        filterBar.setBorder(BorderFactory.createEmptyBorder(12, 24, 8, 24));
+        filterBar.setLayout(new BoxLayout(filterBar, BoxLayout.X_AXIS));
+
+        JLabel viewLbl = new JLabel("View:");
+        viewLbl.setFont(BODY_FONT);
+        viewLbl.setForeground(AppTheme.FG_PRIMARY);
+
+        String[] viewOptions = { "Weekly", "Monthly" };
+        JComboBox<String> viewCombo = new JComboBox<>(viewOptions);
+        viewCombo.setFont(BODY_FONT);
+        viewCombo.setBackground(AppTheme.BG_SURFACE);
+        viewCombo.setForeground(AppTheme.FG_PRIMARY);
+        viewCombo.setMaximumSize(new Dimension(110, 30));
+
+        JLabel monthLbl = new JLabel("  Month:");
+        monthLbl.setFont(BODY_FONT);
+        monthLbl.setForeground(AppTheme.FG_PRIMARY);
+
+        String[] months = { "January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December" };
+        JComboBox<String> monthCombo = new JComboBox<>(months);
+        monthCombo.setFont(BODY_FONT);
+        monthCombo.setBackground(AppTheme.BG_SURFACE);
+        monthCombo.setForeground(AppTheme.FG_PRIMARY);
+        monthCombo.setMaximumSize(new Dimension(130, 30));
+        monthCombo.setSelectedIndex(Calendar.getInstance().get(Calendar.MONTH));
+
+        JLabel yearLbl = new JLabel("  Year:");
+        yearLbl.setFont(BODY_FONT);
+        yearLbl.setForeground(AppTheme.FG_PRIMARY);
+
+        int currentYear = Calendar.getInstance().get(Calendar.YEAR);
+        Integer[] years = new Integer[5];
+        for (int i = 0; i < 5; i++)
+            years[i] = currentYear - i;
+        JComboBox<Integer> yearCombo = new JComboBox<>(years);
+        yearCombo.setFont(BODY_FONT);
+        yearCombo.setBackground(AppTheme.BG_SURFACE);
+        yearCombo.setForeground(AppTheme.FG_PRIMARY);
+        yearCombo.setMaximumSize(new Dimension(90, 30));
+
+        filterBar.add(viewLbl);
+        filterBar.add(Box.createHorizontalStrut(8));
+        filterBar.add(viewCombo);
+        filterBar.add(monthLbl);
+        filterBar.add(Box.createHorizontalStrut(8));
+        filterBar.add(monthCombo);
+        filterBar.add(yearLbl);
+        filterBar.add(Box.createHorizontalStrut(8));
+        filterBar.add(yearCombo);
+        filterBar.add(Box.createHorizontalGlue());
+
+        // ── Archive Table ────────────────────────────────────────────────────
+        String[] cols = { "Period", "Transactions", "Total Revenue", "Avg. Order" };
+        DefaultTableModel archiveModel = new DefaultTableModel(cols, 0) {
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
+        };
+
+        JTable archiveTable = new JTable(archiveModel);
+        AppTheme.applyTableDefaults(archiveTable);
+        archiveTable.setRowHeight(28);
+        archiveTable.getTableHeader().setReorderingAllowed(false);
+        archiveTable.getColumnModel().getColumn(0).setPreferredWidth(200);
+        archiveTable.getColumnModel().getColumn(1).setPreferredWidth(110);
+        archiveTable.getColumnModel().getColumn(2).setPreferredWidth(140);
+        archiveTable.getColumnModel().getColumn(3).setPreferredWidth(120);
+
+        // Right-align numeric columns
+        DefaultTableCellRenderer rightAlign = new DefaultTableCellRenderer();
+        rightAlign.setHorizontalAlignment(SwingConstants.RIGHT);
+        archiveTable.getColumnModel().getColumn(1).setCellRenderer(rightAlign);
+        archiveTable.getColumnModel().getColumn(2).setCellRenderer(rightAlign);
+        archiveTable.getColumnModel().getColumn(3).setCellRenderer(rightAlign);
+
+        JScrollPane scroll = new JScrollPane(archiveTable);
+        scroll.setBorder(BorderFactory.createMatteBorder(1, 0, 1, 0, AppTheme.BORDER));
+        scroll.setPreferredSize(new Dimension(600, 300));
+
+        // Summary label beneath table
+        JLabel summaryLbl = new JLabel(" ");
+        summaryLbl.setFont(new Font("Segoe UI", Font.ITALIC, 11));
+        summaryLbl.setForeground(AppTheme.FG_MUTED);
+        summaryLbl.setBorder(BorderFactory.createEmptyBorder(4, 24, 0, 24));
+
+        // Runnable to reload the archive table
+        Runnable reloadArchive = () -> {
+            archiveModel.setRowCount(0);
+            String view = (String) viewCombo.getSelectedItem();
+            int month = monthCombo.getSelectedIndex() + 1; // 1-12
+            int year = (Integer) yearCombo.getSelectedItem();
+
+            if ("Weekly".equals(view)) {
+                loadWeeklyArchive(archiveModel, month, year);
+            } else {
+                loadMonthlyArchive(archiveModel, year);
+            }
+
+            // Compute grand total for summary
+            double grandTotal = 0;
+            int grandTx = 0;
+            for (int r = 0; r < archiveModel.getRowCount(); r++) {
+                try {
+                    String txStr = archiveModel.getValueAt(r, 1).toString().replace(",", "");
+                    String revStr = archiveModel.getValueAt(r, 2).toString()
+                            .replace("₱", "").replace(",", "").trim();
+                    grandTx += Integer.parseInt(txStr);
+                    grandTotal += Double.parseDouble(revStr);
+                } catch (Exception ignored) {
+                }
+            }
+            summaryLbl.setText(String.format(
+                    "  %d period(s) found  ·  %d total transactions  ·  Grand total: ₱%,.2f",
+                    archiveModel.getRowCount(), grandTx, grandTotal));
+        };
+
+        // Wire filters
+        viewCombo.addActionListener(e -> {
+            boolean isWeekly = "Weekly".equals(viewCombo.getSelectedItem());
+            monthCombo.setEnabled(isWeekly);
+            monthLbl.setEnabled(isWeekly);
+            reloadArchive.run();
+        });
+        monthCombo.addActionListener(e -> reloadArchive.run());
+        yearCombo.addActionListener(e -> reloadArchive.run());
+
+        // Initial load
+        reloadArchive.run();
+
+        // ── Footer Buttons ───────────────────────────────────────────────────
+        JPanel footerRow = new JPanel(new BorderLayout(12, 0));
+        footerRow.setBackground(AppTheme.BG_SURFACE);
+        footerRow.setBorder(BorderFactory.createEmptyBorder(12, 24, 16, 24));
+
+        JButton generateBtn = new JButton("\uD83D\uDCE4  Generate Selected Report");
+        generateBtn.setFont(BOLD_FONT);
+        generateBtn.setForeground(Color.WHITE);
+        generateBtn.setBackground(new Color(0x7C3AED));
+        generateBtn.setBorder(BorderFactory.createEmptyBorder(8, 20, 8, 20));
+        generateBtn.setFocusPainted(false);
+        generateBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        generateBtn.addActionListener(e -> {
+            int selectedRow = archiveTable.getSelectedRow();
+            if (selectedRow < 0) {
+                JOptionPane.showMessageDialog(dialog,
+                        "Please select a period from the table first.",
+                        "No Selection", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            String periodLabel = archiveModel.getValueAt(selectedRow, 0).toString();
+            String view = (String) viewCombo.getSelectedItem();
+            dialog.dispose();
+            generateArchiveReport(view, periodLabel,
+                    monthCombo.getSelectedIndex() + 1,
+                    (Integer) yearCombo.getSelectedItem(),
+                    selectedRow);
+        });
+
+        JButton closeBtn = new JButton("Close");
+        closeBtn.setFont(BODY_FONT);
+        closeBtn.setForeground(AppTheme.FG_PRIMARY);
+        closeBtn.setBackground(AppTheme.BG_PRIMARY);
+        closeBtn.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(AppTheme.BORDER),
+                BorderFactory.createEmptyBorder(7, 18, 7, 18)));
+        closeBtn.setFocusPainted(false);
+        closeBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        closeBtn.addActionListener(e -> dialog.dispose());
+
+        JPanel btnGroup = new JPanel();
+        btnGroup.setOpaque(false);
+        btnGroup.setLayout(new BoxLayout(btnGroup, BoxLayout.X_AXIS));
+        btnGroup.add(generateBtn);
+        btnGroup.add(Box.createHorizontalStrut(10));
+        btnGroup.add(closeBtn);
+
+        footerRow.add(summaryLbl, BorderLayout.WEST);
+        footerRow.add(btnGroup, BorderLayout.EAST);
+
+        // ── Assemble ─────────────────────────────────────────────────────────
+        JPanel center = new JPanel(new BorderLayout(0, 0));
+        center.setBackground(AppTheme.BG_SURFACE);
+        center.add(filterBar, BorderLayout.NORTH);
+        center.add(scroll, BorderLayout.CENTER);
+
+        root.add(banner, BorderLayout.NORTH);
+        root.add(center, BorderLayout.CENTER);
+        root.add(footerRow, BorderLayout.SOUTH);
+
+        dialog.setContentPane(root);
+        dialog.pack();
+        dialog.setMinimumSize(new Dimension(640, 480));
+        dialog.setLocationRelativeTo(SwingUtilities.getWindowAncestor(this));
+        dialog.setVisible(true);
+    }
+
+    /**
+     * Loads weekly rows for a given month+year into archiveModel.
+     * Each row = one ISO-week that falls within the selected month.
+     */
+    private void loadWeeklyArchive(DefaultTableModel model, int month, int year) {
+        // Build week ranges that overlap the chosen month
+        List<long[]> weeks = getWeeksForMonth(month, year); // [startEpoch, endEpoch]
+
+        SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy");
+        String[] cols = { "Period", "Transactions", "Total Revenue", "Avg. Order" };
+
+        try (Connection conn = AppDatabase.openConnection()) {
+            for (long[] range : weeks) {
+                String startStr = new SimpleDateFormat("yyyy-MM-dd").format(new Date(range[0]));
+                String endStr = new SimpleDateFormat("yyyy-MM-dd").format(new Date(range[1]));
+
+                String label = sdf.format(new Date(range[0])) + " – " + sdf.format(new Date(range[1]));
+
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT COUNT(*) AS cnt, COALESCE(SUM(total),0) AS rev, " +
+                                "       COALESCE(AVG(total),0) AS avg_ord " +
+                                "FROM sales_transactions " +
+                                "WHERE DATE(created_at) BETWEEN ? AND ?")) {
+                    ps.setString(1, startStr);
+                    ps.setString(2, endStr);
+                    ResultSet rs = ps.executeQuery();
+                    if (rs.next()) {
+                        int cnt = rs.getInt("cnt");
+                        double rev = rs.getDouble("rev");
+                        double avgOrd = rs.getDouble("avg_ord");
+                        model.addRow(new Object[] {
+                                label,
+                                String.valueOf(cnt),
+                                String.format("₱%,.2f", rev),
+                                cnt > 0 ? String.format("₱%,.2f", avgOrd) : "—"
+                        });
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        if (model.getRowCount() == 0)
+            model.addRow(new Object[] { "No data for this period", "—", "—", "—" });
+    }
+
+    /**
+     * Loads one row per month within the chosen year into archiveModel.
+     */
+    private void loadMonthlyArchive(DefaultTableModel model, int year) {
+        SimpleDateFormat labelFmt = new SimpleDateFormat("MMMM yyyy");
+        Calendar cal = Calendar.getInstance();
+
+        try (Connection conn = AppDatabase.openConnection()) {
+            for (int m = 1; m <= 12; m++) {
+                cal.set(year, m - 1, 1);
+                String startStr = String.format("%04d-%02d-01", year, m);
+                cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH));
+                String endStr = new SimpleDateFormat("yyyy-MM-dd").format(cal.getTime());
+                String label = labelFmt.format(new Date(
+                        new SimpleDateFormat("yyyy-MM-dd").parse(startStr).getTime()));
+
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT COUNT(*) AS cnt, COALESCE(SUM(total),0) AS rev, " +
+                                "       COALESCE(AVG(total),0) AS avg_ord " +
+                                "FROM sales_transactions " +
+                                "WHERE DATE(created_at) BETWEEN ? AND ?")) {
+                    ps.setString(1, startStr);
+                    ps.setString(2, endStr);
+                    ResultSet rs = ps.executeQuery();
+                    if (rs.next()) {
+                        int cnt = rs.getInt("cnt");
+                        double rev = rs.getDouble("rev");
+                        double avgOrd = rs.getDouble("avg_ord");
+                        model.addRow(new Object[] {
+                                label,
+                                String.valueOf(cnt),
+                                String.format("₱%,.2f", rev),
+                                cnt > 0 ? String.format("₱%,.2f", avgOrd) : "—"
+                        });
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Returns a list of [mondayEpoch, sundayEpoch] pairs for all weeks
+     * whose Monday falls within the given month/year.
+     */
+    private List<long[]> getWeeksForMonth(int month, int year) {
+        List<long[]> result = new ArrayList<>();
+        Calendar cal = Calendar.getInstance();
+        cal.set(year, month - 1, 1);
+
+        // Find the Monday of the first week that contains day 1
+        int dow = cal.get(Calendar.DAY_OF_WEEK); // 1=Sun … 7=Sat
+        int daysBack = (dow == Calendar.SUNDAY) ? 6 : dow - Calendar.MONDAY;
+        cal.add(Calendar.DAY_OF_MONTH, -daysBack);
+
+        // Iterate week-by-week, stopping when Monday is past month end
+        Calendar monthEnd = Calendar.getInstance();
+        monthEnd.set(year, month - 1, 1);
+        monthEnd.set(Calendar.DAY_OF_MONTH, monthEnd.getActualMaximum(Calendar.DAY_OF_MONTH));
+
+        while (!cal.getTime().after(monthEnd.getTime())) {
+            long monday = cal.getTimeInMillis();
+            cal.add(Calendar.DAY_OF_MONTH, 6);
+            long sunday = cal.getTimeInMillis();
+            result.add(new long[] { monday, sunday });
+            cal.add(Calendar.DAY_OF_MONTH, 1); // move to next Monday
+        }
+        return result;
+    }
+
+    /**
+     * Delegates to SalesReportGenerator for the selected archive period.
+     * For weekly: finds the exact week index; for monthly: uses the month number.
+     */
+    private void generateArchiveReport(String view, String periodLabel,
+            int month, int year, int rowIndex) {
+        if ("Weekly".equals(view)) {
+            List<long[]> weeks = getWeeksForMonth(month, year);
+            if (rowIndex >= 0 && rowIndex < weeks.size()) {
+                long[] range = weeks.get(rowIndex);
+                SalesReportGenerator.generateWeeklyForRange(
+                        MonitoringPanel.this,
+                        new Date(range[0]),
+                        new Date(range[1]),
+                        periodLabel);
+            }
+        } else {
+            SalesReportGenerator.generateMonthlyForYear(
+                    MonitoringPanel.this, rowIndex + 1, year, periodLabel);
+        }
+    }
+
     // ─── Summary Cards ────────────────────────────────────────────────────────
     private JPanel buildSummaryRow() {
         JPanel row = new JPanel(new GridLayout(1, 4, 16, 0));
@@ -371,7 +772,6 @@ public class MonitoringPanel extends JPanel {
                 }
             });
 
-            // ── Custom-drawn icon box ──────────────────────────────────────
             JPanel iconBox = new JPanel() {
                 @Override
                 protected void paintComponent(Graphics g) {
@@ -380,68 +780,44 @@ public class MonitoringPanel extends JPanel {
                     g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
 
                     int w = getWidth(), h = getHeight();
-
-                    // Rounded-square background
                     g2.setColor(CARD_TINTS[idx]);
                     g2.fillRoundRect(0, 0, w, h, 12, 12);
-
-                    // Icon stroke
                     g2.setColor(CARD_ICON_COLORS[idx]);
                     g2.setStroke(new java.awt.BasicStroke(1.7f,
-                            java.awt.BasicStroke.CAP_ROUND,
-                            java.awt.BasicStroke.JOIN_ROUND));
+                            java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND));
 
                     int cx = w / 2, cy = h / 2;
-
                     switch (idx) {
                         case 0 -> {
-                            // Clipboard with plus — Total Items
-                            // Body
                             g2.drawRoundRect(cx - 8, cy - 10, 16, 18, 3, 3);
-                            // Clip tab at top
                             g2.drawRoundRect(cx - 4, cy - 13, 8, 5, 2, 2);
-                            // Plus sign
                             g2.drawLine(cx, cy - 3, cx, cy + 5);
                             g2.drawLine(cx - 4, cy + 1, cx + 4, cy + 1);
                         }
                         case 1 -> {
-                            // Warning triangle — Low Stock
                             int[] tx = { cx, cx - 10, cx + 10 };
                             int[] ty = { cy - 10, cy + 8, cy + 8 };
                             g2.drawPolygon(tx, ty, 3);
-                            // Exclamation stem
                             g2.drawLine(cx, cy - 4, cx, cy + 1);
-                            // Exclamation dot
                             g2.setStroke(new java.awt.BasicStroke(2f,
-                                    java.awt.BasicStroke.CAP_ROUND,
-                                    java.awt.BasicStroke.JOIN_ROUND));
+                                    java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND));
                             g2.drawLine(cx, cy + 4, cx, cy + 4);
                         }
                         case 2 -> {
-                            // Trash bin — Expired
-                            // Lid
                             g2.drawLine(cx - 9, cy - 7, cx + 9, cy - 7);
-                            // Handle on lid
                             g2.drawRoundRect(cx - 4, cy - 11, 8, 4, 2, 2);
-                            // Body
                             g2.drawRoundRect(cx - 7, cy - 7, 14, 15, 2, 2);
-                            // Three vertical lines inside
                             g2.setStroke(new java.awt.BasicStroke(1.4f,
-                                    java.awt.BasicStroke.CAP_ROUND,
-                                    java.awt.BasicStroke.JOIN_ROUND));
+                                    java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND));
                             g2.drawLine(cx - 3, cy - 4, cx - 3, cy + 5);
                             g2.drawLine(cx, cy - 4, cx, cy + 5);
                             g2.drawLine(cx + 3, cy - 4, cx + 3, cy + 5);
                         }
                         case 3 -> {
-                            // Box / briefcase with minus — Out of Stock
-                            // Box body
                             g2.drawRoundRect(cx - 9, cy - 4, 18, 13, 3, 3);
-                            // Handle (arch at top)
                             g2.drawLine(cx - 5, cy - 4, cx - 5, cy - 8);
                             g2.drawLine(cx - 5, cy - 8, cx + 5, cy - 8);
                             g2.drawLine(cx + 5, cy - 8, cx + 5, cy - 4);
-                            // Minus line inside box
                             g2.drawLine(cx - 4, cy + 2, cx + 4, cy + 2);
                         }
                     }
@@ -451,7 +827,6 @@ public class MonitoringPanel extends JPanel {
             iconBox.setPreferredSize(new Dimension(48, 48));
             iconBox.setOpaque(false);
 
-            // ── Text stack ────────────────────────────────────────────────
             JPanel textStack = new JPanel(new BorderLayout(0, 2));
             textStack.setOpaque(false);
 
@@ -545,8 +920,7 @@ public class MonitoringPanel extends JPanel {
                 case 3 -> "SELECT name, unit FROM inventory_items WHERE quantity <= 0 ORDER BY name";
                 default -> "";
             };
-            try (PreparedStatement ps = conn.prepareStatement(sql);
-                    ResultSet rs = ps.executeQuery()) {
+            try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     List<String> cols = new ArrayList<>();
                     for (int c = 1; c <= rs.getMetaData().getColumnCount(); c++)
@@ -586,10 +960,10 @@ public class MonitoringPanel extends JPanel {
         JTable table = new JTable(model);
         AppTheme.applyTableDefaults(table);
         table.setRowHeight(24);
-        JScrollPane scroll = new JScrollPane(table);
-        scroll.setPreferredSize(new Dimension(520, Math.min(400, rows.size() * 26 + 30)));
-        scroll.setBorder(BorderFactory.createLineBorder(AppTheme.BORDER));
-        content.add(scroll, BorderLayout.CENTER);
+        JScrollPane scrollPane = new JScrollPane(table);
+        scrollPane.setPreferredSize(new Dimension(520, Math.min(400, rows.size() * 26 + 30)));
+        scrollPane.setBorder(BorderFactory.createLineBorder(AppTheme.BORDER));
+        content.add(scrollPane, BorderLayout.CENTER);
 
         JOptionPane.showMessageDialog(SwingUtilities.windowForComponent(this),
                 content, title, JOptionPane.PLAIN_MESSAGE);
@@ -690,19 +1064,18 @@ public class MonitoringPanel extends JPanel {
     private void loadSalesTable() {
         cachedTransactions.clear();
         salesTableModel.setRowCount(0);
-
         String whereClause = buildTimeFilter(timeFilter);
 
         try (Connection conn = AppDatabase.openConnection();
                 PreparedStatement ps = conn.prepareStatement(
                         "SELECT st.id, st.transaction_ref, "
                                 + "COALESCE(st.customer_name,'') AS customer_name, "
-                                + "COALESCE(st.subtotal,0)      AS subtotal, "
-                                + "COALESCE(st.tax,0)           AS tax, "
-                                + "COALESCE(st.total,0)         AS total, "
-                                + "COALESCE(st.cash,0)          AS cash, "
-                                + "COALESCE(st.change_amount,0) AS change_amount, "
-                                + "COALESCE(st.created_at,'')   AS created_at "
+                                + "COALESCE(st.subtotal,0)       AS subtotal, "
+                                + "COALESCE(st.tax,0)            AS tax, "
+                                + "COALESCE(st.total,0)          AS total, "
+                                + "COALESCE(st.cash,0)           AS cash, "
+                                + "COALESCE(st.change_amount,0)  AS change_amount, "
+                                + "COALESCE(st.created_at,'')    AS created_at "
                                 + "FROM sales_transactions st "
                                 + whereClause
                                 + " ORDER BY st.id DESC LIMIT 50");
@@ -734,7 +1107,6 @@ public class MonitoringPanel extends JPanel {
                                 rs2.getDouble("price"),
                                 rs2.getDouble("total")));
                 }
-
                 cachedTransactions.add(
                         new TransactionRow(ref, customerName, subtotal, tax, total, cash, change, createdAt, items));
                 salesTableModel.addRow(new Object[] {
@@ -851,7 +1223,6 @@ public class MonitoringPanel extends JPanel {
         JPanel row = new JPanel(new GridLayout(1, 2, 16, 0));
         row.setOpaque(false);
 
-        // Bar chart card
         CardPanel barCard = new CardPanel(16, AppTheme.BG_SURFACE);
         barCard.setLayout(new BorderLayout(0, 8));
         barCard.setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
@@ -875,7 +1246,6 @@ public class MonitoringPanel extends JPanel {
         barChart = new BarChartPanel();
         barCard.add(barChart, BorderLayout.CENTER);
 
-        // Line chart card
         CardPanel lineCard = new CardPanel(16, AppTheme.BG_SURFACE);
         lineCard.setLayout(new BorderLayout(0, 8));
         lineCard.setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
@@ -895,11 +1265,8 @@ public class MonitoringPanel extends JPanel {
     private class BarChartPanel extends JPanel {
         private List<BarData> data = new ArrayList<>();
         private static final Color[] RAINBOW = {
-                new Color(0xFFADAD),
-                new Color(0xFFD6A5),
-                new Color(0xFDFFB6),
-                new Color(0xCAFFBF),
-                new Color(0xA0C4FF),
+                new Color(0xFFADAD), new Color(0xFFD6A5), new Color(0xFDFFB6),
+                new Color(0xCAFFBF), new Color(0xA0C4FF),
         };
 
         BarChartPanel() {
@@ -985,15 +1352,13 @@ public class MonitoringPanel extends JPanel {
 
                 g2.setColor(AppTheme.FG_PRIMARY);
                 g2.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-                g2.drawString(bd.name,
-                        padL - 8 - nameFm.stringWidth(bd.name),
+                g2.drawString(bd.name, padL - 8 - nameFm.stringWidth(bd.name),
                         y + barH / 2 + nameFm.getAscent() / 2 - 2);
 
                 g2.setFont(new Font("Segoe UI", Font.BOLD, 11));
                 FontMetrics qtyFm = g2.getFontMetrics();
-                String qtyLabel = String.valueOf(bd.qty);
                 g2.setColor(AppTheme.FG_PRIMARY);
-                g2.drawString(qtyLabel, padL + barW + 6,
+                g2.drawString(String.valueOf(bd.qty), padL + barW + 6,
                         y + barH / 2 + qtyFm.getAscent() / 2 - 2);
             }
             g2.dispose();
@@ -1012,7 +1377,6 @@ public class MonitoringPanel extends JPanel {
         void refreshData() {
             thisWeek.clear();
             lastWeek.clear();
-
             Map<String, Double> dailyMap = new LinkedHashMap<>();
             try (Connection conn = AppDatabase.openConnection();
                     PreparedStatement ps = conn.prepareStatement(
@@ -1029,7 +1393,6 @@ public class MonitoringPanel extends JPanel {
 
             java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
             Calendar cal = Calendar.getInstance();
-
             for (int offset = -14; offset < -7; offset++) {
                 cal.setTime(new Date());
                 cal.add(Calendar.DAY_OF_YEAR, offset);
@@ -1067,8 +1430,7 @@ public class MonitoringPanel extends JPanel {
                 return;
             }
 
-            int chartW = w - padL - padR;
-            int chartH = h - padT - padB;
+            int chartW = w - padL - padR, chartH = h - padT - padB;
             double maxRev = 0;
             for (DailyPoint p : thisWeek)
                 if (p.revenue > maxRev)
@@ -1091,7 +1453,6 @@ public class MonitoringPanel extends JPanel {
                 g2.setColor(AppTheme.FG_MUTED);
             }
 
-            // Legend
             g2.setFont(new Font("Segoe UI", Font.PLAIN, 9));
             g2.setColor(new Color(0x3B82F6));
             g2.fillRect(w - 120, padT - 8, 10, 10);
@@ -1106,7 +1467,6 @@ public class MonitoringPanel extends JPanel {
                     new Color(0x94A3B8), new Color(0xE2E8F0), false);
             drawLineSeries(g2, thisWeek, maxRev, padL, padT, chartW, chartH,
                     new Color(0x3B82F6), new Color(0xDBEAFE), true);
-
             g2.dispose();
         }
 
@@ -1121,7 +1481,6 @@ public class MonitoringPanel extends JPanel {
                 xs[i] = padL + (int) ((i + 0.5) * chartW / n);
                 ys[i] = padT + chartH - (int) ((points.get(i).revenue / maxRev) * chartH);
             }
-
             int[] xFill = new int[n + 2], yFill = new int[n + 2];
             System.arraycopy(xs, 0, xFill, 0, n);
             System.arraycopy(ys, 0, yFill, 0, n);
@@ -1129,23 +1488,19 @@ public class MonitoringPanel extends JPanel {
             yFill[n] = padT + chartH;
             xFill[n + 1] = xs[0];
             yFill[n + 1] = padT + chartH;
-
             g2.setColor(fillColor);
             g2.fillPolygon(xFill, yFill, n + 2);
-
             g2.setColor(lineColor);
             g2.setStroke(new java.awt.BasicStroke(2.5f,
                     java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND));
             for (int i = 0; i < n - 1; i++)
                 g2.drawLine(xs[i], ys[i], xs[i + 1], ys[i + 1]);
-
             for (int i = 0; i < n; i++) {
                 g2.setColor(lineColor);
                 g2.fillOval(xs[i] - 3, ys[i] - 3, 6, 6);
                 g2.setColor(Color.WHITE);
                 g2.fillOval(xs[i] - 2, ys[i] - 2, 4, 4);
             }
-
             if (showLabels) {
                 g2.setFont(new Font("Segoe UI", Font.PLAIN, 8));
                 g2.setColor(AppTheme.FG_MUTED);

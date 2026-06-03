@@ -278,9 +278,6 @@ public class OrderingPanel extends JPanel {
     // ═══════════════════════════════════════════════════════════════
 
     private void buildUI() {
-        JPanel topBar = createTopBar();
-        add(topBar, BorderLayout.NORTH);
-
         JPanel body = new JPanel(new BorderLayout());
         body.setOpaque(false);
         body.add(buildLeftColumn(), BorderLayout.CENTER);
@@ -313,6 +310,7 @@ public class OrderingPanel extends JPanel {
         JPanel topSection = new JPanel(new BorderLayout(0, 6));
         topSection.setOpaque(false);
         topSection.add(buildOrderListStrip(), BorderLayout.NORTH);
+
         topSection.add(buildCategoryBar(), BorderLayout.CENTER);
         col.add(topSection, BorderLayout.NORTH);
 
@@ -472,7 +470,21 @@ public class OrderingPanel extends JPanel {
 
     // ─── Category Tabs ───
     private JPanel buildCategoryBar() {
-        JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 6));
+        JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 6)) {
+            @Override
+            public Dimension getPreferredSize() {
+                Dimension d = super.getPreferredSize();
+                if (getParent() != null && getParent().getWidth() > 0) {
+                    doLayout();
+                    int maxY = 0;
+                    for (Component c : getComponents())
+                        maxY = Math.max(maxY, c.getY() + c.getHeight());
+                    if (maxY > 0)
+                        return new Dimension(d.width, maxY + getInsets().bottom + 4);
+                }
+                return d;
+            }
+        };
         bar.setOpaque(false);
         bar.setBorder(new EmptyBorder(4, 0, 2, 0));
         pillButtons.clear();
@@ -696,9 +708,7 @@ public class OrderingPanel extends JPanel {
         addBtn.setFont(new Font("Segoe UI", Font.BOLD, 11));
         addBtn.setForeground(Color.WHITE);
         addBtn.setBackground(available ? ACCENT : new Color(0x9CA3AF));
-        addBtn.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(ACCENT, 1, true),
-            new EmptyBorder(6, 12, 6, 12)));
+        addBtn.setBorder(new EmptyBorder(6, 12, 6, 12));
         addBtn.setFocusPainted(false);
         addBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         addBtn.setEnabled(available);

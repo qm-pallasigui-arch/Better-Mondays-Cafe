@@ -46,8 +46,9 @@ public class InventoryController {
                 status = "Good";
             }
 
+            List<InventoryBatch> batches = new ArrayList<>();
             try {
-                List<InventoryBatch> batches = repository.findBatchesForItem(item.getName());
+                batches = repository.findBatchesForItem(item.getName());
                 boolean anyExpired = false;
                 for (InventoryBatch b : batches) {
                     String exp = b.getExpiryDate();
@@ -72,10 +73,34 @@ public class InventoryController {
                     item.getStorageLocation(),
                     item.getLastUpdated(),
                     formatUsageSummary(ingredientUsage.get(item.getName())),
-                    formatCategorySummary(ingredientCategories.get(item.getName()))
+                    formatCategorySummary(ingredientCategories.get(item.getName())),
+                    batches
             ));
         }
         return rows;
+    }
+
+    public List<InventoryBatch> getBatchesForItem(String itemName) {
+        try {
+            return repository.findBatchesForItem(itemName);
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
+    }
+
+    public void deleteBatch(long batchId, String itemName) throws Exception {
+        repository.deleteBatch(batchId);
+        try { inventory.refreshItem(itemName); } catch (Exception ignored) {}
+    }
+
+    public void archiveBatch(long batchId, String itemName) throws Exception {
+        repository.archiveBatch(batchId);
+        try { inventory.refreshItem(itemName); } catch (Exception ignored) {}
+    }
+
+    public void deductFromBatch(long batchId, double amount, String itemName) throws Exception {
+        repository.deductFromBatch(batchId, amount);
+        try { inventory.refreshItem(itemName); } catch (Exception ignored) {}
     }
 
     private Map<String, Set<String>> buildIngredientUsageMap() {

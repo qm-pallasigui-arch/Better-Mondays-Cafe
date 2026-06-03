@@ -70,9 +70,14 @@ public final class SchemaInitializer {
                                         + "sku TEXT, "
                                         + "quantity REAL NOT NULL, "
                                         + "expiry_date TEXT, "
+                                        + "archived INTEGER NOT NULL DEFAULT 0, "
                                         + "created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, "
                                         + "FOREIGN KEY(inventory_item_id) REFERENCES inventory_items(id) ON DELETE CASCADE"
                                         + ")");
+                        // Migration: add archived column to existing databases
+                        try {
+                            statement.execute("ALTER TABLE inventory_batches ADD COLUMN archived INTEGER NOT NULL DEFAULT 0");
+                        } catch (java.sql.SQLException ignored) {}
                         statement.execute("CREATE TABLE IF NOT EXISTS sales_records ("
                                         + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
                                         + "product_name TEXT NOT NULL, "

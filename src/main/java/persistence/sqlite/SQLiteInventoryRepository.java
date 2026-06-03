@@ -131,7 +131,7 @@ public class SQLiteInventoryRepository implements InventoryRepository {
                     if (!rs.next()) return batches;
                     long itemId = rs.getLong("id");
                     try (PreparedStatement stmt = connection.prepareStatement(
-                            "SELECT id, sku, quantity, expiry_date FROM inventory_batches WHERE inventory_item_id = ? ORDER BY expiry_date ASC NULLS LAST, id")) {
+                            "SELECT id, sku, quantity, expiry_date, archived FROM inventory_batches WHERE inventory_item_id = ? ORDER BY archived ASC, expiry_date ASC NULLS LAST, id")) {
                         stmt.setLong(1, itemId);
                         try (ResultSet r2 = stmt.executeQuery()) {
                             while (r2.next()) {
@@ -139,7 +139,8 @@ public class SQLiteInventoryRepository implements InventoryRepository {
                                         r2.getLong("id"),
                                         r2.getString("sku"),
                                         r2.getDouble("quantity"),
-                                        r2.getString("expiry_date")
+                                        r2.getString("expiry_date"),
+                                        r2.getInt("archived") == 1
                                 ));
                             }
                         }
@@ -287,6 +288,100 @@ public class SQLiteInventoryRepository implements InventoryRepository {
              PreparedStatement statement = connection.prepareStatement("DELETE FROM inventory_items WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))")) {
             statement.setString(1, StringUtil.normalizeName(name));
             statement.executeUpdate();
+        }
+    }
+
+    @Override
+    public void deleteBatch(long batchId) throws Exception {
+        try (Connection conn = AppDatabase.openConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                long itemId = getItemIdForBatch(conn, batchId);
+                try (PreparedStatement del = conn.prepareStatement(
+                        "DELETE FROM inventory_batches WHERE id = ?")) {
+                    del.setLong(1, batchId);
+                    del.executeUpdate();
+                }
+                recomputeItemQuantity(conn, itemId);
+                conn.commit();
+            } catch (Exception e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        }
+    }
+
+    @Override
+    public void archiveBatch(long batchId) throws Exception {
+        try (Connection conn = AppDatabase.openConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                long itemId = getItemIdForBatch(conn, batchId);
+                try (PreparedStatement upd = conn.prepareStatement(
+                        "UPDATE inventory_batches SET archived = 1 WHERE id = ?")) {
+                    upd.setLong(1, batchId);
+                    upd.executeUpdate();
+                }
+                recomputeItemQuantity(conn, itemId);
+                conn.commit();
+            } catch (Exception e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        }
+    }
+
+    @Override
+    public void deductFromBatch(long batchId, double amount) throws Exception {
+        if (amount <= 0) return;
+        try (Connection conn = AppDatabase.openConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                long itemId = getItemIdForBatch(conn, batchId);
+                try (PreparedStatement upd = conn.prepareStatement(
+                        "UPDATE inventory_batches SET quantity = MAX(0, quantity - ?) WHERE id = ?")) {
+                    upd.setDouble(1, amount);
+                    upd.setLong(2, batchId);
+                    upd.executeUpdate();
+                }
+                recomputeItemQuantity(conn, itemId);
+                conn.commit();
+            } catch (Exception e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        }
+    }
+
+    private long getItemIdForBatch(Connection conn, long batchId) throws Exception {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT inventory_item_id FROM inventory_batches WHERE id = ?")) {
+            ps.setLong(1, batchId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) throw new IllegalArgumentException("Batch not found: " + batchId);
+                return rs.getLong("inventory_item_id");
+            }
+        }
+    }
+
+    private void recomputeItemQuantity(Connection conn, long itemId) throws Exception {
+        try (PreparedStatement sum = conn.prepareStatement(
+                "SELECT COALESCE(SUM(quantity),0) FROM inventory_batches WHERE inventory_item_id = ? AND archived = 0");
+             PreparedStatement upd = conn.prepareStatement(
+                "UPDATE inventory_items SET quantity = ? WHERE id = ?")) {
+            sum.setLong(1, itemId);
+            try (ResultSet rs = sum.executeQuery()) {
+                double total = rs.next() ? rs.getDouble(1) : 0.0;
+                upd.setDouble(1, total);
+                upd.setLong(2, itemId);
+                upd.executeUpdate();
+            }
         }
     }
 }

@@ -22,4 +22,10 @@ public interface InventoryRepository {
 
     // Deduct inventory using FEFO (first-expire-first-out) behavior
     void deductFEFO(String itemName, double amount) throws Exception;
+
+    void deleteBatch(long batchId) throws Exception;
+
+    void archiveBatch(long batchId) throws Exception;
+
+    void deductFromBatch(long batchId, double amount) throws Exception;
 }

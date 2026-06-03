@@ -975,7 +975,7 @@ public class POSSystem extends javax.swing.JFrame {
         inventoryTable = new javax.swing.JTable();
         inventoryTable.setModel(new DefaultTableModel(
             new Object[][]{},
-            new String[]{"Item Name", "Quantity", "Alert Level", "Last Updated", "Status", "Actions"}
+            new String[]{"Item Name", "Quantity", "Alert Level", "Batches", "Status", "Actions"}
         ) {
             boolean[] canEdit = new boolean[]{false, false, false, false, false, true};
             public boolean isCellEditable(int rowIndex, int columnIndex) {
@@ -1003,17 +1003,27 @@ public class POSSystem extends javax.swing.JFrame {
             inventoryTable.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
         }
 
+        // Batches column at index 3
+        inventoryTable.getColumnModel().getColumn(3).setCellRenderer(new BatchSummaryRenderer());
+
         // Actions column at index 5
         inventoryTable.getColumnModel().getColumn(5).setCellRenderer(new ActionsCellRenderer());
         inventoryTable.getColumnModel().getColumn(5).setCellEditor(new ActionsCellEditor());
 
-        // Single-click activates the Actions editor without requiring a double-click
+        // Single-click: col 3 opens batch modal, col 5 opens actions menu
         inventoryTable.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseClicked(java.awt.event.MouseEvent e) {
                 int col = inventoryTable.columnAtPoint(e.getPoint());
                 int row = inventoryTable.rowAtPoint(e.getPoint());
-                if (col == 5 && row >= 0) {
+                if (row < 0) return;
+                if (col == 3) {
+                    Object cellVal = inventoryTable.getModel().getValueAt(row, 3);
+                    if (!(cellVal instanceof controller.InventoryRowView rv)) return;
+                    if (inventoryController == null) return;
+                    new ui.InventoryBatchModal(POSSystem.this, rv.getName(),
+                            inventoryController, POSSystem.this::loadInventoryTable).setVisible(true);
+                } else if (col == 5) {
                     inventoryTable.editCellAt(row, col);
                 }
             }
@@ -1178,7 +1188,7 @@ public class POSSystem extends javax.swing.JFrame {
             }
             String qtyDisplay = row.getQuantity() + " " + row.getUnit();
             String alertDisplay = row.getAlertLevel() + " " + row.getUnit();
-            model.addRow(new Object[]{row.getName(), qtyDisplay, alertDisplay, row.getLastUpdated(), row.getStatus(), "..."});
+            model.addRow(new Object[]{row.getName(), qtyDisplay, alertDisplay, row, row.getStatus(), "..."});
         }
 
         if (model.getRowCount() > 0) {
@@ -1418,7 +1428,7 @@ public class POSSystem extends javax.swing.JFrame {
                     || row.getName().toLowerCase().contains(query.toLowerCase())) {
                 String qtyDisplay = row.getQuantity() + " " + row.getUnit();
                 String alertDisplay = row.getAlertLevel() + " " + row.getUnit();
-                model.addRow(new Object[]{row.getName(), qtyDisplay, alertDisplay, row.getLastUpdated(), row.getStatus(), "..."});
+                model.addRow(new Object[]{row.getName(), qtyDisplay, alertDisplay, row, row.getStatus(), "..."});
             }
         }
     }
@@ -1444,6 +1454,51 @@ public class POSSystem extends javax.swing.JFrame {
                 }
             }
             return c;
+        }
+    }
+
+    private static class BatchSummaryRenderer extends DefaultTableCellRenderer {
+        @Override
+        public java.awt.Component getTableCellRendererComponent(JTable table, Object value,
+                boolean isSelected, boolean hasFocus, int row, int column) {
+            java.awt.Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            if (!(c instanceof JLabel label)) return c;
+            label.setHorizontalAlignment(SwingConstants.CENTER);
+
+            String text = "—";
+            Color fg = AppTheme.FG_MUTED;
+
+            if (value instanceof controller.InventoryRowView rv) {
+                java.util.List<inventory.InventoryBatch> batches = rv.getBatches();
+                if (batches != null && !batches.isEmpty()) {
+                    int expired = 0, expiring = 0, active = 0;
+                    java.time.LocalDate today = java.time.LocalDate.now();
+                    for (inventory.InventoryBatch b : batches) {
+                        if (b.isArchived()) continue;
+                        active++;
+                        String exp = b.getExpiryDate();
+                        if (exp == null || exp.isBlank()) continue;
+                        try {
+                            java.time.LocalDate d = java.time.LocalDate.parse(exp);
+                            if (!d.isAfter(today))                 expired++;
+                            else if (!d.isAfter(today.plusDays(7))) expiring++;
+                        } catch (Exception ignored) {}
+                    }
+                    if (expired > 0) {
+                        text = "⚠ " + expired + " expired";
+                        fg   = new Color(200, 50, 50);
+                    } else if (expiring > 0) {
+                        text = "⚠ " + expiring + " expiring";
+                        fg   = new Color(200, 160, 40);
+                    } else if (active > 0) {
+                        text = active + " batch" + (active == 1 ? "" : "es");
+                    }
+                }
+            }
+
+            label.setText(text);
+            if (!isSelected) label.setForeground(fg);
+            return label;
         }
     }
 

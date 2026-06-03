@@ -1,5 +1,9 @@
 package controller;
 
+import inventory.InventoryBatch;
+import java.util.Collections;
+import java.util.List;
+
 public class InventoryRowView {
 
     private final String name;
@@ -11,8 +15,11 @@ public class InventoryRowView {
     private final String lastUpdated;
     private final String usedIn;
     private final String categories;
+    private final List<InventoryBatch> batches;
 
-    public InventoryRowView(String name, double quantity, String unit, double alertLevel, String status, String storageLocation, String lastUpdated, String usedIn, String categories) {
+    public InventoryRowView(String name, double quantity, String unit, double alertLevel, String status,
+            String storageLocation, String lastUpdated, String usedIn, String categories,
+            List<InventoryBatch> batches) {
         this.name = name;
         this.quantity = quantity;
         this.unit = unit;
@@ -22,6 +29,7 @@ public class InventoryRowView {
         this.lastUpdated = lastUpdated;
         this.usedIn = usedIn;
         this.categories = categories;
+        this.batches = batches != null ? batches : Collections.emptyList();
     }
 
     public String getName() { return name; }
@@ -33,4 +41,5 @@ public class InventoryRowView {
     public String getLastUpdated() { return lastUpdated; }
     public String getUsedIn() { return usedIn; }
     public String getCategories() { return categories; }
+    public List<InventoryBatch> getBatches() { return batches; }
 }

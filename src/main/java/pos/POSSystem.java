@@ -944,14 +944,6 @@ public class POSSystem extends javax.swing.JFrame {
         inventoryCategoryFilter.addActionListener(e -> applyInventoryFilters());
         leftControls.add(inventoryCategoryFilter);
 
-        JButton filterBtn = new JButton("\u2699 Filter");
-        filterBtn.setFont(BODY_FONT);
-        filterBtn.setForeground(AppTheme.FG_PRIMARY);
-        filterBtn.setBackground(AppTheme.BG_SURFACE);
-        filterBtn.setBorder(ui.AppTheme.inputBorderRegular());
-        filterBtn.setFocusPainted(false);
-        filterBtn.addActionListener(e -> applyInventoryFilters());
-        leftControls.add(filterBtn);
 
         controlsPanel.add(leftControls, BorderLayout.WEST);
 
@@ -983,9 +975,9 @@ public class POSSystem extends javax.swing.JFrame {
         inventoryTable = new javax.swing.JTable();
         inventoryTable.setModel(new DefaultTableModel(
             new Object[][]{},
-            new String[]{"Item Name", "Quantity", "Last Updated", "Status", "Actions"}
+            new String[]{"Item Name", "Quantity", "Alert Level", "Last Updated", "Status", "Actions"}
         ) {
-            boolean[] canEdit = new boolean[]{false, false, false, false, false};
+            boolean[] canEdit = new boolean[]{false, false, false, false, false, true};
             public boolean isCellEditable(int rowIndex, int columnIndex) {
                 return canEdit[columnIndex];
             }
@@ -996,26 +988,39 @@ public class POSSystem extends javax.swing.JFrame {
         inventoryTable.setRowMargin(4);
         inventoryTable.getTableHeader().setReorderingAllowed(false);
 
-        // Column widths (storage & used-in removed)
-        inventoryTable.getColumnModel().getColumn(0).setPreferredWidth(180);
+        // Column widths: Name | Quantity | Alert Level | Last Updated | Status | Actions
+        inventoryTable.getColumnModel().getColumn(0).setPreferredWidth(160);
         inventoryTable.getColumnModel().getColumn(1).setPreferredWidth(100);
-        inventoryTable.getColumnModel().getColumn(2).setPreferredWidth(140);
-        inventoryTable.getColumnModel().getColumn(3).setPreferredWidth(100);
-        inventoryTable.getColumnModel().getColumn(4).setPreferredWidth(80);
+        inventoryTable.getColumnModel().getColumn(2).setPreferredWidth(100);
+        inventoryTable.getColumnModel().getColumn(3).setPreferredWidth(130);
+        inventoryTable.getColumnModel().getColumn(4).setPreferredWidth(100);
+        inventoryTable.getColumnModel().getColumn(5).setPreferredWidth(80);
 
         // Center align all columns
         DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
         centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 6; i++) {
             inventoryTable.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
         }
 
-        // Actions column: three-dot button (now at index 4)
-        inventoryTable.getColumnModel().getColumn(4).setCellRenderer(new ActionsCellRenderer());
-        inventoryTable.getColumnModel().getColumn(4).setCellEditor(new ActionsCellEditor());
+        // Actions column at index 5
+        inventoryTable.getColumnModel().getColumn(5).setCellRenderer(new ActionsCellRenderer());
+        inventoryTable.getColumnModel().getColumn(5).setCellEditor(new ActionsCellEditor());
 
-        // Status column: colored badge renderer (now at index 3)
-        inventoryTable.getColumnModel().getColumn(3).setCellRenderer(new StatusBadgeRenderer());
+        // Single-click activates the Actions editor without requiring a double-click
+        inventoryTable.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                int col = inventoryTable.columnAtPoint(e.getPoint());
+                int row = inventoryTable.rowAtPoint(e.getPoint());
+                if (col == 5 && row >= 0) {
+                    inventoryTable.editCellAt(row, col);
+                }
+            }
+        });
+
+        // Status column: colored badge renderer at index 4
+        inventoryTable.getColumnModel().getColumn(4).setCellRenderer(new StatusBadgeRenderer());
 
         inventoryTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
@@ -1172,7 +1177,8 @@ public class POSSystem extends javax.swing.JFrame {
                 continue;
             }
             String qtyDisplay = row.getQuantity() + " " + row.getUnit();
-            model.addRow(new Object[]{row.getName(), qtyDisplay, row.getLastUpdated(), row.getStatus(), "..."});
+            String alertDisplay = row.getAlertLevel() + " " + row.getUnit();
+            model.addRow(new Object[]{row.getName(), qtyDisplay, alertDisplay, row.getLastUpdated(), row.getStatus(), "..."});
         }
 
         if (model.getRowCount() > 0) {
@@ -1411,7 +1417,8 @@ public class POSSystem extends javax.swing.JFrame {
             if (query == null || query.trim().isEmpty()
                     || row.getName().toLowerCase().contains(query.toLowerCase())) {
                 String qtyDisplay = row.getQuantity() + " " + row.getUnit();
-                model.addRow(new Object[]{row.getName(), qtyDisplay, row.getLastUpdated(), row.getStatus(), "..."});
+                String alertDisplay = row.getAlertLevel() + " " + row.getUnit();
+                model.addRow(new Object[]{row.getName(), qtyDisplay, alertDisplay, row.getLastUpdated(), row.getStatus(), "..."});
             }
         }
     }
@@ -1468,10 +1475,15 @@ public class POSSystem extends javax.swing.JFrame {
                     if (editingRow < 0) return;
                     String itemName = inventoryTable.getValueAt(editingRow, 0).toString();
                     JPopupMenu menu = new JPopupMenu();
+                    JMenuItem editItem = new JMenuItem("Edit");
                     JMenuItem deleteItem = new JMenuItem("Delete");
-                    JMenuItem changeStatus = new JMenuItem("Change Status");
+                    editItem.setFont(new Font("Segoe UI", Font.PLAIN, 13));
                     deleteItem.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-                    changeStatus.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+                    final int rowToEdit = editingRow;
+                    editItem.addActionListener(ev -> {
+                        fireEditingStopped();
+                        openInventoryEditDialog(rowToEdit);
+                    });
                     deleteItem.addActionListener(ev -> {
                         int confirm = JOptionPane.showConfirmDialog(POSSystem.this,
                                 "Remove " + itemName + " from inventory?", "Confirm",
@@ -1483,21 +1495,8 @@ public class POSSystem extends javax.swing.JFrame {
                             loadInventoryTable();
                         }
                     });
-                    changeStatus.addActionListener(ev -> {
-
-                if (inventoryTable.getRowCount() > 0) {
-                    inventoryTable.setRowSelectionInterval(0, 0);
-                } else {
-                    updateInventoryDetailPanel();
-                }
-                        String newStatus = JOptionPane.showInputDialog(POSSystem.this,
-                                "Change status for " + itemName + " (Good, Low Stock, Out of Stock, Expired):");
-                        if (newStatus != null && !newStatus.trim().isEmpty()) {
-                            JOptionPane.showMessageDialog(POSSystem.this, "Status updated for " + itemName);
-                        }
-                    });
+                    menu.add(editItem);
                     menu.add(deleteItem);
-                    menu.add(changeStatus);
                     menu.show(panel, e.getX(), e.getY());
                 }
             });
@@ -1512,6 +1511,132 @@ public class POSSystem extends javax.swing.JFrame {
             editingRow = row;
             return panel;
         }
+    }
+
+    private void openInventoryEditDialog(int tableRow) {
+        String itemName = inventoryTable.getValueAt(tableRow, 0).toString();
+        InventoryItem item = Inventory.getInstance().getItem(itemName);
+        if (item == null) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Item not found: " + itemName);
+            return;
+        }
+
+        javax.swing.JDialog dialog = new javax.swing.JDialog(
+                (java.awt.Frame) javax.swing.SwingUtilities.getWindowAncestor(this),
+                "Edit Inventory Item", true);
+        dialog.setLayout(new java.awt.BorderLayout(0, 0));
+        dialog.setResizable(false);
+
+        JPanel content = new JPanel(new java.awt.GridBagLayout());
+        content.setBackground(AppTheme.BG_SURFACE);
+        content.setBorder(BorderFactory.createEmptyBorder(24, 28, 16, 28));
+
+        java.awt.GridBagConstraints gc = new java.awt.GridBagConstraints();
+        gc.insets = new java.awt.Insets(6, 0, 6, 12);
+        gc.anchor = java.awt.GridBagConstraints.WEST;
+
+        Font labelFont = new Font("Segoe UI", Font.PLAIN, 13);
+        Font fieldFont = new Font("Segoe UI", Font.PLAIN, 13);
+
+        // Item name (read-only)
+        gc.gridx = 0; gc.gridy = 0; gc.weightx = 0;
+        JLabel nameLabel = new JLabel("Item:");
+        nameLabel.setFont(labelFont);
+        nameLabel.setForeground(AppTheme.FG_MUTED);
+        content.add(nameLabel, gc);
+
+        gc.gridx = 1; gc.weightx = 1; gc.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        JLabel nameValue = new JLabel(item.getName());
+        nameValue.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        nameValue.setForeground(AppTheme.FG_PRIMARY);
+        content.add(nameValue, gc);
+
+        // Quantity field
+        gc.gridx = 0; gc.gridy = 1; gc.weightx = 0; gc.fill = java.awt.GridBagConstraints.NONE;
+        JLabel qtyLabel = new JLabel("Quantity:");
+        qtyLabel.setFont(labelFont);
+        qtyLabel.setForeground(AppTheme.FG_MUTED);
+        content.add(qtyLabel, gc);
+
+        gc.gridx = 1; gc.weightx = 1; gc.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        JTextField qtyField = new JTextField(String.valueOf(item.getQuantity()), 12);
+        qtyField.setFont(fieldFont);
+        qtyField.setBorder(BorderFactory.createCompoundBorder(
+                new ui.RoundedLineBorder(AppTheme.BORDER, 1, 6),
+                BorderFactory.createEmptyBorder(5, 8, 5, 8)));
+        content.add(qtyField, gc);
+
+        // Alert level field
+        gc.gridx = 0; gc.gridy = 2; gc.weightx = 0; gc.fill = java.awt.GridBagConstraints.NONE;
+        JLabel alertLabel = new JLabel("Alert Level:");
+        alertLabel.setFont(labelFont);
+        alertLabel.setForeground(AppTheme.FG_MUTED);
+        content.add(alertLabel, gc);
+
+        gc.gridx = 1; gc.weightx = 1; gc.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        JTextField alertField = new JTextField(String.valueOf(item.getAlertLevel()), 12);
+        alertField.setFont(fieldFont);
+        alertField.setBorder(BorderFactory.createCompoundBorder(
+                new ui.RoundedLineBorder(AppTheme.BORDER, 1, 6),
+                BorderFactory.createEmptyBorder(5, 8, 5, 8)));
+        content.add(alertField, gc);
+
+        dialog.add(content, java.awt.BorderLayout.CENTER);
+
+        // Buttons
+        JPanel btnRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 8, 12));
+        btnRow.setBackground(AppTheme.BG_SURFACE);
+        btnRow.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, AppTheme.BORDER));
+
+        JButton cancelBtn = new JButton("Cancel");
+        cancelBtn.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        cancelBtn.setBackground(AppTheme.BG_PRIMARY);
+        cancelBtn.setForeground(AppTheme.FG_PRIMARY);
+        cancelBtn.setFocusPainted(false);
+        cancelBtn.setBorder(BorderFactory.createCompoundBorder(
+                new ui.RoundedLineBorder(AppTheme.BORDER, 1, 6),
+                BorderFactory.createEmptyBorder(6, 16, 6, 16)));
+        cancelBtn.addActionListener(ev -> dialog.dispose());
+
+        JButton saveBtn = new JButton("Save");
+        saveBtn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        saveBtn.setBackground(AppTheme.ACCENT);
+        saveBtn.setForeground(Color.WHITE);
+        saveBtn.setOpaque(true);
+        saveBtn.setFocusPainted(false);
+        saveBtn.setBorder(BorderFactory.createCompoundBorder(
+                new ui.RoundedLineBorder(AppTheme.ACCENT, 1, 6),
+                BorderFactory.createEmptyBorder(6, 16, 6, 16)));
+        saveBtn.addActionListener(ev -> {
+            String qtyText = qtyField.getText().trim();
+            String alertText = alertField.getText().trim();
+            if (qtyText.isEmpty() || alertText.isEmpty()) {
+                javax.swing.JOptionPane.showMessageDialog(dialog, "Quantity and Alert Level cannot be empty.");
+                return;
+            }
+            try {
+                Double.parseDouble(qtyText);
+                Double.parseDouble(alertText);
+            } catch (NumberFormatException ex) {
+                javax.swing.JOptionPane.showMessageDialog(dialog, "Please enter valid numbers for Quantity and Alert Level.");
+                return;
+            }
+            if (inventoryController == null)
+                inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
+            inventoryController.updateItem(itemName, itemName, qtyText, item.getUnit(), alertText);
+            loadInventoryTable();
+            if (monitoringPanel != null) monitoringPanel.refreshData();
+            dialog.dispose();
+        });
+
+        btnRow.add(cancelBtn);
+        btnRow.add(saveBtn);
+        dialog.add(btnRow, java.awt.BorderLayout.SOUTH);
+
+        dialog.pack();
+        dialog.setMinimumSize(new java.awt.Dimension(340, dialog.getHeight()));
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
     }
 
     private void updateInventoryDetailPanel() {

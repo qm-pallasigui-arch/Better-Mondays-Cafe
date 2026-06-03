@@ -47,9 +47,13 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import inventory.Inventory;
+import inventory.InventoryBatch;
 import monitoring.SalesRecord;
 import persistence.AppDatabase;
+import persistence.sqlite.SQLiteInventoryRepository;
 import ui.AppTheme;
+import java.awt.Dialog;
+import java.time.LocalDate;
 
 public class OrderingPanel extends JPanel {
 
@@ -234,6 +238,9 @@ public class OrderingPanel extends JPanel {
             this.items = items;
         }
     }
+
+    // ─── Repositories ───
+    private final SQLiteInventoryRepository batchRepo = new SQLiteInventoryRepository();
 
     // ─── State ───
     private final List<OrderEntry> orderEntries = new ArrayList<>();
@@ -697,7 +704,10 @@ public class OrderingPanel extends JPanel {
 
         boolean available = isMenuItemAvailable(spec.baseName);
         if (!available) {
-            JLabel unavailable = new JLabel("Not available: ingredient stock is missing");
+            boolean expired = hasExpiredIngredient(spec.baseName);
+            JLabel unavailable = new JLabel(expired
+                    ? "Not available: ingredient expired"
+                    : "Not available: ingredient stock is missing");
             unavailable.setFont(FONT_XSMALL);
             unavailable.setForeground(DANGER);
             content.add(unavailable, BorderLayout.SOUTH);
@@ -714,7 +724,7 @@ public class OrderingPanel extends JPanel {
         addBtn.setEnabled(available);
         addBtn.setToolTipText(available
             ? "Add this item to the order"
-            : buildUnavailableIngredientsTooltip(spec.baseName));
+            : buildUnavailableIngredientsTooltip(spec.baseName, hasExpiredIngredient(spec.baseName)));
         addBtn.addActionListener(e -> addOrderItem(spec));
         content.add(addBtn, BorderLayout.SOUTH);
 
@@ -926,7 +936,78 @@ public class OrderingPanel extends JPanel {
     // ═══════════════════════════════════════════════════════════════
 
     private void addOrderItem(ItemSpec spec) {
-        // Ensure enough ingredients for one more unit
+        // Show size picker for iced drinks that have a large price in the DB
+        if (!spec.variant.equals("Hot")) {
+            MenuItem menuItem = Menu.getInstance().getMenuItem(spec.baseName);
+            if (menuItem != null && menuItem.getIcedLargePrice() > 0 && menuItem.getIcedRegularPrice() > 0) {
+                showSizePicker(spec, menuItem);
+                return;
+            }
+        }
+        doAddOrderItem(spec);
+    }
+
+    private void showSizePicker(ItemSpec spec, MenuItem menuItem) {
+        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this),
+                "Choose Size — " + spec.baseName, Dialog.ModalityType.APPLICATION_MODAL);
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        dialog.setResizable(false);
+
+        JPanel root = new JPanel(new BorderLayout(0, 0));
+        root.setBackground(AppTheme.BG_PRIMARY);
+        root.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
+
+        JLabel title = new JLabel("Select a size for " + spec.baseName);
+        title.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        title.setForeground(FG_PRIMARY);
+        title.setBorder(BorderFactory.createEmptyBorder(0, 0, 16, 0));
+        root.add(title, BorderLayout.NORTH);
+
+        JPanel btnRow = new JPanel(new GridLayout(1, 2, 12, 0));
+        btnRow.setOpaque(false);
+
+        JButton regularBtn = buildSizeButton(
+                "Regular", String.format("₱%.2f", menuItem.getIcedRegularPrice()), ACCENT);
+        JButton largeBtn = buildSizeButton(
+                "Large", String.format("₱%.2f", menuItem.getIcedLargePrice()), AppTheme.SUCCESS);
+
+        regularBtn.addActionListener(e -> {
+            dialog.dispose();
+            doAddOrderItem(new ItemSpec(spec.displayName, spec.baseName, "Regular Iced", menuItem.getIcedRegularPrice()));
+        });
+        largeBtn.addActionListener(e -> {
+            dialog.dispose();
+            String largeDisplay = spec.displayName.replaceFirst("(?i)^iced\\s+", "Iced Large ");
+            if (largeDisplay.equals(spec.displayName)) largeDisplay = spec.displayName + " (Large)";
+            doAddOrderItem(new ItemSpec(largeDisplay, spec.baseName, "Large Iced", menuItem.getIcedLargePrice()));
+        });
+
+        btnRow.add(regularBtn);
+        btnRow.add(largeBtn);
+        root.add(btnRow, BorderLayout.CENTER);
+
+        dialog.setContentPane(root);
+        dialog.pack();
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
+    }
+
+    private JButton buildSizeButton(String size, String price, Color accent) {
+        JButton btn = new JButton("<html><center><b style='font-size:13px'>" + size +
+                "</b><br><span style='font-size:11px'>" + price + "</span></center></html>");
+        btn.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        btn.setForeground(Color.WHITE);
+        btn.setBackground(accent);
+        btn.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(accent.darker(), 1, true),
+                new EmptyBorder(12, 20, 12, 20)));
+        btn.setFocusPainted(false);
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setOpaque(true);
+        return btn;
+    }
+
+    private void doAddOrderItem(ItemSpec spec) {
         if (!isMenuItemAvailableForQuantity(spec.baseName, 1)) {
             JOptionPane.showMessageDialog(this, "Insufficient ingredients to add this item.", "Unavailable", JOptionPane.WARNING_MESSAGE);
             return;
@@ -1629,21 +1710,65 @@ public class OrderingPanel extends JPanel {
 
     private boolean isMenuItemAvailable(String baseName) {
         MenuItem item = Menu.getInstance().getMenuItem(baseName);
-        if (item == null) {
-            return false;
-        }
-        if (item.getIngredients().isEmpty()) {
-            return true;
-        }
+        if (item == null) return false;
+        if (item.getIngredients().isEmpty()) return true;
 
         Inventory inventory = Inventory.getInstance();
-        for (Map.Entry<String, Double> ingredient : item.getIngredients().entrySet()) {
-            inventory.InventoryItem stock = inventory.getItem(ingredient.getKey());
-            if (stock == null || stock.getQuantity() < ingredient.getValue()) {
-                return false;
-            }
+        LocalDate today = LocalDate.now();
+        for (Map.Entry<String, Double> ing : item.getIngredients().entrySet()) {
+            double required = ing.getValue() == null ? 0.0 : ing.getValue();
+            if (required <= 0) continue;
+
+            // fast path: aggregate quantity check
+            inventory.InventoryItem stock = inventory.getItem(ing.getKey());
+            if (stock == null || stock.getQuantity() < required) return false;
+
+            // expiry check: sum only non-archived, non-expired batch quantities
+            try {
+                List<InventoryBatch> batches = batchRepo.findBatchesForItem(ing.getKey());
+                double fresh = 0;
+                for (InventoryBatch b : batches) {
+                    if (b.isArchived()) continue;
+                    String exp = b.getExpiryDate();
+                    if (exp != null && !exp.isBlank()) {
+                        try { if (LocalDate.parse(exp).isBefore(today)) continue; }
+                        catch (Exception ignored) {}
+                    }
+                    fresh += b.getQuantity();
+                }
+                if (fresh < required) return false;
+            } catch (Exception ignored) {}
         }
         return true;
+    }
+
+    /** Returns true if the item is unavailable specifically because an ingredient is expired. */
+    private boolean hasExpiredIngredient(String baseName) {
+        MenuItem item = Menu.getInstance().getMenuItem(baseName);
+        if (item == null || item.getIngredients().isEmpty()) return false;
+        Inventory inventory = Inventory.getInstance();
+        LocalDate today = LocalDate.now();
+        for (Map.Entry<String, Double> ing : item.getIngredients().entrySet()) {
+            double required = ing.getValue() == null ? 0.0 : ing.getValue();
+            if (required <= 0) continue;
+            inventory.InventoryItem stock = inventory.getItem(ing.getKey());
+            if (stock == null || stock.getQuantity() < required) continue; // missing, not expired
+            try {
+                List<InventoryBatch> batches = batchRepo.findBatchesForItem(ing.getKey());
+                double fresh = 0;
+                for (InventoryBatch b : batches) {
+                    if (b.isArchived()) continue;
+                    String exp = b.getExpiryDate();
+                    if (exp != null && !exp.isBlank()) {
+                        try { if (LocalDate.parse(exp).isBefore(today)) continue; }
+                        catch (Exception ignored) {}
+                    }
+                    fresh += b.getQuantity();
+                }
+                if (fresh < required) return true;
+            } catch (Exception ignored) {}
+        }
+        return false;
     }
 
     private boolean isMenuItemAvailableForQuantity(String baseName, int qty) {
@@ -1663,39 +1788,49 @@ public class OrderingPanel extends JPanel {
         return true;
     }
 
-    private String buildUnavailableIngredientsTooltip(String baseName) {
+    private String buildUnavailableIngredientsTooltip(String baseName, boolean hasExpired) {
         MenuItem item = Menu.getInstance().getMenuItem(baseName);
-        if (item == null) {
-            return htmlTooltip("Item not found in menu.");
-        }
+        if (item == null) return htmlTooltip("Item not found in menu.");
 
         Inventory inventory = Inventory.getInstance();
+        LocalDate today = LocalDate.now();
         StringBuilder details = new StringBuilder();
         for (Map.Entry<String, Double> ingredient : item.getIngredients().entrySet()) {
-            inventory.InventoryItem stock = inventory.getItem(ingredient.getKey());
             double required = ingredient.getValue() == null ? 0.0 : ingredient.getValue();
+            inventory.InventoryItem stock = inventory.getItem(ingredient.getKey());
             double available = stock == null ? 0.0 : stock.getQuantity();
-            if (stock == null || available < required) {
-                if (details.length() > 0) {
-                    details.append("<br>");
-                }
-                details.append("<b>")
-                        .append(escapeHtml(ingredient.getKey()))
-                        .append("</b>: need ")
-                        .append(formatAmount(required))
-                        .append(", have ")
-                        .append(formatAmount(available));
-                if (stock == null) {
-                    details.append(" (missing)");
-                }
+
+            boolean insufficientFresh = false;
+            if (hasExpired && stock != null && available >= required) {
+                try {
+                    List<InventoryBatch> batches = batchRepo.findBatchesForItem(ingredient.getKey());
+                    double fresh = 0;
+                    for (InventoryBatch b : batches) {
+                        if (b.isArchived()) continue;
+                        String exp = b.getExpiryDate();
+                        if (exp != null && !exp.isBlank()) {
+                            try { if (LocalDate.parse(exp).isBefore(today)) continue; }
+                            catch (Exception ignored) {}
+                        }
+                        fresh += b.getQuantity();
+                    }
+                    insufficientFresh = fresh < required;
+                } catch (Exception ignored) {}
+            }
+
+            if (stock == null || available < required || insufficientFresh) {
+                if (details.length() > 0) details.append("<br>");
+                details.append("<b>").append(escapeHtml(ingredient.getKey()))
+                        .append("</b>: need ").append(formatAmount(required))
+                        .append(", have ").append(formatAmount(available));
+                if (stock == null) details.append(" (missing)");
+                else if (insufficientFresh) details.append(" (expired)");
             }
         }
 
-        if (details.length() == 0) {
-            return htmlTooltip("Unavailable because ingredient stock is insufficient.");
-        }
-
-        return htmlTooltip("Unavailable ingredients:<br>" + details);
+        if (details.length() == 0)
+            return htmlTooltip(hasExpired ? "Unavailable: ingredient is expired." : "Unavailable: insufficient stock.");
+        return htmlTooltip((hasExpired ? "Expired ingredients:<br>" : "Unavailable ingredients:<br>") + details);
     }
 
     private String htmlTooltip(String body) {

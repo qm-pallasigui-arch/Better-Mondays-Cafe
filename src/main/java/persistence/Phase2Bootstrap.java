@@ -3,8 +3,11 @@ package persistence;
 import inventory.Inventory;
 import inventory.InventoryItem;
 import java.util.Map;
+import loginregister.UserDataManager;
+import loginregister.UserDataManager.Role;
 import persistence.sqlite.SQLiteInventoryRepository;
 import persistence.sqlite.SQLiteMenuRepository;
+import persistence.sqlite.SQLiteUserRepository;
 import pos.Menu;
 import pos.MenuItem;
 
@@ -20,6 +23,8 @@ public final class Phase2Bootstrap {
     public static void seedCatalogIfEmpty() throws Exception {
         AppDatabase.ensureInitialized();
 
+        seedDefaultAccounts();
+
         SQLiteMenuRepository menuRepository = new SQLiteMenuRepository();
         SQLiteInventoryRepository inventoryRepository = new SQLiteInventoryRepository();
 
@@ -34,5 +39,17 @@ public final class Phase2Bootstrap {
                 inventoryRepository.save(entry.getValue());
             }
         }
+    }
+
+    private static void seedDefaultAccounts() throws Exception {
+        SQLiteUserRepository userRepository = new SQLiteUserRepository();
+        // Only create if no users exist yet — never overwrites existing accounts
+        if (!userRepository.listUsers().isEmpty()) {
+            return;
+        }
+        userRepository.createUser("admin", "Admin@123", Role.ADMIN,
+                "Administrator", 0, "", "", "", "");
+        userRepository.createUser("staff", "Staff@123", Role.STAFF,
+                "Staff User", 0, "", "", "", "");
     }
 }

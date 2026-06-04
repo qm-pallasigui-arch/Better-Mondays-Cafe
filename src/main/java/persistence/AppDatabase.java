@@ -99,27 +99,9 @@ public final class AppDatabase {
             } catch (Exception e) {
                 throw new SQLException("Unable to migrate legacy users", e);
             }
-            bootstrapAdminIfEmpty(connection);
             consolidateInventoryItemNames(connection);
         }
         initialized = true;
-    }
-
-    private static void bootstrapAdminIfEmpty(Connection connection) throws SQLException {
-        try (PreparedStatement countStmt = connection.prepareStatement("SELECT COUNT(*) FROM users")) {
-            try (ResultSet rs = countStmt.executeQuery()) {
-                if (rs.next() && rs.getInt(1) == 0) {
-                    String defaultPasswordHash = loginregister.PasswordHasher.hashPassword("Admin123!");
-                    try (PreparedStatement insertStmt = connection.prepareStatement(
-                            "INSERT INTO users(username, password_hash, role) VALUES (?, ?, ?)")) {
-                        insertStmt.setString(1, "admin");
-                        insertStmt.setString(2, defaultPasswordHash);
-                        insertStmt.setString(3, "ADMIN");
-                        insertStmt.executeUpdate();
-                    }
-                }
-            }
-        }
     }
 
     private static Connection openRawConnection() throws SQLException {

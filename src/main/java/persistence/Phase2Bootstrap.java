@@ -3,7 +3,6 @@ package persistence;
 import inventory.Inventory;
 import inventory.InventoryItem;
 import java.util.Map;
-import loginregister.UserDataManager;
 import loginregister.UserDataManager.Role;
 import persistence.sqlite.SQLiteInventoryRepository;
 import persistence.sqlite.SQLiteMenuRepository;
@@ -43,7 +42,7 @@ public final class Phase2Bootstrap {
 
     private static void seedDefaultAccounts() throws Exception {
         SQLiteUserRepository userRepository = new SQLiteUserRepository();
-        // Only create if no users exist yet — never overwrites existing accounts
+        // Only runs once on a genuinely empty database — never overwrites existing accounts
         if (!userRepository.listUsers().isEmpty()) {
             return;
         }

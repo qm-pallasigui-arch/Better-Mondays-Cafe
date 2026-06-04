@@ -228,7 +228,25 @@ public class POSSystem extends javax.swing.JFrame {
         // because `AppTheme.applyToFrame` overrides JButton backgrounds.
         if (orderingPanel != null) orderingPanel.refreshCategoryPills();
 
-        // OrderingPanel handles its own initial category state
+        // Auto-start shift on login
+        autoStartShift(username);
+    }
+
+    private void autoStartShift(String username) {
+        new javax.swing.SwingWorker<Void, Void>() {
+            @Override protected Void doInBackground() {
+                try {
+                    new SQLiteStaffShiftRepository().startShift(username);
+                } catch (Exception ignored) {}
+                return null;
+            }
+        }.execute();
+    }
+
+    private void autoEndShift(String username) {
+        try {
+            new SQLiteStaffShiftRepository().endShift(username, "");
+        } catch (Exception ignored) {}
     }
 
     @Deprecated
@@ -245,6 +263,7 @@ public class POSSystem extends javax.swing.JFrame {
         if (confirm != JOptionPane.YES_OPTION) {
             return;
         }
+        autoEndShift(currentUsername);
         java.awt.EventQueue.invokeLater(() -> new Login().setVisible(true));
         dispose();
     }

@@ -16,7 +16,7 @@ public class SQLiteStaffShiftRepository implements StaffShiftRepository {
     public void startShift(String username) throws Exception {
         try (Connection connection = AppDatabase.openConnection();
                 PreparedStatement stmt = connection.prepareStatement(
-                        "INSERT INTO staff_shifts(username) VALUES (?)")) {
+                        "INSERT INTO staff_shifts(username, started_at) VALUES (?, datetime('now','localtime'))")) {
             stmt.setString(1, username);
             stmt.executeUpdate();
         }
@@ -40,7 +40,7 @@ public class SQLiteStaffShiftRepository implements StaffShiftRepository {
                 if (shiftId == -1)
                     return;
                 try (PreparedStatement upd = connection.prepareStatement(
-                        "UPDATE staff_shifts SET ended_at = CURRENT_TIMESTAMP, notes = ? WHERE id = ?")) {
+                        "UPDATE staff_shifts SET ended_at = datetime('now','localtime'), notes = ? WHERE id = ?")) {
                     upd.setString(1, notes);
                     upd.setLong(2, shiftId);
                     upd.executeUpdate();
@@ -60,12 +60,17 @@ public class SQLiteStaffShiftRepository implements StaffShiftRepository {
         List<StaffShift> shifts = new ArrayList<>();
         try (Connection connection = AppDatabase.openConnection();
                 PreparedStatement stmt = connection.prepareStatement(
-                        "SELECT id, username, started_at, ended_at, notes FROM staff_shifts WHERE username = ? ORDER BY id DESC")) {
+                        "SELECT ss.id, COALESCE(u.staff_id, 0) AS staff_id, ss.username, "
+                        + "ss.started_at, ss.ended_at, ss.notes "
+                        + "FROM staff_shifts ss "
+                        + "LEFT JOIN users u ON u.username = ss.username "
+                        + "WHERE ss.username = ? ORDER BY ss.id DESC")) {
             stmt.setString(1, username);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     shifts.add(new StaffShift(
                             rs.getLong("id"),
+                            rs.getInt("staff_id"),
                             rs.getString("username"),
                             rs.getString("started_at"),
                             rs.getString("ended_at"),
@@ -81,11 +86,16 @@ public class SQLiteStaffShiftRepository implements StaffShiftRepository {
         List<StaffShift> shifts = new ArrayList<>();
         try (Connection connection = AppDatabase.openConnection();
                 PreparedStatement stmt = connection.prepareStatement(
-                        "SELECT id, username, started_at, ended_at, notes FROM staff_shifts ORDER BY id DESC");
+                        "SELECT ss.id, COALESCE(u.staff_id, 0) AS staff_id, ss.username, "
+                        + "ss.started_at, ss.ended_at, ss.notes "
+                        + "FROM staff_shifts ss "
+                        + "LEFT JOIN users u ON u.username = ss.username "
+                        + "ORDER BY ss.id DESC");
                 ResultSet rs = stmt.executeQuery()) {
             while (rs.next()) {
                 shifts.add(new StaffShift(
                         rs.getLong("id"),
+                        rs.getInt("staff_id"),
                         rs.getString("username"),
                         rs.getString("started_at"),
                         rs.getString("ended_at"),

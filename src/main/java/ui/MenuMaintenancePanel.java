@@ -15,7 +15,6 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
-import javax.swing.JTabbedPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.event.DocumentEvent;
@@ -72,41 +71,40 @@ public class MenuMaintenancePanel extends JPanel {
         ingredientDetails.setWrapStyleWord(true);
         ingredientDetails.setOpaque(false);
 
-        JTabbedPane tabs = new JTabbedPane();
-        tabs.addTab("Menu Maintenance", buildMenuTab(filterPanel));
-        tabs.addTab("Backup & Restore", new BackupPanel());
-        add(tabs, BorderLayout.CENTER);
-
-        reload();
-        AppTheme.applyToComponent(this);
-    }
-
-    private JPanel buildMenuTab(FilterRow filterPanel) {
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         buttons.setOpaque(false);
         buttons.setBorder(javax.swing.BorderFactory.createEmptyBorder(4, 0, 4, 0));
-        JButton add    = new JButton("Add");
-        JButton edit   = new JButton("Edit");
+        JButton add = new JButton("Add");
+        JButton edit = new JButton("Edit");
         JButton delete = new JButton("Delete");
 
         add.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 12));
         edit.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 12));
         delete.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 12));
 
-        for (JButton b : new JButton[]{add, edit, delete}) {
-            b.setPreferredSize(new Dimension(92, 34));
-            b.setMinimumSize(new Dimension(92, 34));
-            b.setMargin(new java.awt.Insets(6, 14, 6, 14));
-        }
+        add.setPreferredSize(new Dimension(92, 34));
+        edit.setPreferredSize(new Dimension(92, 34));
+        delete.setPreferredSize(new Dimension(92, 34));
+
+        add.setMinimumSize(new Dimension(92, 34));
+        edit.setMinimumSize(new Dimension(92, 34));
+        delete.setMinimumSize(new Dimension(92, 34));
+
+        add.setMargin(new java.awt.Insets(6, 14, 6, 14));
+        edit.setMargin(new java.awt.Insets(6, 14, 6, 14));
+        delete.setMargin(new java.awt.Insets(6, 14, 6, 14));
 
         add.addActionListener((ActionEvent e) -> onAdd());
         edit.addActionListener((ActionEvent e) -> onEdit());
         delete.addActionListener((ActionEvent e) -> onDelete());
         categoryFilter.addActionListener((ActionEvent e) -> applyFilters());
         searchField.getDocument().addDocumentListener(new DocumentListener() {
-            @Override public void insertUpdate(DocumentEvent e)  { applyFilters(); }
-            @Override public void removeUpdate(DocumentEvent e)  { applyFilters(); }
-            @Override public void changedUpdate(DocumentEvent e) { applyFilters(); }
+            @Override
+            public void insertUpdate(DocumentEvent e) { applyFilters(); }
+            @Override
+            public void removeUpdate(DocumentEvent e) { applyFilters(); }
+            @Override
+            public void changedUpdate(DocumentEvent e) { applyFilters(); }
         });
 
         buttons.add(add);
@@ -122,10 +120,11 @@ public class MenuMaintenancePanel extends JPanel {
         tableArea.add(new JScrollPane(table), BorderLayout.CENTER);
         tableArea.add(buildIngredientPanel(), BorderLayout.EAST);
 
-        JPanel tab = new JPanel(new BorderLayout());
-        tab.add(topBar,    BorderLayout.NORTH);
-        tab.add(tableArea, BorderLayout.CENTER);
-        return tab;
+        add(topBar, BorderLayout.NORTH);
+        add(tableArea, BorderLayout.CENTER);
+
+        reload();
+        AppTheme.applyToComponent(this);
     }
 
     private JPanel buildIngredientPanel() {
@@ -141,7 +140,7 @@ public class MenuMaintenancePanel extends JPanel {
         scroll.setBorder(AppTheme.inputBorderRegular());
         scroll.setPreferredSize(new Dimension(240, 220));
 
-        panel.add(title,  BorderLayout.NORTH);
+        panel.add(title, BorderLayout.NORTH);
         panel.add(scroll, BorderLayout.CENTER);
         return panel;
     }
@@ -212,7 +211,7 @@ public class MenuMaintenancePanel extends JPanel {
             return;
         }
 
-        String itemName  = String.valueOf(model.getValueAt(row, 0));
+        String itemName = String.valueOf(model.getValueAt(row, 0));
         String normalized = StringUtil.normalizeName(itemName);
         Optional<MenuItem> selected = cachedItems.stream()
                 .filter(item -> StringUtil.normalizeName(item.getName()).equals(normalized))
@@ -245,19 +244,27 @@ public class MenuMaintenancePanel extends JPanel {
 
     private void onEdit() {
         int r = table.getSelectedRow();
-        if (r < 0) { JOptionPane.showMessageDialog(this, "Select a row to edit"); return; }
+        if (r < 0) {
+            JOptionPane.showMessageDialog(this, "Select a row to edit");
+            return;
+        }
         String name = model.getValueAt(r, 0).toString();
         try {
             Optional<MenuItem> opt = repo.findByName(StringUtil.normalizeName(name));
-            if (opt.isEmpty()) { JOptionPane.showMessageDialog(this, "Item not found in repository"); return; }
+            if (opt.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Item not found in repository");
+                return;
+            }
             MenuItem item = opt.get();
             MenuItemDialog dlg = new MenuItemDialog(javax.swing.SwingUtilities.getWindowAncestor(this), item);
             dlg.setLocationRelativeTo(this);
             dlg.setVisible(true);
             if (!dlg.isConfirmed()) return;
             String newName = dlg.getName();
-            String newCat  = dlg.getCategory();
-            double hot = dlg.getHot(), reg = dlg.getIcedRegular(), large = dlg.getIcedLarge();
+            String newCat = dlg.getCategory();
+            double hot = dlg.getHot();
+            double reg = dlg.getIcedRegular();
+            double large = dlg.getIcedLarge();
             MenuItem edited = createMenuItem(normalizeCategory(newCat.trim()), StringUtil.normalizeName(newName.trim()), hot, reg, large);
             java.util.Map<String, Double> ingMap = dlg.getIngredientsMap();
             if (ingMap != null && !ingMap.isEmpty()) {
@@ -277,10 +284,14 @@ public class MenuMaintenancePanel extends JPanel {
 
     private void onDelete() {
         int r = table.getSelectedRow();
-        if (r < 0) { JOptionPane.showMessageDialog(this, "Select a row to delete"); return; }
+        if (r < 0) {
+            JOptionPane.showMessageDialog(this, "Select a row to delete");
+            return;
+        }
         String name = model.getValueAt(r, 0).toString();
         int confirm = JOptionPane.showConfirmDialog(this, "Delete " + name + "?", "Confirm", JOptionPane.YES_NO_OPTION);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (confirm != JOptionPane.YES_OPTION)
+            return;
         try {
             Menu.getInstance().removeItem(name);
             reload();
@@ -291,12 +302,12 @@ public class MenuMaintenancePanel extends JPanel {
 
     private MenuItem createMenuItem(String category, String name, double hot, double reg, double large) {
         return switch (category) {
-            case "Coffee"     -> new pos.CoffeeItem(name, hot, reg, large);
+            case "Coffee" -> new pos.CoffeeItem(name, hot, reg, large);
             case "Non-Coffee" -> new pos.NonCoffeeItem(name, hot, reg, large);
-            case "Fruit Tea"  -> new pos.FruitTeaItem(name, hot, reg, large);
+            case "Fruit Tea" -> new pos.FruitTeaItem(name, hot, reg, large);
             case "Herbal Tea" -> new pos.HerbalTeaItem(name, hot, reg, large);
-            case "Food"       -> new pos.FoodItem(name, "Food", hot > 0 ? hot : (reg > 0 ? reg : large));
-            default           -> new pos.CoffeeItem(name, hot, reg, large);
+            case "Food" -> new pos.FoodItem(name, "Food", hot > 0 ? hot : (reg > 0 ? reg : large));
+            default -> new pos.CoffeeItem(name, hot, reg, large);
         };
     }
 
@@ -304,23 +315,26 @@ public class MenuMaintenancePanel extends JPanel {
         if (category == null) return "Coffee";
         String c = category.trim();
         return switch (c) {
-            case "NonCoffee"  -> "Non-Coffee";
-            case "FruitTea"   -> "Fruit Tea";
-            case "HerbalTea"  -> "Herbal Tea";
-            default           -> c;
+            case "NonCoffee" -> "Non-Coffee";
+            case "FruitTea" -> "Fruit Tea";
+            case "HerbalTea" -> "Herbal Tea";
+            default -> c;
         };
     }
 
     private void parseAndSetIngredients(MenuItem item, String csv) {
-        if (csv == null || csv.trim().isEmpty()) return;
+        if (csv == null || csv.trim().isEmpty())
+            return;
         String[] parts = csv.split(Pattern.quote(","));
         for (String p : parts) {
             String[] kv = p.split(":", 2);
             if (kv.length == 2) {
                 try {
                     item.addIngredient(StringUtil.normalizeName(kv[0].trim()), Double.parseDouble(kv[1].trim()));
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
         }
     }
+
 }

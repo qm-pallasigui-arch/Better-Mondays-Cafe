@@ -191,18 +191,21 @@ public class Login extends javax.swing.JFrame {
 
     private void showForgotPasswordDialog() {
         javax.swing.JTextField usernameField = new javax.swing.JTextField(20);
+        javax.swing.JPasswordField newPasswordField = new javax.swing.JPasswordField(20);
+        javax.swing.JPasswordField confirmPasswordField = new javax.swing.JPasswordField(20);
 
         javax.swing.JPanel panel = new javax.swing.JPanel(new java.awt.GridLayout(0, 1, 8, 8));
-        panel.add(new javax.swing.JLabel("Enter your username to request a password reset."));
-        panel.add(new javax.swing.JLabel("An admin will review and approve your request."));
-        panel.add(new javax.swing.JLabel(" "));
-        panel.add(new javax.swing.JLabel("Username:"));
+        panel.add(new javax.swing.JLabel("Username"));
         panel.add(usernameField);
+        panel.add(new javax.swing.JLabel("New password"));
+        panel.add(newPasswordField);
+        panel.add(new javax.swing.JLabel("Confirm new password"));
+        panel.add(confirmPasswordField);
 
         int result = javax.swing.JOptionPane.showConfirmDialog(
                 this,
                 panel,
-                "Forgot Password — Request Reset",
+                "Forgot Password",
                 javax.swing.JOptionPane.OK_CANCEL_OPTION,
                 javax.swing.JOptionPane.PLAIN_MESSAGE);
         if (result != javax.swing.JOptionPane.OK_OPTION) {
@@ -210,41 +213,44 @@ public class Login extends javax.swing.JFrame {
         }
 
         String username = usernameField.getText().trim();
+        String newPassword = new String(newPasswordField.getPassword()).trim();
+        String confirmPassword = new String(confirmPasswordField.getPassword()).trim();
 
-        if (username.isEmpty()) {
-            javax.swing.JOptionPane.showMessageDialog(this, "Please enter your username.",
-                    "Forgot Password", javax.swing.JOptionPane.WARNING_MESSAGE);
+        if (username.isEmpty() || newPassword.isEmpty()) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Username and new password are required.", "Forgot Password", javax.swing.JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        if (!newPassword.equals(confirmPassword)) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Passwords do not match.", "Forgot Password", javax.swing.JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        if (!isStrongPassword(newPassword)) {
+            javax.swing.JOptionPane.showMessageDialog(this,
+                    "Password must be at least 8 characters and include a number and a special character.",
+                    "Forgot Password",
+                    javax.swing.JOptionPane.WARNING_MESSAGE);
             return;
         }
 
         boolean userExists = UserDataManager.listUsers().stream()
                 .anyMatch(account -> account.getUsername().equalsIgnoreCase(username));
         if (!userExists) {
-            javax.swing.JOptionPane.showMessageDialog(this, "Username not found.",
-                    "Forgot Password", javax.swing.JOptionPane.ERROR_MESSAGE);
+            javax.swing.JOptionPane.showMessageDialog(this, "Username not found.", "Forgot Password", javax.swing.JOptionPane.ERROR_MESSAGE);
             return;
         }
 
-        if (UserDataManager.hasPendingResetRequest(username)) {
-            javax.swing.JOptionPane.showMessageDialog(this,
-                    "A reset request for \"" + username + "\" is already pending admin approval.",
-                    "Forgot Password", javax.swing.JOptionPane.INFORMATION_MESSAGE);
-            return;
+        if (UserDataManager.resetPassword(username, newPassword)) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Password reset successfully.", "Forgot Password", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+        } else {
+            javax.swing.JOptionPane.showMessageDialog(this, "Unable to reset password.", "Forgot Password", javax.swing.JOptionPane.ERROR_MESSAGE);
         }
+    }
 
-        try {
-            UserDataManager.submitResetRequest(username);
-            javax.swing.JOptionPane.showMessageDialog(this,
-                    "<html><b>Request submitted.</b><br><br>"
-                    + "Your password reset request has been sent to an admin.<br>"
-                    + "Please wait for approval before trying to log in again.</html>",
-                    "Forgot Password — Submitted",
-                    javax.swing.JOptionPane.INFORMATION_MESSAGE);
-        } catch (Exception ex) {
-            javax.swing.JOptionPane.showMessageDialog(this,
-                    "Unable to submit request: " + ex.getMessage(),
-                    "Forgot Password", javax.swing.JOptionPane.ERROR_MESSAGE);
-        }
+    private boolean isStrongPassword(String password) {
+        return password != null
+                && password.length() >= 8
+                && password.matches(".*\\d.*")
+                && password.matches(".*[!@#$%^&*(),.?\":{}|<>].*");
     }
 
     /**

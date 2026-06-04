@@ -36,53 +36,6 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
             statement.setString(3, role.name());
             statement.executeUpdate();
         }
-        // Ensure staff_id is set (won't overwrite if already assigned)
-        assignStaffIdIfMissing(username);
-    }
-
-    @Override
-    public void createUser(String username, String plainPassword, Role role,
-            String fullName, int age, String birthdate,
-            String address, String mobile, String gender) throws Exception {
-        String passwordHash = PasswordHasher.hashPassword(plainPassword);
-        try (Connection connection = AppDatabase.openConnection();
-             PreparedStatement stmt = connection.prepareStatement(
-                     "INSERT INTO users(username, password_hash, role, full_name, age, birthdate, address, mobile, gender) "
-                     + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
-            stmt.setString(1, username);
-            stmt.setString(2, passwordHash);
-            stmt.setString(3, role.name());
-            stmt.setString(4, fullName);
-            stmt.setInt(5, age);
-            stmt.setString(6, birthdate);
-            stmt.setString(7, address);
-            stmt.setString(8, mobile);
-            stmt.setString(9, gender);
-            stmt.executeUpdate();
-        }
-        assignStaffIdIfMissing(username);
-    }
-
-    private void assignStaffIdIfMissing(String username) throws Exception {
-        try (Connection connection = AppDatabase.openConnection();
-             PreparedStatement check = connection.prepareStatement(
-                     "SELECT id, staff_id FROM users WHERE username = ?")) {
-            check.setString(1, username);
-            try (java.sql.ResultSet rs = check.executeQuery()) {
-                if (rs.next()) {
-                    int staffId = rs.getInt("staff_id");
-                    int id = rs.getInt("id");
-                    if (staffId == 0) {
-                        try (PreparedStatement upd = connection.prepareStatement(
-                                "UPDATE users SET staff_id = ? WHERE username = ?")) {
-                            upd.setInt(1, id);
-                            upd.setString(2, username);
-                            upd.executeUpdate();
-                        }
-                    }
-                }
-            }
-        }
     }
 
     @Override
@@ -124,8 +77,7 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
         List<UserAccount> users = new ArrayList<>();
         try (Connection connection = AppDatabase.openConnection();
              PreparedStatement statement = connection.prepareStatement(
-                     "SELECT staff_id, username, role, full_name, age, birthdate, address, mobile, gender, created_at "
-                     + "FROM users ORDER BY username ASC");
+                     "SELECT username, role, created_at FROM users ORDER BY username ASC");
              ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
                 Role role;
@@ -135,15 +87,8 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
                     role = Role.STAFF;
                 }
                 users.add(new UserAccount(
-                        resultSet.getInt("staff_id"),
                         resultSet.getString("username"),
                         role,
-                        resultSet.getString("full_name"),
-                        resultSet.getInt("age"),
-                        resultSet.getString("birthdate"),
-                        resultSet.getString("address"),
-                        resultSet.getString("mobile"),
-                        resultSet.getString("gender"),
                         resultSet.getString("created_at")
                 ));
             }

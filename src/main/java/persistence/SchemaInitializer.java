@@ -19,36 +19,11 @@ public final class SchemaInitializer {
                         statement.execute("PRAGMA foreign_keys = ON");
                         statement.execute("CREATE TABLE IF NOT EXISTS users ("
                                         + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                                        + "staff_id INTEGER NOT NULL UNIQUE DEFAULT 0, "
                                         + "username TEXT NOT NULL UNIQUE, "
                                         + "password_hash TEXT NOT NULL, "
                                         + "role TEXT NOT NULL, "
-                                        + "full_name TEXT NOT NULL DEFAULT '', "
-                                        + "age INTEGER NOT NULL DEFAULT 0, "
-                                        + "birthdate TEXT NOT NULL DEFAULT '', "
-                                        + "address TEXT NOT NULL DEFAULT '', "
-                                        + "mobile TEXT NOT NULL DEFAULT '', "
-                                        + "gender TEXT NOT NULL DEFAULT '', "
                                         + "created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
                                         + ")");
-                        // Migrations for existing databases
-                        for (String colDef : new String[]{
-                                "staff_id INTEGER NOT NULL DEFAULT 0",
-                                "full_name TEXT NOT NULL DEFAULT ''",
-                                "age INTEGER NOT NULL DEFAULT 0",
-                                "birthdate TEXT NOT NULL DEFAULT ''",
-                                "address TEXT NOT NULL DEFAULT ''",
-                                "mobile TEXT NOT NULL DEFAULT ''",
-                                "gender TEXT NOT NULL DEFAULT ''"}) {
-                            try {
-                                statement.execute("ALTER TABLE users ADD COLUMN " + colDef);
-                            } catch (SQLException ignored) {}
-                        }
-                        // Assign permanent staff_id to any existing users that have the default 0
-                        try {
-                            statement.execute(
-                                "UPDATE users SET staff_id = id WHERE staff_id = 0 OR staff_id IS NULL");
-                        } catch (SQLException ignored) {}
                         statement.execute("CREATE TABLE IF NOT EXISTS menu_items ("
                                         + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
                                         + "name TEXT NOT NULL UNIQUE, "
@@ -142,17 +117,9 @@ public final class SchemaInitializer {
                         statement.execute("CREATE TABLE IF NOT EXISTS staff_shifts ("
                                         + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
                                         + "username TEXT NOT NULL, "
-                                        + "started_at TEXT NOT NULL DEFAULT (datetime('now','localtime')), "
+                                        + "started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, "
                                         + "ended_at TEXT, "
                                         + "notes TEXT"
-                                        + ")");
-                        // Password reset requests submitted from the login screen
-                        statement.execute("CREATE TABLE IF NOT EXISTS password_reset_requests ("
-                                        + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                                        + "username TEXT NOT NULL, "
-                                        + "status TEXT NOT NULL DEFAULT 'PENDING', "
-                                        + "requested_at TEXT NOT NULL DEFAULT (datetime('now','localtime')), "
-                                        + "resolved_at TEXT"
                                         + ")");
                 }
         }

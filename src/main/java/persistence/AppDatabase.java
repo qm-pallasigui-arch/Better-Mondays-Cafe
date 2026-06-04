@@ -33,11 +33,6 @@ public final class AppDatabase {
         return DriverManager.getConnection(JDBC_PREFIX + DATABASE_PATH.toAbsolutePath());
     }
 
-    /** Called before overwriting the database file during a restore. */
-    public static synchronized void resetForRestore() {
-        initialized = false;
-    }
-
     public static synchronized void ensureInitialized() throws SQLException {
         if (initialized) {
             return;

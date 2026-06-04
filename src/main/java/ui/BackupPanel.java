@@ -6,7 +6,6 @@ import javax.swing.*;
 import javax.swing.border.TitledBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.io.IOException;
 import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -26,23 +25,30 @@ public class BackupPanel extends JPanel {
     };
     private final JTable historyTable = new JTable(historyModel);
 
-    private final JButton backupBtn  = new JButton("Backup Now");
-    private final JButton restoreBtn = new JButton("Restore from File");
-    private final JLabel  statusLabel = new JLabel(" ");
+    private final JButton backupBtn      = new JButton("Backup Now");
+    private final JButton restoreBtn     = new JButton("Restore from File");
+    private final JButton resetProdBtn   = new JButton("Reset for Production");
+    private final JLabel  statusLabel    = new JLabel(" ");
 
     public BackupPanel() {
         super(new BorderLayout(12, 12));
         setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
 
-        styleButton(backupBtn,  false);
-        styleButton(restoreBtn, true);
+        styleButton(backupBtn,    false);
+        styleButton(restoreBtn,   true);
+        styleButton(resetProdBtn, true);
 
-        backupBtn.addActionListener(e  -> onBackup());
-        restoreBtn.addActionListener(e -> onRestore());
+        backupBtn.addActionListener(e    -> onBackup());
+        restoreBtn.addActionListener(e   -> onRestore());
+        resetProdBtn.addActionListener(e -> onResetForProduction());
 
-        add(buildTopPanel(),     BorderLayout.NORTH);
-        add(buildHistoryPanel(), BorderLayout.CENTER);
-        add(statusLabel,         BorderLayout.SOUTH);
+        JPanel center = new JPanel(new BorderLayout(0, 12));
+        center.add(buildHistoryPanel(),    BorderLayout.CENTER);
+        center.add(buildResetPanel(),      BorderLayout.SOUTH);
+
+        add(buildTopPanel(), BorderLayout.NORTH);
+        add(center,          BorderLayout.CENTER);
+        add(statusLabel,     BorderLayout.SOUTH);
 
         AppTheme.applyToComponent(this);
     }
@@ -194,6 +200,100 @@ public class BackupPanel extends JPanel {
                     restoreBtn.setEnabled(true);
                     statusLabel.setText("Restore failed.");
                     showError("Restore failed:\n" + rootCause(ex));
+                }
+            }
+        }.execute();
+    }
+
+    // ── Production reset ─────────────────────────────────────────────────────
+
+    private JPanel buildResetPanel() {
+        JPanel info = new JPanel(new GridLayout(0, 1, 4, 4));
+        info.setBorder(BorderFactory.createTitledBorder(
+                BorderFactory.createLineBorder(new Color(0xDC2626), 1),
+                "⚠  Production Reset",
+                TitledBorder.LEFT, TitledBorder.TOP,
+                new Font("Segoe UI", Font.BOLD, 13),
+                new Color(0xDC2626)));
+
+        info.add(new JLabel("Wipes all test/operational data. Keeps: menu items, inventory definitions."));
+        info.add(new JLabel("Erases: shifts, sales, transactions, inventory batches, all user accounts."));
+        info.add(new JLabel("Default admin and staff accounts are re-created automatically after reset."));
+
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 6));
+        buttons.add(resetProdBtn);
+
+        JPanel panel = new JPanel(new BorderLayout(0, 4));
+        panel.add(info,    BorderLayout.CENTER);
+        panel.add(buttons, BorderLayout.SOUTH);
+        return panel;
+    }
+
+    private void onResetForProduction() {
+        // First confirmation
+        int first = JOptionPane.showConfirmDialog(this,
+                "<html><b>⚠ Reset for Production?</b><br><br>"
+                + "This will permanently erase:<br>"
+                + "&nbsp;&nbsp;• All staff shift records<br>"
+                + "&nbsp;&nbsp;• All sales and transaction history<br>"
+                + "&nbsp;&nbsp;• All inventory batch quantities<br>"
+                + "&nbsp;&nbsp;• All user accounts<br>"
+                + "&nbsp;&nbsp;• All password reset requests<br><br>"
+                + "The following will be <b>kept</b>:<br>"
+                + "&nbsp;&nbsp;• Menu items and ingredients<br>"
+                + "&nbsp;&nbsp;• Inventory item definitions<br><br>"
+                + "Default admin and staff accounts will be re-created.<br><br>"
+                + "<b>This cannot be undone. Are you sure?</b></html>",
+                "Reset for Production — Step 1 of 2",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+        if (first != JOptionPane.YES_OPTION) return;
+
+        // Second confirmation — type the word to confirm
+        String typed = JOptionPane.showInputDialog(this,
+                "<html>Type <b>RESET</b> to confirm the production reset:</html>",
+                "Reset for Production — Step 2 of 2",
+                JOptionPane.WARNING_MESSAGE);
+        if (typed == null || !typed.trim().equals("RESET")) {
+            JOptionPane.showMessageDialog(this,
+                    "Reset cancelled — confirmation word did not match.",
+                    "Cancelled", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        resetProdBtn.setEnabled(false);
+        statusLabel.setText("Resetting…");
+
+        new SwingWorker<Void, Void>() {
+            private String errorMsg;
+
+            @Override
+            protected Void doInBackground() {
+                try {
+                    persistence.AppDatabase.resetForProduction();
+                } catch (Exception ex) {
+                    errorMsg = ex.getMessage();
+                }
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                resetProdBtn.setEnabled(true);
+                if (errorMsg != null) {
+                    statusLabel.setText("Reset failed.");
+                    showError("Production reset failed:\n" + errorMsg);
+                } else {
+                    String ts = LocalDateTime.now().format(DISPLAY_FMT);
+                    historyModel.insertRow(0, new Object[]{
+                            "— production reset —", "Reset", "—", ts});
+                    statusLabel.setText("Production reset completed at " + ts);
+                    JOptionPane.showMessageDialog(BackupPanel.this,
+                            "<html><b>Production reset complete.</b><br><br>"
+                            + "All operational data has been erased.<br>"
+                            + "Default admin and staff accounts have been re-created.<br><br>"
+                            + "The system is ready for live use.</html>",
+                            "Reset Complete", JOptionPane.INFORMATION_MESSAGE);
                 }
             }
         }.execute();

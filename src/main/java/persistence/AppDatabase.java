@@ -38,6 +38,45 @@ public final class AppDatabase {
         initialized = false;
     }
 
+    /**
+     * Production reset — wipes all operational/test data while keeping
+     * reference data (menu, inventory definitions) and resetting users to
+     * the seeded defaults only.
+     *
+     * Tables wiped:
+     *   staff_shifts, sales_records, sales_transactions,
+     *   sales_transaction_items, sales_order_status,
+     *   password_reset_requests, inventory_batches, users
+     *
+     * Tables kept:
+     *   menu_items, menu_item_ingredients,
+     *   inventory_items (definitions only, quantities zeroed)
+     */
+    public static void resetForProduction() throws SQLException {
+        try (Connection conn = openConnection();
+             java.sql.Statement st = conn.createStatement()) {
+            st.execute("DELETE FROM staff_shifts");
+            st.execute("DELETE FROM sales_transaction_items");
+            st.execute("DELETE FROM sales_order_status");
+            st.execute("DELETE FROM sales_transactions");
+            st.execute("DELETE FROM sales_records");
+            st.execute("DELETE FROM password_reset_requests");
+            st.execute("DELETE FROM inventory_batches");
+            st.execute("DELETE FROM users");
+            // Reset SQLite auto-increment counters
+            st.execute("DELETE FROM sqlite_sequence WHERE name IN ("
+                    + "'staff_shifts','sales_transaction_items','sales_order_status',"
+                    + "'sales_transactions','sales_records','password_reset_requests',"
+                    + "'inventory_batches','users')");
+        }
+        // Re-seed default admin + staff accounts immediately
+        try {
+            persistence.Phase2Bootstrap.seedCatalogIfEmpty();
+        } catch (Exception e) {
+            throw new SQLException("Reset succeeded but re-seeding accounts failed: " + e.getMessage(), e);
+        }
+    }
+
     public static synchronized void ensureInitialized() throws SQLException {
         if (initialized) {
             return;

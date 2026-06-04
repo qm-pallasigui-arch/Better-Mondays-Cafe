@@ -29,8 +29,6 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Insets;
 import java.awt.RenderingHints;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -63,7 +61,6 @@ import ui.AppTheme;
 import ui.CardPanel;
 import ui.SidebarPanel;
 import persistence.sqlite.SQLiteInventoryRepository;
-import persistence.sqlite.SQLiteProfilePictureRepository;
 import persistence.sqlite.SQLiteStaffShiftRepository;
 import persistence.sqlite.SQLiteSalesRepository;
 import persistence.sqlite.SQLiteUserRepository;
@@ -80,95 +77,102 @@ public class POSSystem extends javax.swing.JFrame {
     private OrderController orderController;
 
     private static final List<String> ORDERING_CATEGORIES = List.of(
-            "Espresso & Coffee",
-            "Specialty Drinks",
-            "Tea Latte",
-            "Non-Coffee",
-            "House Favorites",
-            "Fruit Tea",
-            "Herbal Tea",
-            "Sandwiches",
-            "Pandesal Pairs",
-            "Pastries");
+        "Espresso & Coffee",
+        "Specialty Drinks",
+        "Tea Latte",
+        "Non-Coffee",
+        "House Favorites",
+        "Fruit Tea",
+        "Herbal Tea",
+        "Sandwiches",
+        "Pandesal Pairs",
+        "Pastries"
+    );
 
     private final Map<String, List<String>> categoryItems;
 
     private static final Map<String, Double> HOUSE_FAVORITES_PRICES = Map.of(
-            "Mango Latte", 210.0,
-            "Strawberry Latte", 200.0,
-            "Salted Cream Latte", 190.0,
-            "Spanish Latte", 180.0);
+        "Mango Latte", 210.0,
+        "Strawberry Latte", 200.0,
+        "Salted Cream Latte", 190.0,
+        "Spanish Latte", 180.0
+    );
 
     private static final List<String> SPECIALTY_DRINKS = List.of(
-            "Vietnamese Coffee",
-            "Ube Espresso",
-            "Manila Latte",
-            "Pumpkin Spice Latte",
-            "Spiced Cookie Latte");
+        "Vietnamese Coffee",
+        "Ube Espresso",
+        "Manila Latte",
+        "Pumpkin Spice Latte",
+        "Spiced Cookie Latte"
+    );
 
     private static final List<String> TEA_LATTE_ITEMS = List.of(
-            "Matcha Latte",
-            "Chocolate Matcha",
-            "Matcha Espresso",
-            "Hojicha Latte",
-            "Chai Latte");
+        "Matcha Latte",
+        "Chocolate Matcha",
+        "Matcha Espresso",
+        "Hojicha Latte",
+        "Chai Latte"
+    );
 
     private static final List<String> NON_COFFEE_ITEMS = List.of(
-            "Chocolate Latte",
-            "Strawberry Latte",
-            "Mango Latte",
-            "Dragon Fruit Coconut Latte",
-            "Ube Latte");
+        "Chocolate Latte",
+        "Strawberry Latte",
+        "Mango Latte",
+        "Dragon Fruit Coconut Latte",
+        "Ube Latte"
+    );
 
     private static final List<String> FRUIT_TEA_ITEMS = List.of(
-            "Strawberry Green Tea",
-            "Mango Green Tea",
-            "Peach Green Tea",
-            "Passion Fruit Green Tea");
+        "Strawberry Green Tea",
+        "Mango Green Tea",
+        "Peach Green Tea",
+        "Passion Fruit Green Tea"
+    );
 
     private static final List<String> HERBAL_TEA_ITEMS = List.of(
-            "Peppermint",
-            "Chamomile",
-            "Earl Grey",
-            "Cinnamon");
+        "Peppermint",
+        "Chamomile",
+        "Earl Grey",
+        "Cinnamon"
+    );
 
     private static final List<String> SANDWICH_ITEMS = List.of(
-            "Signature Ham & Cheese",
-            "Classic Grilled Cheese",
-            "Homestyle Pesto & Cheese");
+        "Signature Ham & Cheese",
+        "Classic Grilled Cheese",
+        "Homestyle Pesto & Cheese"
+    );
 
     private static final List<String> PANDESAL_PAIR_ITEMS = List.of(
-            "Ham & Cheese",
-            "Cheesy Pesto",
-            "Spam & Cheese");
+        "Ham & Cheese",
+        "Cheesy Pesto",
+        "Spam & Cheese"
+    );
 
     private static final List<String> PASTRY_ITEMS = List.of(
-            "Chocolate Crinkles",
-            "Chocolate Cookies",
-            "Brownies",
-            "Banana Bread",
-            "Chocolate Tiramisu",
-            "Matcha Tiramisu",
-            "Creamy Spinach",
-            "Blueberry Cheesecake");
+        "Chocolate Crinkles",
+        "Chocolate Cookies",
+        "Brownies",
+        "Banana Bread",
+        "Chocolate Tiramisu",
+        "Matcha Tiramisu",
+        "Creamy Spinach",
+        "Blueberry Cheesecake"
+    );
 
     private static class OrderEntry {
         String name;
         String variant;
         int quantity;
         double unitPrice;
-
         OrderEntry(String name, String variant, int quantity, double unitPrice) {
             this.name = name;
             this.variant = variant;
             this.quantity = quantity;
             this.unitPrice = unitPrice;
         }
-
         String displayName() {
             return variant.isEmpty() ? name : name + " (" + variant + ")";
         }
-
         double lineTotal() {
             return quantity * unitPrice;
         }
@@ -219,20 +223,30 @@ public class POSSystem extends javax.swing.JFrame {
         monitoringPanel = new MonitoringPanel();
 
         AppTheme.applyToFrame(this);
-        setDefaultCloseOperation(javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE);
-        addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowClosing(WindowEvent e) {
-                attemptExit();
-            }
-        });
 
         // Re-apply ordering category pill styles after the global theme
         // because `AppTheme.applyToFrame` overrides JButton backgrounds.
-        if (orderingPanel != null)
-            orderingPanel.refreshCategoryPills();
+        if (orderingPanel != null) orderingPanel.refreshCategoryPills();
 
-        // OrderingPanel handles its own initial category state
+        // Auto-start shift on login
+        autoStartShift(username);
+    }
+
+    private void autoStartShift(String username) {
+        new javax.swing.SwingWorker<Void, Void>() {
+            @Override protected Void doInBackground() {
+                try {
+                    new SQLiteStaffShiftRepository().startShift(username);
+                } catch (Exception ignored) {}
+                return null;
+            }
+        }.execute();
+    }
+
+    private void autoEndShift(String username) {
+        try {
+            new SQLiteStaffShiftRepository().endShift(username, "");
+        } catch (Exception ignored) {}
     }
 
     @Deprecated
@@ -249,50 +263,11 @@ public class POSSystem extends javax.swing.JFrame {
         if (confirm != JOptionPane.YES_OPTION) {
             return;
         }
-
-        // ── Auto-end shift on logout ───────────────────────────────────────
-        try {
-            persistence.StaffShiftRepository shiftRepo = new persistence.sqlite.SQLiteStaffShiftRepository();
-            shiftRepo.endShift(currentUsername, "Auto-ended on logout");
-        } catch (Exception e) {
-            // Non-fatal: log but don't block logout
-            java.util.logging.Logger.getLogger(POSSystem.class.getName())
-                    .log(java.util.logging.Level.WARNING,
-                            "Could not auto-end shift for " + currentUsername, e);
-            JOptionPane.showMessageDialog(this,
-                    "Logged out, but shift could not be ended automatically.\n" + e.getMessage(),
-                    "Shift Warning", JOptionPane.WARNING_MESSAGE);
-        }
-        // ──────────────────────────────────────────────────────────────────
-
+        autoEndShift(currentUsername);
         java.awt.EventQueue.invokeLater(() -> new Login().setVisible(true));
         dispose();
     }
 
-    private void attemptExit() {
-        int option = JOptionPane.showConfirmDialog(this, "Do you want to exit?",
-                "Better Mondays Coffeee Cafe Management System",
-                JOptionPane.YES_NO_OPTION,
-                JOptionPane.QUESTION_MESSAGE);
-        if (option != JOptionPane.YES_OPTION) {
-            return;
-        }
-
-        try {
-            persistence.StaffShiftRepository shiftRepo = new persistence.sqlite.SQLiteStaffShiftRepository();
-            shiftRepo.endShift(currentUsername, "Auto-ended on exit");
-        } catch (Exception e) {
-            java.util.logging.Logger.getLogger(POSSystem.class.getName())
-                    .log(java.util.logging.Level.WARNING,
-                            "Could not auto-end shift for " + currentUsername, e);
-            JOptionPane.showMessageDialog(this,
-                    "The application will exit, but the current shift could not be ended automatically.\n"
-                            + e.getMessage(),
-                    "Shift Warning", JOptionPane.WARNING_MESSAGE);
-        }
-
-        System.exit(0);
-    }
 
     // ─── Category display (legacy, kept for compatibility) ──────
     private void showCategory(String category) {
@@ -313,9 +288,9 @@ public class POSSystem extends javax.swing.JFrame {
         List<String> itemNames = categoryItems.getOrDefault(category, List.of());
 
         List<MenuItem> items = itemNames.stream()
-                .map(name -> Menu.getInstance().getMenuItem(name))
-                .filter(item -> item != null)
-                .collect(Collectors.toList());
+            .map(name -> Menu.getInstance().getMenuItem(name))
+            .filter(item -> item != null)
+            .collect(Collectors.toList());
 
         String searchTerm = search.trim();
         if ("Search a product".equals(searchTerm)) {
@@ -324,8 +299,8 @@ public class POSSystem extends javax.swing.JFrame {
         if (!searchTerm.isEmpty()) {
             String finalSearch = searchTerm.toLowerCase();
             items = items.stream()
-                    .filter(item -> item.getName().toLowerCase().contains(finalSearch))
-                    .collect(Collectors.toList());
+                .filter(item -> item.getName().toLowerCase().contains(finalSearch))
+                .collect(Collectors.toList());
         }
 
         if (items.isEmpty()) {
@@ -386,11 +361,9 @@ public class POSSystem extends javax.swing.JFrame {
         textPanel.setMaximumSize(new Dimension(160, 66));
 
         JLabel nameLabel = new JLabel(
-                "<html><div style='width:164px;text-align:center;line-height:1.15;'><b style='color:#F5F8FC;font-size:11px;'>"
-                        + item.getName()
-                        + "</b><br><span style='color:#32C075;font-size:10px;'>\u20B1"
-                        + String.format("%.2f", displayPrice) + "</span></div></html>",
-                SwingConstants.CENTER);
+            "<html><div style='width:164px;text-align:center;line-height:1.15;'><b style='color:#F5F8FC;font-size:11px;'>" + item.getName()
+            + "</b><br><span style='color:#32C075;font-size:10px;'>\u20B1" + String.format("%.2f", displayPrice) + "</span></div></html>",
+            SwingConstants.CENTER);
         nameLabel.setHorizontalAlignment(SwingConstants.CENTER);
         nameLabel.setVerticalAlignment(SwingConstants.CENTER);
         textPanel.add(nameLabel, BorderLayout.CENTER);
@@ -421,8 +394,8 @@ public class POSSystem extends javax.swing.JFrame {
                 return HOUSE_FAVORITES_PRICES.getOrDefault(item.getName(), 0.0);
             default:
                 return item.getIcedRegularPrice() > 0 ? item.getIcedRegularPrice()
-                        : item.getHotPrice() > 0 ? item.getHotPrice()
-                                : item.getIcedLargePrice();
+                     : item.getHotPrice() > 0 ? item.getHotPrice()
+                     : item.getIcedLargePrice();
         }
     }
 
@@ -554,8 +527,7 @@ public class POSSystem extends javax.swing.JFrame {
     }
 
     private void addSingleBtn(JPanel panel, String text, double price, String itemName) {
-        if (price <= 0)
-            return;
+        if (price <= 0) return;
         JButton btn = new JButton(text);
         styleProdBtn(btn);
         btn.addActionListener(e -> addOrderItem(itemName, "", price));
@@ -563,8 +535,7 @@ public class POSSystem extends javax.swing.JFrame {
     }
 
     private void addItemBtn(JPanel panel, String text, double price, String variant, String itemName) {
-        if (price <= 0)
-            return;
+        if (price <= 0) return;
         JButton btn = new JButton(text);
         styleProdBtn(btn);
         btn.addActionListener(e -> addOrderItem(itemName, variant, price));
@@ -589,8 +560,7 @@ public class POSSystem extends javax.swing.JFrame {
     }
 
     private void addOrderItem(String name, String variant, double price) {
-        if (name == null || name.isEmpty())
-            return;
+        if (name == null || name.isEmpty()) return;
         for (OrderEntry entry : orderEntries) {
             if (entry.name.equals(name) && entry.variant.equals(variant)) {
                 entry.quantity++;
@@ -676,8 +646,9 @@ public class POSSystem extends javax.swing.JFrame {
         receiptPanel.setLayout(new BoxLayout(receiptPanel, BoxLayout.Y_AXIS));
         receiptPanel.setBackground(AppTheme.BG_SURFACE);
         receiptPanel.setBorder(BorderFactory.createCompoundBorder(
-                new ui.RoundedLineBorder(AppTheme.BORDER, ui.AppTheme.BORDER_THICKNESS, ui.AppTheme.BORDER_RADIUS),
-                BorderFactory.createEmptyBorder(6, 8, 6, 8)));
+            new ui.RoundedLineBorder(AppTheme.BORDER, ui.AppTheme.BORDER_THICKNESS, ui.AppTheme.BORDER_RADIUS),
+            BorderFactory.createEmptyBorder(6, 8, 6, 8)
+        ));
 
         double totalInclusive = 0;
         for (OrderEntry entry : orderEntries) {
@@ -705,8 +676,7 @@ public class POSSystem extends javax.swing.JFrame {
         receiptPanel.add(clearBtn);
         receiptPanel.add(Box.createVerticalStrut(4));
 
-        receiptPanel.add(new JScrollPane(orderPanel, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER));
+        receiptPanel.add(new JScrollPane(orderPanel, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER));
         receiptPanel.add(Box.createVerticalStrut(4));
 
         JLabel line = new JLabel("─────────────────────");
@@ -786,14 +756,14 @@ public class POSSystem extends javax.swing.JFrame {
     private void showReceipt(double subTotal, double vat, double total, double cash, double change) {
         String lineSep = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
         String receipt = " ☕ Better Mondays Cafe ☕\n"
-                + " 123 Main St., Manila\n"
-                + " VAT REG TIN: 123-456-789\n"
-                + lineSep
-                + "Date: " + new SimpleDateFormat("MM/dd/yyyy HH:mm").format(new Date()) + "\n"
-                + "Txn #: TXN" + String.format("%06d", ++transactionCounter) + "\n"
-                + lineSep
-                + String.format("%-15s %3s %8s\n", "ITEM", "QTY", "AMOUNT")
-                + "───────────────────────────────\n";
+               + " 123 Main St., Manila\n"
+               + " VAT REG TIN: 123-456-789\n"
+               + lineSep
+               + "Date: " + new SimpleDateFormat("MM/dd/yyyy HH:mm").format(new Date()) + "\n"
+               + "Txn #: TXN" + String.format("%06d", ++transactionCounter) + "\n"
+               + lineSep
+               + String.format("%-15s %3s %8s\n", "ITEM", "QTY", "AMOUNT")
+               + "───────────────────────────────\n";
 
         for (OrderEntry entry : orderEntries) {
             receipt += String.format("%-15s %3d %8.2f\n",
@@ -801,14 +771,14 @@ public class POSSystem extends javax.swing.JFrame {
         }
 
         receipt += "───────────────────────────────\n"
-                + String.format("%-23s \u20B1%7.2f\n", "Subtotal (excl VAT):", subTotal)
-                + String.format("%-23s \u20B1%7.2f\n", "VAT (12%):", vat)
-                + String.format("%-23s \u20B1%7.2f\n", "TOTAL (incl VAT):", total)
-                + String.format("%-23s \u20B1%7.2f\n", "Cash:", cash)
-                + String.format("%-23s \u20B1%7.2f\n", "Change:", change)
-                + lineSep
-                + " Thank you! Come again!\n"
-                + " *** Have a nice day ***\n";
+                 + String.format("%-23s \u20B1%7.2f\n", "Subtotal (excl VAT):", subTotal)
+                 + String.format("%-23s \u20B1%7.2f\n", "VAT (12%):", vat)
+                 + String.format("%-23s \u20B1%7.2f\n", "TOTAL (incl VAT):", total)
+                 + String.format("%-23s \u20B1%7.2f\n", "Cash:", cash)
+                 + String.format("%-23s \u20B1%7.2f\n", "Change:", change)
+                 + lineSep
+                 + " Thank you! Come again!\n"
+                 + " *** Have a nice day ***\n";
 
         JOptionPane.showMessageDialog(this, receipt,
                 "✅ RECEIPT - TXN" + String.format("%06d", transactionCounter),
@@ -871,12 +841,11 @@ public class POSSystem extends javax.swing.JFrame {
         contentPanel.setBackground(AppTheme.BG_PRIMARY);
 
         // ═══════════════════════════════════════════════════════════
-        // ORDERING TAB (redesigned OrderingPanel)
+        //  ORDERING TAB  (redesigned OrderingPanel)
         // ═══════════════════════════════════════════════════════════
         orderingPanel = new OrderingPanel(() -> {
             loadInventoryTable();
-            if (monitoringPanel != null)
-                monitoringPanel.refreshData();
+            if (monitoringPanel != null) monitoringPanel.refreshData();
         });
         orderingPanel.setBackground(AppTheme.BG_PRIMARY);
         contentPanel.add(orderingPanel, "Ordering");
@@ -890,7 +859,7 @@ public class POSSystem extends javax.swing.JFrame {
         }));
 
         // ═══════════════════════════════════════════════════════════
-        // INVENTORY TAB - Card-on-Canvas Design
+        //  INVENTORY TAB - Card-on-Canvas Design
         // ═══════════════════════════════════════════════════════════
         Font TITLE_FONT = new Font("Segoe UI", Font.BOLD, 28);
         Font SUB_FONT = new Font("Segoe UI", Font.PLAIN, 13);
@@ -954,7 +923,6 @@ public class POSSystem extends javax.swing.JFrame {
                 }
                 inventorySearchField.setBorder(ui.AppTheme.focusInputBorder(new Color(90, 140, 190)));
             }
-
             @Override
             public void focusLost(java.awt.event.FocusEvent e) {
                 if (inventorySearchField.getText().isBlank()) {
@@ -965,19 +933,11 @@ public class POSSystem extends javax.swing.JFrame {
         });
         inventorySearchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
             @Override
-            public void insertUpdate(javax.swing.event.DocumentEvent e) {
-                applyInventoryFilters();
-            }
-
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { applyInventoryFilters(); }
             @Override
-            public void removeUpdate(javax.swing.event.DocumentEvent e) {
-                applyInventoryFilters();
-            }
-
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { applyInventoryFilters(); }
             @Override
-            public void changedUpdate(javax.swing.event.DocumentEvent e) {
-                applyInventoryFilters();
-            }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { applyInventoryFilters(); }
         });
 
         JLabel searchIconLabel = new JLabel("\uD83D\uDD0D");
@@ -992,16 +952,17 @@ public class POSSystem extends javax.swing.JFrame {
         leftControls.add(searchPill);
 
         inventoryCategoryFilter = new JComboBox<>(new String[] {
-                "All",
-                "Coffee",
-                "Non-Coffee",
-                "Fruit Tea",
-                "Herbal Tea",
-                "Food"
+            "All",
+            "Coffee",
+            "Non-Coffee",
+            "Fruit Tea",
+            "Herbal Tea",
+            "Food"
         });
         inventoryCategoryFilter.setFont(BODY_FONT);
         inventoryCategoryFilter.addActionListener(e -> applyInventoryFilters());
         leftControls.add(inventoryCategoryFilter);
+
 
         controlsPanel.add(leftControls, BorderLayout.WEST);
 
@@ -1032,10 +993,10 @@ public class POSSystem extends javax.swing.JFrame {
 
         inventoryTable = new javax.swing.JTable();
         inventoryTable.setModel(new DefaultTableModel(
-                new Object[][] {},
-                new String[] { "Item Name", "Quantity", "Alert Level", "Batches", "Status", "Actions" }) {
-            boolean[] canEdit = new boolean[] { false, false, false, false, false, true };
-
+            new Object[][]{},
+            new String[]{"Item Name", "Quantity", "Alert Level", "Batches", "Status", "Actions"}
+        ) {
+            boolean[] canEdit = new boolean[]{false, false, false, false, false, true};
             public boolean isCellEditable(int rowIndex, int columnIndex) {
                 return canEdit[columnIndex];
             }
@@ -1046,8 +1007,7 @@ public class POSSystem extends javax.swing.JFrame {
         inventoryTable.setRowMargin(4);
         inventoryTable.getTableHeader().setReorderingAllowed(false);
 
-        // Column widths: Name | Quantity | Alert Level | Last Updated | Status |
-        // Actions
+        // Column widths: Name | Quantity | Alert Level | Last Updated | Status | Actions
         inventoryTable.getColumnModel().getColumn(0).setPreferredWidth(160);
         inventoryTable.getColumnModel().getColumn(1).setPreferredWidth(100);
         inventoryTable.getColumnModel().getColumn(2).setPreferredWidth(100);
@@ -1075,14 +1035,11 @@ public class POSSystem extends javax.swing.JFrame {
             public void mouseClicked(java.awt.event.MouseEvent e) {
                 int col = inventoryTable.columnAtPoint(e.getPoint());
                 int row = inventoryTable.rowAtPoint(e.getPoint());
-                if (row < 0)
-                    return;
+                if (row < 0) return;
                 if (col == 3) {
                     Object cellVal = inventoryTable.getModel().getValueAt(row, 3);
-                    if (!(cellVal instanceof controller.InventoryRowView rv))
-                        return;
-                    if (inventoryController == null)
-                        return;
+                    if (!(cellVal instanceof controller.InventoryRowView rv)) return;
+                    if (inventoryController == null) return;
                     new ui.InventoryBatchModal(POSSystem.this, rv.getName(),
                             inventoryController, POSSystem.this::loadInventoryTable).setVisible(true);
                 } else if (col == 5) {
@@ -1122,8 +1079,7 @@ public class POSSystem extends javax.swing.JFrame {
         inventoryDetailArea.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
         JScrollPane detailScroll = new JScrollPane(inventoryDetailArea);
-        detailScroll.setBorder(
-                new ui.RoundedLineBorder(AppTheme.BORDER, ui.AppTheme.BORDER_THICKNESS, ui.AppTheme.BORDER_RADIUS));
+        detailScroll.setBorder(new ui.RoundedLineBorder(AppTheme.BORDER, ui.AppTheme.BORDER_THICKNESS, ui.AppTheme.BORDER_RADIUS));
         detailScroll.getViewport().setBackground(AppTheme.BG_PRIMARY);
         detailCard.add(detailScroll, BorderLayout.CENTER);
 
@@ -1135,7 +1091,7 @@ public class POSSystem extends javax.swing.JFrame {
         contentPanel.add(jPanelInventory, "Inventory");
 
         // ═══════════════════════════════════════════════════════════
-        // MONITORING TAB (redesigned MonitoringPanel)
+        //  MONITORING TAB (redesigned MonitoringPanel)
         // ═══════════════════════════════════════════════════════════
         monitoringPanel = new MonitoringPanel();
         monitoringPanel.setBackground(AppTheme.BG_PRIMARY);
@@ -1144,11 +1100,9 @@ public class POSSystem extends javax.swing.JFrame {
         // Other tabs
         try {
             contentPanel.add(new MenuMaintenancePanel(), "Menu Maintenance");
-        } catch (Exception e) {
-            System.err.println("MenuMaintenancePanel init failed: " + e.getMessage());
-        }
+        } catch (Exception e) { System.err.println("MenuMaintenancePanel init failed: " + e.getMessage()); }
         try {
-            contentPanel.add(new InventoryRegistrationPanel(
+                contentPanel.add(new InventoryRegistrationPanel(
                     new SQLiteInventoryRepository(),
                     this::loadInventoryTable,
                     () -> {
@@ -1156,19 +1110,10 @@ public class POSSystem extends javax.swing.JFrame {
                             monitoringPanel.refreshData();
                         }
                     }), "Register Product");
-        } catch (Exception e) {
-            System.err.println("InventoryRegistrationPanel init failed: " + e.getMessage());
-        }
+        } catch (Exception e) { System.err.println("InventoryRegistrationPanel init failed: " + e.getMessage()); }
         try {
-            contentPanel.add(new StaffPanel(
-                    new SQLiteStaffShiftRepository(),
-                    new SQLiteUserRepository(),
-                    currentUsername,
-                    currentUserRole,
-                    new SQLiteProfilePictureRepository()), "Staff");
-        } catch (Exception e) {
-            System.err.println("StaffPanel init failed: " + e.getMessage());
-        }
+            contentPanel.add(new StaffPanel(new SQLiteStaffShiftRepository(), new SQLiteUserRepository(), currentUsername, currentUserRole), "Staff");
+        } catch (Exception e) { System.err.println("StaffPanel init failed: " + e.getMessage()); }
         contentPanel.add(new InventoryGuidePanel(), "Inventory Guide");
         contentPanel.add(new AboutModule(), "About");
         contentPanel.add(new HelpModule(), "Help");
@@ -1206,11 +1151,9 @@ public class POSSystem extends javax.swing.JFrame {
             double change = cash - total;
             jTextFieldChange.setText(String.format("\u20B1%.2f", change));
             JOptionPane.showMessageDialog(this,
-                    "Payment Successful!\nSubtotal: " + jTextFieldSubTotal.getText() + "\nVAT (12%): "
-                            + jTextFieldTax.getText()
-                            + "\nTotal: " + jTextFieldTotal.getText() + "\nCash: \u20B1" + String.format("%.2f", cash)
-                            + "\nChange: \u20B1" + String.format("%.2f", change),
-                    "Success", JOptionPane.INFORMATION_MESSAGE);
+                "Payment Successful!\nSubtotal: " + jTextFieldSubTotal.getText() + "\nVAT (12%): " + jTextFieldTax.getText()
+                + "\nTotal: " + jTextFieldTotal.getText() + "\nCash: \u20B1" + String.format("%.2f", cash)
+                + "\nChange: \u20B1" + String.format("%.2f", change), "Success", JOptionPane.INFORMATION_MESSAGE);
             return true;
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Please Enter Cash Amount.", "Error", JOptionPane.ERROR_MESSAGE);
@@ -1232,7 +1175,7 @@ public class POSSystem extends javax.swing.JFrame {
             }
         }
         if (!found) {
-            model.addRow(new Object[] { productName, 1, price });
+            model.addRow(new Object[]{productName, 1, price});
         }
         ItemCost();
     }
@@ -1264,7 +1207,7 @@ public class POSSystem extends javax.swing.JFrame {
             }
             String qtyDisplay = row.getQuantity() + " " + row.getUnit();
             String alertDisplay = row.getAlertLevel() + " " + row.getUnit();
-            model.addRow(new Object[] { row.getName(), qtyDisplay, alertDisplay, row, row.getStatus(), "..." });
+            model.addRow(new Object[]{row.getName(), qtyDisplay, alertDisplay, row, row.getStatus(), "..."});
         }
 
         if (model.getRowCount() > 0) {
@@ -1287,11 +1230,11 @@ public class POSSystem extends javax.swing.JFrame {
         }
 
         String haystack = String.join(" ",
-                row.getName(),
-                row.getUnit(),
-                row.getStatus(),
-                safeText(row.getCategories()),
-                safeText(row.getLastUpdated())).toLowerCase();
+            row.getName(),
+            row.getUnit(),
+            row.getStatus(),
+            safeText(row.getCategories()),
+            safeText(row.getLastUpdated())).toLowerCase();
         return haystack.contains(query);
     }
 
@@ -1330,16 +1273,14 @@ public class POSSystem extends javax.swing.JFrame {
 
     private void chooseHotOrIced(String rawProductName) {
         String productName = rawProductName;
-        Object[] options = { "Hot", "Regular Iced", "Large Iced" };
+        Object[] options = {"Hot", "Regular Iced", "Large Iced"};
         int choice = JOptionPane.showOptionDialog(this, "Choose variant for " + productName + ":", "Choose Variant",
-                JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
-        if (choice == JOptionPane.CLOSED_OPTION || choice < 0)
-            return;
+            JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+        if (choice == JOptionPane.CLOSED_OPTION || choice < 0) return;
         String variant = options[choice].toString();
         String displayName = productName + " (" + variant + ")";
         double price = Menu.getInstance().getPrice(productName, variant);
-        if (price > 0)
-            addItem(displayName, price);
+        if (price > 0) addItem(displayName, price);
     }
 
     // ─── Event handlers ─────────────────────────────────────────
@@ -1383,7 +1324,9 @@ public class POSSystem extends javax.swing.JFrame {
     }
 
     private void exitActionPerformed(java.awt.event.ActionEvent evt) {
-        attemptExit();
+        int option = JOptionPane.showConfirmDialog(this, "Do you want to exit?",
+            "Better Mondays Coffeee Cafe Management System", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+        if (option == JOptionPane.YES_OPTION) System.exit(0);
     }
 
     private static int transactionCounter = loadTransactionCounter();
@@ -1394,8 +1337,7 @@ public class POSSystem extends javax.swing.JFrame {
 
     private void payActionPerformed(java.awt.event.ActionEvent evt) {
         boolean paymentSuccess = Change();
-        if (!paymentSuccess)
-            return;
+        if (!paymentSuccess) return;
 
         DefaultTableModel orderModel = (DefaultTableModel) jTable1.getModel();
         Inventory inv = Inventory.getInstance();
@@ -1427,33 +1369,29 @@ public class POSSystem extends javax.swing.JFrame {
 
         String transactionRef = nextTransactionRef();
         try {
-            if (orderController == null)
-                orderController = new OrderController(new SQLiteSalesRepository());
+            if (orderController == null) orderController = new OrderController(new SQLiteSalesRepository());
             orderController.persistCompletedTransaction(transactionRef, salesList, subTotal, cash, change);
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Unable to save sales to database: " + e.getMessage(), "Database",
-                    JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Unable to save sales to database: " + e.getMessage(), "Database", JOptionPane.WARNING_MESSAGE);
         }
 
         String lineSep = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
         String receiptStr = " ☕ Better Mondays Cafe ☕\n 123 Main St., Manila\n VAT REG TIN: 123-456-789\n" + lineSep
-                + "Date: " + new SimpleDateFormat("MM/dd/yyyy HH:mm").format(new Date()) + "\n"
-                + "Txn #: " + transactionRef + "\n" + lineSep
-                + String.format("%-15s %3s %8s\n", "ITEM", "QTY", "AMOUNT") + "───────────────────────────────\n";
+            + "Date: " + new SimpleDateFormat("MM/dd/yyyy HH:mm").format(new Date()) + "\n"
+            + "Txn #: " + transactionRef + "\n" + lineSep
+            + String.format("%-15s %3s %8s\n", "ITEM", "QTY", "AMOUNT") + "───────────────────────────────\n";
         for (SalesRecord s : salesList) {
-            receiptStr += String.format("%-15s %3d %8.2f\n", truncate(s.getProductName(), 15), s.getQuantity(),
-                    s.getTotal());
+            receiptStr += String.format("%-15s %3d %8.2f\n", truncate(s.getProductName(), 15), s.getQuantity(), s.getTotal());
         }
         receiptStr += "───────────────────────────────\n"
-                + String.format("%-23s %8.2f\n", "Subtotal (excl VAT):", subTotal / 1.12)
-                + String.format("%-23s %8.2f\n", "VAT (12%):", subTotal * 0.12 / 1.12)
-                + String.format("%-23s %8.2f\n", "TOTAL (incl VAT):", subTotal)
-                + String.format("%-23s %8.2f\n", "Cash:", cash)
-                + String.format("%-23s %8.2f\n", "Change:", change) + lineSep
-                + " Thank you! Come again!\n *** Have a nice day ***\n";
+            + String.format("%-23s %8.2f\n", "Subtotal (excl VAT):", subTotal / 1.12)
+            + String.format("%-23s %8.2f\n", "VAT (12%):", subTotal * 0.12 / 1.12)
+            + String.format("%-23s %8.2f\n", "TOTAL (incl VAT):", subTotal)
+            + String.format("%-23s %8.2f\n", "Cash:", cash)
+            + String.format("%-23s %8.2f\n", "Change:", change) + lineSep
+            + " Thank you! Come again!\n *** Have a nice day ***\n";
 
-        JOptionPane.showMessageDialog(this, receiptStr, "✅ RECEIPT - " + transactionRef,
-                JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(this, receiptStr, "✅ RECEIPT - " + transactionRef, JOptionPane.INFORMATION_MESSAGE);
 
         orderModel.setRowCount(0);
         jTextFieldChange.setText("");
@@ -1468,9 +1406,9 @@ public class POSSystem extends javax.swing.JFrame {
 
     private static int loadTransactionCounter() {
         try (Connection conn = persistence.AppDatabase.openConnection();
-                PreparedStatement ps = conn.prepareStatement(
-                        "SELECT transaction_ref FROM sales_transactions ORDER BY id DESC LIMIT 1");
-                ResultSet rs = ps.executeQuery()) {
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT transaction_ref FROM sales_transactions ORDER BY id DESC LIMIT 1");
+             ResultSet rs = ps.executeQuery()) {
             if (rs.next()) {
                 String ref = rs.getString(1);
                 return parseTransactionNumber(ref);
@@ -1481,11 +1419,9 @@ public class POSSystem extends javax.swing.JFrame {
     }
 
     private static int parseTransactionNumber(String ref) {
-        if (ref == null)
-            return 1000;
+        if (ref == null) return 1000;
         String digits = ref.replaceAll("\\D", "");
-        if (digits.isEmpty())
-            return 1000;
+        if (digits.isEmpty()) return 1000;
         try {
             return Integer.parseInt(digits);
         } catch (NumberFormatException ex) {
@@ -1499,8 +1435,7 @@ public class POSSystem extends javax.swing.JFrame {
     }
 
     private void filterInventoryTable(String query) {
-        if (inventoryTable == null)
-            return;
+        if (inventoryTable == null) return;
         DefaultTableModel model = (DefaultTableModel) inventoryTable.getModel();
         model.setRowCount(0);
         if (inventoryController == null) {
@@ -1512,7 +1447,7 @@ public class POSSystem extends javax.swing.JFrame {
                     || row.getName().toLowerCase().contains(query.toLowerCase())) {
                 String qtyDisplay = row.getQuantity() + " " + row.getUnit();
                 String alertDisplay = row.getAlertLevel() + " " + row.getUnit();
-                model.addRow(new Object[] { row.getName(), qtyDisplay, alertDisplay, row, row.getStatus(), "..." });
+                model.addRow(new Object[]{row.getName(), qtyDisplay, alertDisplay, row, row.getStatus(), "..."});
             }
         }
     }
@@ -1546,8 +1481,7 @@ public class POSSystem extends javax.swing.JFrame {
         public java.awt.Component getTableCellRendererComponent(JTable table, Object value,
                 boolean isSelected, boolean hasFocus, int row, int column) {
             java.awt.Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-            if (!(c instanceof JLabel label))
-                return c;
+            if (!(c instanceof JLabel label)) return c;
             label.setHorizontalAlignment(SwingConstants.CENTER);
 
             String text = "—";
@@ -1559,27 +1493,22 @@ public class POSSystem extends javax.swing.JFrame {
                     int expired = 0, expiring = 0, active = 0;
                     java.time.LocalDate today = java.time.LocalDate.now();
                     for (inventory.InventoryBatch b : batches) {
-                        if (b.isArchived())
-                            continue;
+                        if (b.isArchived()) continue;
                         active++;
                         String exp = b.getExpiryDate();
-                        if (exp == null || exp.isBlank())
-                            continue;
+                        if (exp == null || exp.isBlank()) continue;
                         try {
                             java.time.LocalDate d = java.time.LocalDate.parse(exp);
-                            if (!d.isAfter(today))
-                                expired++;
-                            else if (!d.isAfter(today.plusDays(7)))
-                                expiring++;
-                        } catch (Exception ignored) {
-                        }
+                            if (!d.isAfter(today))                 expired++;
+                            else if (!d.isAfter(today.plusDays(7))) expiring++;
+                        } catch (Exception ignored) {}
                     }
                     if (expired > 0) {
                         text = "⚠ " + expired + " expired";
-                        fg = new Color(200, 50, 50);
+                        fg   = new Color(200, 50, 50);
                     } else if (expiring > 0) {
                         text = "⚠ " + expiring + " expiring";
-                        fg = new Color(200, 160, 40);
+                        fg   = new Color(200, 160, 40);
                     } else if (active > 0) {
                         text = active + " batch" + (active == 1 ? "" : "es");
                     }
@@ -1587,8 +1516,7 @@ public class POSSystem extends javax.swing.JFrame {
             }
 
             label.setText(text);
-            if (!isSelected)
-                label.setForeground(fg);
+            if (!isSelected) label.setForeground(fg);
             return label;
         }
     }
@@ -1618,8 +1546,7 @@ public class POSSystem extends javax.swing.JFrame {
             panel.addMouseListener(new java.awt.event.MouseAdapter() {
                 @Override
                 public void mouseClicked(java.awt.event.MouseEvent e) {
-                    if (editingRow < 0)
-                        return;
+                    if (editingRow < 0) return;
                     String itemName = inventoryTable.getValueAt(editingRow, 0).toString();
                     JPopupMenu menu = new JPopupMenu();
                     JMenuItem editItem = new JMenuItem("Edit");
@@ -1637,8 +1564,7 @@ public class POSSystem extends javax.swing.JFrame {
                                 JOptionPane.YES_NO_OPTION);
                         if (confirm == JOptionPane.YES_OPTION) {
                             if (inventoryController == null)
-                                inventoryController = new InventoryController(Inventory.getInstance(),
-                                        new SQLiteInventoryRepository());
+                                inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
                             inventoryController.removeItem(itemName);
                             loadInventoryTable();
                         }
@@ -1651,9 +1577,7 @@ public class POSSystem extends javax.swing.JFrame {
         }
 
         @Override
-        public Object getCellEditorValue() {
-            return "...";
-        }
+        public Object getCellEditorValue() { return "..."; }
 
         @Override
         public java.awt.Component getTableCellEditorComponent(JTable table, Object value,
@@ -1689,35 +1613,26 @@ public class POSSystem extends javax.swing.JFrame {
         Font fieldFont = new Font("Segoe UI", Font.PLAIN, 13);
 
         // Item name (read-only)
-        gc.gridx = 0;
-        gc.gridy = 0;
-        gc.weightx = 0;
+        gc.gridx = 0; gc.gridy = 0; gc.weightx = 0;
         JLabel nameLabel = new JLabel("Item:");
         nameLabel.setFont(labelFont);
         nameLabel.setForeground(AppTheme.FG_MUTED);
         content.add(nameLabel, gc);
 
-        gc.gridx = 1;
-        gc.weightx = 1;
-        gc.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gc.gridx = 1; gc.weightx = 1; gc.fill = java.awt.GridBagConstraints.HORIZONTAL;
         JLabel nameValue = new JLabel(item.getName());
         nameValue.setFont(new Font("Segoe UI", Font.BOLD, 13));
         nameValue.setForeground(AppTheme.FG_PRIMARY);
         content.add(nameValue, gc);
 
         // Quantity field
-        gc.gridx = 0;
-        gc.gridy = 1;
-        gc.weightx = 0;
-        gc.fill = java.awt.GridBagConstraints.NONE;
+        gc.gridx = 0; gc.gridy = 1; gc.weightx = 0; gc.fill = java.awt.GridBagConstraints.NONE;
         JLabel qtyLabel = new JLabel("Quantity:");
         qtyLabel.setFont(labelFont);
         qtyLabel.setForeground(AppTheme.FG_MUTED);
         content.add(qtyLabel, gc);
 
-        gc.gridx = 1;
-        gc.weightx = 1;
-        gc.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gc.gridx = 1; gc.weightx = 1; gc.fill = java.awt.GridBagConstraints.HORIZONTAL;
         JTextField qtyField = new JTextField(String.valueOf(item.getQuantity()), 12);
         qtyField.setFont(fieldFont);
         qtyField.setBorder(BorderFactory.createCompoundBorder(
@@ -1726,18 +1641,13 @@ public class POSSystem extends javax.swing.JFrame {
         content.add(qtyField, gc);
 
         // Alert level field
-        gc.gridx = 0;
-        gc.gridy = 2;
-        gc.weightx = 0;
-        gc.fill = java.awt.GridBagConstraints.NONE;
+        gc.gridx = 0; gc.gridy = 2; gc.weightx = 0; gc.fill = java.awt.GridBagConstraints.NONE;
         JLabel alertLabel = new JLabel("Alert Level:");
         alertLabel.setFont(labelFont);
         alertLabel.setForeground(AppTheme.FG_MUTED);
         content.add(alertLabel, gc);
 
-        gc.gridx = 1;
-        gc.weightx = 1;
-        gc.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gc.gridx = 1; gc.weightx = 1; gc.fill = java.awt.GridBagConstraints.HORIZONTAL;
         JTextField alertField = new JTextField(String.valueOf(item.getAlertLevel()), 12);
         alertField.setFont(fieldFont);
         alertField.setBorder(BorderFactory.createCompoundBorder(
@@ -1782,16 +1692,14 @@ public class POSSystem extends javax.swing.JFrame {
                 Double.parseDouble(qtyText);
                 Double.parseDouble(alertText);
             } catch (NumberFormatException ex) {
-                javax.swing.JOptionPane.showMessageDialog(dialog,
-                        "Please enter valid numbers for Quantity and Alert Level.");
+                javax.swing.JOptionPane.showMessageDialog(dialog, "Please enter valid numbers for Quantity and Alert Level.");
                 return;
             }
             if (inventoryController == null)
                 inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
             inventoryController.updateItem(itemName, itemName, qtyText, item.getUnit(), alertText);
             loadInventoryTable();
-            if (monitoringPanel != null)
-                monitoringPanel.refreshData();
+            if (monitoringPanel != null) monitoringPanel.refreshData();
             dialog.dispose();
         });
 
@@ -1828,12 +1736,8 @@ public class POSSystem extends javax.swing.JFrame {
             details.append("Quantity: ").append(row.getQuantity()).append(' ').append(row.getUnit()).append('\n');
             details.append("Alert Level: ").append(row.getAlertLevel()).append(' ').append(row.getUnit()).append('\n');
             details.append("Status: ").append(row.getStatus()).append('\n');
-            details.append("Updated: ").append(
-                    row.getLastUpdated() == null || row.getLastUpdated().isBlank() ? "N/A" : row.getLastUpdated())
-                    .append('\n');
-            details.append("Categories: ")
-                    .append(row.getCategories() == null || row.getCategories().isBlank() ? "N/A" : row.getCategories())
-                    .append('\n');
+            details.append("Updated: ").append(row.getLastUpdated() == null || row.getLastUpdated().isBlank() ? "N/A" : row.getLastUpdated()).append('\n');
+                details.append("Categories: ").append(row.getCategories() == null || row.getCategories().isBlank() ? "N/A" : row.getCategories()).append('\n');
             inventoryDetailArea.setText(details.toString());
             inventoryDetailArea.setCaretPosition(0);
             return;
@@ -1857,14 +1761,12 @@ public class POSSystem extends javax.swing.JFrame {
         }
         try {
             String newName = JOptionPane.showInputDialog(this, "Enter new name:", item.getName());
-            if (newName == null || newName.trim().isEmpty())
-                return;
+            if (newName == null || newName.trim().isEmpty()) return;
             newName = newName.trim();
             String quantityStr = JOptionPane.showInputDialog(this, "Enter new quantity:", item.getQuantity());
             String unit = JOptionPane.showInputDialog(this, "Enter new unit:", item.getUnit());
             String alertStr = JOptionPane.showInputDialog(this, "Enter new alert level:", item.getAlertLevel());
-            if (inventoryController == null)
-                inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
+            if (inventoryController == null) inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
             inventoryController.updateItem(currentName.trim(), newName, quantityStr, unit, alertStr);
             loadInventoryTable();
             monitoringPanel.refreshData();
@@ -1881,11 +1783,9 @@ public class POSSystem extends javax.swing.JFrame {
             return;
         }
         String name = inventoryTable.getValueAt(selectedRow, 0).toString().trim();
-        int confirm = JOptionPane.showConfirmDialog(this, "Remove " + name + " from inventory?", "Confirm",
-                JOptionPane.YES_NO_OPTION);
+        int confirm = JOptionPane.showConfirmDialog(this, "Remove " + name + " from inventory?", "Confirm", JOptionPane.YES_NO_OPTION);
         if (confirm == JOptionPane.YES_OPTION) {
-            if (inventoryController == null)
-                inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
+            if (inventoryController == null) inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
             inventoryController.removeItem(name);
             loadInventoryTable();
         }
@@ -1899,23 +1799,18 @@ public class POSSystem extends javax.swing.JFrame {
                 return;
             }
             String quantityStr = JOptionPane.showInputDialog(this, "Enter quantity:");
-            if (quantityStr == null || quantityStr.trim().isEmpty())
-                return;
+            if (quantityStr == null || quantityStr.trim().isEmpty()) return;
             String unit = JOptionPane.showInputDialog(this, "Enter unit (e.g., kg, pcs):");
-            if (unit == null || unit.trim().isEmpty())
-                return;
+            if (unit == null || unit.trim().isEmpty()) return;
             String alertStr = JOptionPane.showInputDialog(this, "Enter alert level:");
-            if (alertStr == null || alertStr.trim().isEmpty())
-                return;
-            if (inventoryController == null)
-                inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
+            if (alertStr == null || alertStr.trim().isEmpty()) return;
+            if (inventoryController == null) inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
             inventoryController.addItem(name, quantityStr, unit, alertStr);
             loadInventoryTable();
             monitoringPanel.refreshData();
             JOptionPane.showMessageDialog(this, "Item added successfully!");
         } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this,
-                    "Invalid number entered. Please enter valid numeric values for quantity and alert level.");
+            JOptionPane.showMessageDialog(this, "Invalid number entered. Please enter valid numeric values for quantity and alert level.");
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "An unexpected error occurred: " + e.getMessage());
         }

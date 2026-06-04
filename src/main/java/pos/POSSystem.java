@@ -29,6 +29,8 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Insets;
 import java.awt.RenderingHints;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -61,6 +63,7 @@ import ui.AppTheme;
 import ui.CardPanel;
 import ui.SidebarPanel;
 import persistence.sqlite.SQLiteInventoryRepository;
+import persistence.sqlite.SQLiteProfilePictureRepository;
 import persistence.sqlite.SQLiteStaffShiftRepository;
 import persistence.sqlite.SQLiteSalesRepository;
 import persistence.sqlite.SQLiteUserRepository;
@@ -216,6 +219,13 @@ public class POSSystem extends javax.swing.JFrame {
         monitoringPanel = new MonitoringPanel();
 
         AppTheme.applyToFrame(this);
+        setDefaultCloseOperation(javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE);
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                attemptExit();
+            }
+        });
 
         // Re-apply ordering category pill styles after the global theme
         // because `AppTheme.applyToFrame` overrides JButton backgrounds.
@@ -257,6 +267,31 @@ public class POSSystem extends javax.swing.JFrame {
 
         java.awt.EventQueue.invokeLater(() -> new Login().setVisible(true));
         dispose();
+    }
+
+    private void attemptExit() {
+        int option = JOptionPane.showConfirmDialog(this, "Do you want to exit?",
+                "Better Mondays Coffeee Cafe Management System",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE);
+        if (option != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        try {
+            persistence.StaffShiftRepository shiftRepo = new persistence.sqlite.SQLiteStaffShiftRepository();
+            shiftRepo.endShift(currentUsername, "Auto-ended on exit");
+        } catch (Exception e) {
+            java.util.logging.Logger.getLogger(POSSystem.class.getName())
+                    .log(java.util.logging.Level.WARNING,
+                            "Could not auto-end shift for " + currentUsername, e);
+            JOptionPane.showMessageDialog(this,
+                    "The application will exit, but the current shift could not be ended automatically.\n"
+                            + e.getMessage(),
+                    "Shift Warning", JOptionPane.WARNING_MESSAGE);
+        }
+
+        System.exit(0);
     }
 
     // ─── Category display (legacy, kept for compatibility) ──────
@@ -1125,8 +1160,12 @@ public class POSSystem extends javax.swing.JFrame {
             System.err.println("InventoryRegistrationPanel init failed: " + e.getMessage());
         }
         try {
-            contentPanel.add(new StaffPanel(new SQLiteStaffShiftRepository(), new SQLiteUserRepository(),
-                    currentUsername, currentUserRole), "Staff");
+            contentPanel.add(new StaffPanel(
+                    new SQLiteStaffShiftRepository(),
+                    new SQLiteUserRepository(),
+                    currentUsername,
+                    currentUserRole,
+                    new SQLiteProfilePictureRepository()), "Staff");
         } catch (Exception e) {
             System.err.println("StaffPanel init failed: " + e.getMessage());
         }
@@ -1344,11 +1383,7 @@ public class POSSystem extends javax.swing.JFrame {
     }
 
     private void exitActionPerformed(java.awt.event.ActionEvent evt) {
-        int option = JOptionPane.showConfirmDialog(this, "Do you want to exit?",
-                "Better Mondays Coffeee Cafe Management System", JOptionPane.YES_NO_OPTION,
-                JOptionPane.QUESTION_MESSAGE);
-        if (option == JOptionPane.YES_OPTION)
-            System.exit(0);
+        attemptExit();
     }
 
     private static int transactionCounter = loadTransactionCounter();

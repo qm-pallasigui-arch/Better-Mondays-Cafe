@@ -29,9 +29,18 @@ public final class LegacyUserMigration {
             return 0;
         }
 
+        try (Connection connection = AppDatabase.openConnection()) {
+            return migrateUsersFile(connection, filePath);
+        }
+    }
+
+    public static int migrateUsersFile(Connection connection, Path filePath) throws Exception {
+        if (!Files.exists(filePath) || Files.size(filePath) == 0) {
+            return 0;
+        }
+
         int imported = 0;
-        try (Connection connection = AppDatabase.openConnection();
-             BufferedReader reader = new BufferedReader(new FileReader(filePath.toFile()))) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(filePath.toFile()))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 line = line.trim();

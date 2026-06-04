@@ -29,6 +29,14 @@ public class Login extends javax.swing.JFrame {
                 .map(UserAccount::getUsername)
                 .collect(Collectors.toList()));
         AppTheme.applyToFrame(this);
+
+        if (UserDataManager.listUsers().isEmpty()) {
+            javax.swing.JOptionPane.showMessageDialog(this,
+                    "No user accounts were found. A default admin account has been created:\n"
+                            + "Username: admin\nPassword: Admin123!",
+                    "Initial Account Created",
+                    javax.swing.JOptionPane.INFORMATION_MESSAGE);
+        }
     }
 
     // <editor-fold defaultstate="collapsed" desc="Generated

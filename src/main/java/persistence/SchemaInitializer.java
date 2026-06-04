@@ -24,6 +24,11 @@ public final class SchemaInitializer {
                                         + "role TEXT NOT NULL, "
                                         + "created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
                                         + ")");
+                        statement.execute("CREATE TABLE IF NOT EXISTS profile_pictures ("
+                                        + "username TEXT PRIMARY KEY, "
+                                        + "image_data BLOB NOT NULL, "
+                                        + "FOREIGN KEY(username) REFERENCES users(username) ON DELETE CASCADE"
+                                        + ")");
                         statement.execute("CREATE TABLE IF NOT EXISTS menu_items ("
                                         + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
                                         + "name TEXT NOT NULL UNIQUE, "
@@ -56,11 +61,12 @@ public final class SchemaInitializer {
                                         + "last_updated TEXT NOT NULL DEFAULT ''"
                                         + ")");
                         // Migration: add columns to existing databases that predate them
-                        for (String col : new String[]{"storage_location", "last_updated"}) {
-                            try {
-                                statement.execute("ALTER TABLE inventory_items ADD COLUMN " + col
-                                        + " TEXT NOT NULL DEFAULT ''");
-                            } catch (java.sql.SQLException ignored) {}
+                        for (String col : new String[] { "storage_location", "last_updated" }) {
+                                try {
+                                        statement.execute("ALTER TABLE inventory_items ADD COLUMN " + col
+                                                        + " TEXT NOT NULL DEFAULT ''");
+                                } catch (java.sql.SQLException ignored) {
+                                }
                         }
                         // Batches allow tracking SKU, expiry dates and per-batch quantities for FEFO
                         // logic
@@ -76,8 +82,10 @@ public final class SchemaInitializer {
                                         + ")");
                         // Migration: add archived column to existing databases
                         try {
-                            statement.execute("ALTER TABLE inventory_batches ADD COLUMN archived INTEGER NOT NULL DEFAULT 0");
-                        } catch (java.sql.SQLException ignored) {}
+                                statement.execute(
+                                                "ALTER TABLE inventory_batches ADD COLUMN archived INTEGER NOT NULL DEFAULT 0");
+                        } catch (java.sql.SQLException ignored) {
+                        }
                         statement.execute("CREATE TABLE IF NOT EXISTS sales_records ("
                                         + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
                                         + "product_name TEXT NOT NULL, "

@@ -17,7 +17,8 @@ import util.StringUtil;
 
 /**
  * Central database entry point for the local SQLite store.
- * This is the storage seam that later can be swapped for Firebase-backed repositories.
+ * This is the storage seam that later can be swapped for Firebase-backed
+ * repositories.
  */
 public final class AppDatabase {
 
@@ -49,9 +50,32 @@ public final class AppDatabase {
 
         try (Connection connection = openRawConnection()) {
             SchemaInitializer.initialize(connection);
+            try {
+                LegacyUserMigration.migrateUsersFile(connection, Paths.get("data", "users.txt"));
+            } catch (Exception e) {
+                throw new SQLException("Unable to migrate legacy users", e);
+            }
+            bootstrapAdminIfEmpty(connection);
             consolidateInventoryItemNames(connection);
         }
         initialized = true;
+    }
+
+    private static void bootstrapAdminIfEmpty(Connection connection) throws SQLException {
+        try (PreparedStatement countStmt = connection.prepareStatement("SELECT COUNT(*) FROM users")) {
+            try (ResultSet rs = countStmt.executeQuery()) {
+                if (rs.next() && rs.getInt(1) == 0) {
+                    String defaultPasswordHash = loginregister.PasswordHasher.hashPassword("Admin123!");
+                    try (PreparedStatement insertStmt = connection.prepareStatement(
+                            "INSERT INTO users(username, password_hash, role) VALUES (?, ?, ?)")) {
+                        insertStmt.setString(1, "admin");
+                        insertStmt.setString(2, defaultPasswordHash);
+                        insertStmt.setString(3, "ADMIN");
+                        insertStmt.executeUpdate();
+                    }
+                }
+            }
+        }
     }
 
     private static Connection openRawConnection() throws SQLException {
@@ -68,7 +92,8 @@ public final class AppDatabase {
             String storageLocation;
             String lastUpdated;
 
-            InventoryRow(long id, String name, double quantity, String unit, double alertLevel, String storageLocation, String lastUpdated) {
+            InventoryRow(long id, String name, double quantity, String unit, double alertLevel, String storageLocation,
+                    String lastUpdated) {
                 this.id = id;
                 this.name = name;
                 this.quantity = quantity;
@@ -82,7 +107,7 @@ public final class AppDatabase {
         Map<String, List<InventoryRow>> groups = new LinkedHashMap<>();
         try (PreparedStatement statement = connection.prepareStatement(
                 "SELECT id, name, quantity, unit, alert_level, storage_location, last_updated FROM inventory_items ORDER BY id");
-             ResultSet resultSet = statement.executeQuery()) {
+                ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
                 InventoryRow row = new InventoryRow(
                         resultSet.getLong("id"),
@@ -116,10 +141,12 @@ public final class AppDatabase {
                 if ((unit == null || unit.isBlank()) && row.unit != null && !row.unit.isBlank()) {
                     unit = row.unit;
                 }
-                if ((storageLocation == null || storageLocation.isBlank()) && row.storageLocation != null && !row.storageLocation.isBlank()) {
+                if ((storageLocation == null || storageLocation.isBlank()) && row.storageLocation != null
+                        && !row.storageLocation.isBlank()) {
                     storageLocation = row.storageLocation;
                 }
-                if ((lastUpdated == null || lastUpdated.isBlank()) && row.lastUpdated != null && !row.lastUpdated.isBlank()) {
+                if ((lastUpdated == null || lastUpdated.isBlank()) && row.lastUpdated != null
+                        && !row.lastUpdated.isBlank()) {
                     lastUpdated = row.lastUpdated;
                 }
             }

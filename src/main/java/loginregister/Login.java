@@ -287,6 +287,14 @@ public class Login extends javax.swing.JFrame {
         }
         //</editor-fold>
 
+        /* Seed DB and fix default credentials before showing login */
+        try {
+            persistence.Phase2Bootstrap.seedCatalogIfEmpty();
+        } catch (Exception ex) {
+            java.util.logging.Logger.getLogger(Login.class.getName())
+                    .log(java.util.logging.Level.WARNING, "Bootstrap warning: " + ex.getMessage(), ex);
+        }
+
         /* Create and display the form */
         java.awt.EventQueue.invokeLater(new Runnable() {
             public void run() {

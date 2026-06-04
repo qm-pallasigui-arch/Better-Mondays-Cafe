@@ -36,8 +36,13 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
             statement.setString(3, role.name());
             statement.executeUpdate();
         }
-        // Ensure staff_id is set (won't overwrite if already assigned)
-        assignStaffIdIfMissing(username);
+        // Set staff_id = id on the same connection if it is still 0
+        try (Connection connection = AppDatabase.openConnection();
+             PreparedStatement fix = connection.prepareStatement(
+                     "UPDATE users SET staff_id = id WHERE username = ? AND staff_id = 0")) {
+            fix.setString(1, username);
+            fix.executeUpdate();
+        }
     }
 
     @Override
@@ -45,42 +50,28 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
             String fullName, int age, String birthdate,
             String address, String mobile, String gender) throws Exception {
         String passwordHash = PasswordHasher.hashPassword(plainPassword);
-        try (Connection connection = AppDatabase.openConnection();
-             PreparedStatement stmt = connection.prepareStatement(
+        try (Connection connection = AppDatabase.openConnection()) {
+            // Insert the row first (staff_id defaults to 0 temporarily)
+            try (PreparedStatement stmt = connection.prepareStatement(
                      "INSERT INTO users(username, password_hash, role, full_name, age, birthdate, address, mobile, gender) "
                      + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
-            stmt.setString(1, username);
-            stmt.setString(2, passwordHash);
-            stmt.setString(3, role.name());
-            stmt.setString(4, fullName);
-            stmt.setInt(5, age);
-            stmt.setString(6, birthdate);
-            stmt.setString(7, address);
-            stmt.setString(8, mobile);
-            stmt.setString(9, gender);
-            stmt.executeUpdate();
-        }
-        assignStaffIdIfMissing(username);
-    }
-
-    private void assignStaffIdIfMissing(String username) throws Exception {
-        try (Connection connection = AppDatabase.openConnection();
-             PreparedStatement check = connection.prepareStatement(
-                     "SELECT id, staff_id FROM users WHERE username = ?")) {
-            check.setString(1, username);
-            try (java.sql.ResultSet rs = check.executeQuery()) {
-                if (rs.next()) {
-                    int staffId = rs.getInt("staff_id");
-                    int id = rs.getInt("id");
-                    if (staffId == 0) {
-                        try (PreparedStatement upd = connection.prepareStatement(
-                                "UPDATE users SET staff_id = ? WHERE username = ?")) {
-                            upd.setInt(1, id);
-                            upd.setString(2, username);
-                            upd.executeUpdate();
-                        }
-                    }
-                }
+                stmt.setString(1, username);
+                stmt.setString(2, passwordHash);
+                stmt.setString(3, role.name());
+                stmt.setString(4, fullName);
+                stmt.setInt(5, age);
+                stmt.setString(6, birthdate);
+                stmt.setString(7, address);
+                stmt.setString(8, mobile);
+                stmt.setString(9, gender);
+                stmt.executeUpdate();
+            }
+            // Immediately set staff_id = id on the same connection, so there
+            // is never a window where two rows both hold staff_id = 0
+            try (PreparedStatement fix = connection.prepareStatement(
+                     "UPDATE users SET staff_id = id WHERE username = ? AND staff_id = 0")) {
+                fix.setString(1, username);
+                fix.executeUpdate();
             }
         }
     }

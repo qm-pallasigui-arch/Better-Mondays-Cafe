@@ -13,4 +13,8 @@ public interface AccountRoleRepository {
     List<UserAccount> listUsers() throws Exception;
 
     void updateUserRole(String username, Role role) throws Exception;
+
+    void createUser(String username, String plainPassword, Role role,
+            String fullName, int age, String birthdate,
+            String address, String mobile, String gender) throws Exception;
 }

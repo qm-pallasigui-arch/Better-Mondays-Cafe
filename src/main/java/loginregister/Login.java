@@ -180,8 +180,13 @@ public class Login extends javax.swing.JFrame {
             new POSSystem(username, userRole).setVisible(true);
             this.dispose();
         } else {
+            String errorMessage = "Invalid username or password.";
+            if ("admin".equalsIgnoreCase(username) && "Admin123!".equals(password)) {
+                errorMessage += "\nIf this is a previously created admin account, the default password may no longer apply."
+                        + "\nUse Forgot Password to reset the admin password.";
+            }
             javax.swing.JOptionPane.showMessageDialog(this,
-                    "Invalid username or password.",
+                    errorMessage,
                     "Login Failed", javax.swing.JOptionPane.ERROR_MESSAGE);
         }
     }//GEN-LAST:event_jButton2ActionPerformed

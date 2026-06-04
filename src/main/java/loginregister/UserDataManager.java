@@ -34,7 +34,7 @@ public class UserDataManager {
      *
      * @param username the username
      * @param password the plaintext password (will be hashed)
-     * @param role the user role (ADMIN or STAFF)
+     * @param role     the user role (ADMIN or STAFF)
      * @throws IOException if file write fails
      */
     public static void saveUser(String username, String password, Role role) throws java.io.IOException {
@@ -58,6 +58,9 @@ public class UserDataManager {
         try {
             return USER_REPOSITORY.verifyCredentials(username, password);
         } catch (Exception e) {
+            java.util.logging.Logger.getLogger(UserDataManager.class.getName())
+                    .log(java.util.logging.Level.WARNING,
+                            "Failed to verify credentials for user: " + username, e);
             return false;
         }
     }

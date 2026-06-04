@@ -31,7 +31,7 @@ public class Login extends javax.swing.JFrame {
         if (UserDataManager.listUsers().isEmpty()) {
             javax.swing.JOptionPane.showMessageDialog(this,
                     "No user accounts were found. A default admin account has been created:\n"
-                            + "Username: admin\nPassword: Admin123!",
+                            + "Username: admin\nPassword: Admin@123",
                     "Initial Account Created",
                     javax.swing.JOptionPane.INFORMATION_MESSAGE);
         }
@@ -181,7 +181,7 @@ public class Login extends javax.swing.JFrame {
             this.dispose();
         } else {
             String errorMessage = "Invalid username or password.";
-            if ("admin".equalsIgnoreCase(username) && "Admin123!".equals(password)) {
+            if ("admin".equalsIgnoreCase(username) && "Admin@123".equals(password)) {
                 errorMessage += "\nIf this is a previously created admin account, the default password may no longer apply."
                         + "\nUse Forgot Password to reset the admin password.";
             }

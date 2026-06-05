@@ -1097,7 +1097,7 @@ public class MonitoringPanel extends JPanel {
         try (Connection conn = AppDatabase.openConnection();
                 PreparedStatement ps = conn.prepareStatement(
                         "SELECT st.id, st.transaction_ref, "
-                                + "COALESCE(st.customer_name,'') AS customer_name, "
+                                + "'' AS customer_name, "
                                 + "COALESCE(st.subtotal,0)       AS subtotal, "
                                 + "COALESCE(st.tax,0)            AS tax, "
                                 + "COALESCE(st.total,0)          AS total, "

@@ -153,6 +153,19 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
         }
     }
 
+    @Override
+    public void deleteUser(String username) throws Exception {
+        try (Connection connection = AppDatabase.openConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "DELETE FROM users WHERE username = ?")) {
+            statement.setString(1, username);
+            int affected = statement.executeUpdate();
+            if (affected == 0) {
+                throw new IllegalArgumentException("User not found");
+            }
+        }
+    }
+
     public void updateUsername(String currentUsername, String newUsername, String currentPassword) throws Exception {
         try (Connection connection = AppDatabase.openConnection();
              PreparedStatement verify = connection.prepareStatement(

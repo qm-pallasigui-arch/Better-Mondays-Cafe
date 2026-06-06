@@ -8,6 +8,7 @@ public abstract class MenuItem {
     protected double hotPrice;          
     protected double icedRegularPrice; 
     protected double icedLargePrice;   
+    protected String imagePath;
     protected Map<String, Double> ingredients;
 
     public MenuItem(String name,
@@ -40,6 +41,8 @@ public abstract class MenuItem {
     public double getHotPrice()           { return hotPrice; }
     public double getIcedRegularPrice()   { return icedRegularPrice; }
     public double getIcedLargePrice()     { return icedLargePrice; }
+    public String getImagePath()          { return imagePath; }
+    public void setImagePath(String imagePath) { this.imagePath = imagePath; }
 
     public abstract String getCategory();
 }

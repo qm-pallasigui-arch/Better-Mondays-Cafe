@@ -64,6 +64,7 @@ import persistence.sqlite.SQLiteInventoryRepository;
 import persistence.sqlite.SQLiteStaffShiftRepository;
 import persistence.sqlite.SQLiteSalesRepository;
 import persistence.sqlite.SQLiteUserRepository;
+import persistence.sqlite.SQLiteProfilePictureRepository;
 import controller.InventoryController;
 import controller.InventoryRowView;
 import controller.OrderController;
@@ -1126,7 +1127,7 @@ public class POSSystem extends javax.swing.JFrame {
         }
         try {
             contentPanel.add(new StaffPanel(new SQLiteStaffShiftRepository(), new SQLiteUserRepository(),
-                    currentUsername, currentUserRole), "Staff");
+                    new SQLiteProfilePictureRepository(), currentUsername, currentUserRole), "Staff");
         } catch (Exception e) {
             System.err.println("StaffPanel init failed: " + e.getMessage());
         }

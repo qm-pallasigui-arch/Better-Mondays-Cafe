@@ -24,14 +24,15 @@ public class SQLiteMenuRepository implements MenuRepository {
         List<MenuItem> items = new ArrayList<>();
         try (Connection connection = AppDatabase.openConnection();
              PreparedStatement statement = connection.prepareStatement(
-                     "SELECT id, name, category, hot_price, iced_regular_price, iced_large_price FROM menu_items ORDER BY name");
+                     "SELECT id, name, category, hot_price, iced_regular_price, iced_large_price, image_path FROM menu_items ORDER BY name");
              ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
                 MenuItem item = mapRow(resultSet.getString("category"),
                         resultSet.getString("name"),
                         resultSet.getDouble("hot_price"),
                         resultSet.getDouble("iced_regular_price"),
-                        resultSet.getDouble("iced_large_price"));
+                        resultSet.getDouble("iced_large_price"),
+                        resultSet.getString("image_path"));
                 item.replaceIngredients(loadIngredients(connection, resultSet.getLong("id")));
                 items.add(item);
             }
@@ -43,7 +44,7 @@ public class SQLiteMenuRepository implements MenuRepository {
     public Optional<MenuItem> findByName(String name) throws Exception {
         try (Connection connection = AppDatabase.openConnection();
              PreparedStatement statement = connection.prepareStatement(
-                     "SELECT id, name, category, hot_price, iced_regular_price, iced_large_price FROM menu_items WHERE name = ?")) {
+                     "SELECT id, name, category, hot_price, iced_regular_price, iced_large_price, image_path FROM menu_items WHERE name = ?")) {
             statement.setString(1, name);
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (!resultSet.next()) {
@@ -53,7 +54,8 @@ public class SQLiteMenuRepository implements MenuRepository {
                         resultSet.getString("name"),
                         resultSet.getDouble("hot_price"),
                         resultSet.getDouble("iced_regular_price"),
-                        resultSet.getDouble("iced_large_price"));
+                        resultSet.getDouble("iced_large_price"),
+                        resultSet.getString("image_path"));
                 item.replaceIngredients(loadIngredients(connection, resultSet.getLong("id")));
                 return Optional.of(item);
             }
@@ -66,13 +68,14 @@ public class SQLiteMenuRepository implements MenuRepository {
             connection.setAutoCommit(false);
             try {
                 try (PreparedStatement statement = connection.prepareStatement(
-                        "INSERT INTO menu_items(name, category, hot_price, iced_regular_price, iced_large_price) VALUES (?, ?, ?, ?, ?) "
-                        + "ON CONFLICT(name) DO UPDATE SET category = excluded.category, hot_price = excluded.hot_price, iced_regular_price = excluded.iced_regular_price, iced_large_price = excluded.iced_large_price")) {
+                        "INSERT INTO menu_items(name, category, hot_price, iced_regular_price, iced_large_price, image_path) VALUES (?, ?, ?, ?, ?, ?) "
+                        + "ON CONFLICT(name) DO UPDATE SET category = excluded.category, hot_price = excluded.hot_price, iced_regular_price = excluded.iced_regular_price, iced_large_price = excluded.iced_large_price, image_path = excluded.image_path")) {
                     statement.setString(1, item.getName());
                     statement.setString(2, item.getCategory());
                     statement.setDouble(3, item.getHotPrice());
                     statement.setDouble(4, item.getIcedRegularPrice());
                     statement.setDouble(5, item.getIcedLargePrice());
+                    statement.setString(6, item.getImagePath());
                     statement.executeUpdate();
                 }
 
@@ -138,13 +141,16 @@ public class SQLiteMenuRepository implements MenuRepository {
         }
     }
 
-    private MenuItem mapRow(String category, String name, double hotPrice, double regularPrice, double largePrice) {
-        return switch (category) {
+    private MenuItem mapRow(String category, String name, double hotPrice, double regularPrice, double largePrice,
+            String imagePath) {
+        MenuItem item = switch (category) {
             case "Coffee" -> new CoffeeItem(name, hotPrice, regularPrice, largePrice);
             case "Non-Coffee" -> new NonCoffeeItem(name, hotPrice, regularPrice, largePrice);
             case "Fruit Tea" -> new FruitTeaItem(name, hotPrice, regularPrice, largePrice);
             case "Herbal Tea" -> new HerbalTeaItem(name, hotPrice, regularPrice, largePrice);
             default -> new FoodItem(name, "Food", hotPrice > 0 ? hotPrice : (regularPrice > 0 ? regularPrice : largePrice));
         };
+        item.setImagePath(imagePath);
+        return item;
     }
 }

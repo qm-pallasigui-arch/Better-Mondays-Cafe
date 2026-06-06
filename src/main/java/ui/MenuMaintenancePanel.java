@@ -674,6 +674,8 @@ public class MenuMaintenancePanel extends JPanel {
             applyIngredientsToItem(edited, dlg);
             if (dlg.getImagePath() != null)
                 edited.setImagePath(dlg.getImagePath());
+            else
+                edited.setImagePath(item.getImagePath());
             if (!StringUtil.normalizeName(name).equals(StringUtil.normalizeName(dlg.getName().trim())))
                 Menu.getInstance().removeItem(name);
             Menu.getInstance().saveItem(edited);
@@ -699,6 +701,8 @@ public class MenuMaintenancePanel extends JPanel {
             return;
         try {
             Menu.getInstance().removeItem(name);
+            if (onItemSavedCallback != null)
+                onItemSavedCallback.onSaved(null);
             reload();
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Delete failed: " + e.getMessage());

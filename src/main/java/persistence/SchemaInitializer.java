@@ -56,9 +56,15 @@ public final class SchemaInitializer {
                                         + "hot_price REAL NOT NULL, "
                                         + "iced_regular_price REAL NOT NULL, "
                                         + "iced_large_price REAL NOT NULL, "
+                                        + "image_path TEXT, "
                                         + "is_available INTEGER NOT NULL DEFAULT 1"
                                         + ")");
-                        // Migration: add is_available to existing databases that predate this column
+                        // Migrations for existing databases that predate these columns
+                        try {
+                                statement.execute(
+                                                "ALTER TABLE menu_items ADD COLUMN image_path TEXT");
+                        } catch (SQLException ignored) {
+                        }
                         try {
                                 statement.execute(
                                                 "ALTER TABLE menu_items ADD COLUMN is_available INTEGER NOT NULL DEFAULT 1");

@@ -838,7 +838,7 @@ public class MenuItemDialog extends JDialog {
     private static void shake(JComponent c) {
         Point o = c.getLocation();
         int[] off = { -6, 6, -4, 4, -2, 2, 0 };
-        Timer t = new Timer(40, null);
+        javax.swing.Timer t = new javax.swing.Timer(40, null);
         int[] i = { 0 };
         t.addActionListener(e -> {
             if (i[0] >= off.length) {

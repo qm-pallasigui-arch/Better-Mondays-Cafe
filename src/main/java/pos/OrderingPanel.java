@@ -302,42 +302,21 @@ public class OrderingPanel extends JPanel {
 
     /**
      * Call this whenever a MenuItem is added or edited (especially when its
-     * imagePath changes). It clears the image cache for that specific item
+     * imagePath changes). It clears the image cache
      * and rebuilds the product grid so the new image is immediately visible.
      *
-     * @param itemName the MenuItem name (baseName) that was added/edited,
-     *                 or null to clear the entire cache and rebuild everything.
+     * @param itemName the MenuItem name that was added/edited; currently only
+     *                 used as a refresh signal.
      */
     public void onMenuItemSaved(String itemName) {
-        if (itemName == null || itemName.isBlank()) {
-            // Full cache clear — used when we don't know which item changed
-            imageCache.clear();
-        } else {
-            // Evict only the cache entries that relate to this item.
-            // Keys are stored as "category|displayName", so we match on displayName.
-            imageCache.entrySet().removeIf(entry -> {
-                String key = entry.getKey(); // "category|displayName"
-                int sep = key.indexOf('|');
-                if (sep < 0)
-                    return false;
-                String displayName = key.substring(sep + 1);
-                // Strip hot/iced prefix to get the base name for comparison
-                String base = displayName;
-                if (base.toLowerCase().startsWith("hot "))
-                    base = base.substring(4);
-                if (base.toLowerCase().startsWith("iced "))
-                    base = base.substring(5);
-                base = NAME_MAP.getOrDefault(base, base);
-                return base.equalsIgnoreCase(itemName) || displayName.equalsIgnoreCase(itemName);
-            });
-        }
+        imageCache.clear();
         SwingUtilities.invokeLater(() -> {
             syncDynamicMenuItems();
             rebuildProductGrid();
         });
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // ----------------------------------------------------------------
     // UI Construction
     // ═══════════════════════════════════════════════════════════════
 
@@ -1931,11 +1910,11 @@ public class OrderingPanel extends JPanel {
             if (!file.exists()) {
                 return null;
             }
-            ImageIcon icon = new ImageIcon(path);
-            if (icon.getIconWidth() <= 0 || icon.getIconHeight() <= 0) {
+            BufferedImage image = ImageIO.read(file);
+            if (image == null) {
                 return null;
             }
-            return icon;
+            return new ImageIcon(image);
         } catch (Exception ignored) {
             return null;
         }

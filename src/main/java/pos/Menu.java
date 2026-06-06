@@ -230,27 +230,29 @@ public class Menu {
     public void saveItem(MenuItem item) {
         String name = StringUtil.normalizeName(item.getName());
         item.name = name;
-        menuItems.put(name, item);
         try {
             repository.save(item);
         } catch (Exception e) {
             JOptionPane.showMessageDialog(null,
                     "Unable to save menu item to database: " + e.getMessage(),
                     "Database", JOptionPane.WARNING_MESSAGE);
+            throw new IllegalStateException("Unable to save menu item to database", e);
         }
+        menuItems.put(name, item);
         notifyChangeListeners();
     }
 
     public void removeItem(String name) {
         String n = StringUtil.normalizeName(name);
-        menuItems.remove(n);
         try {
             repository.delete(n);
         } catch (Exception e) {
             JOptionPane.showMessageDialog(null,
                     "Unable to remove menu item from database: " + e.getMessage(),
                     "Database", JOptionPane.WARNING_MESSAGE);
+            throw new IllegalStateException("Unable to remove menu item from database", e);
         }
+        menuItems.remove(n);
         notifyChangeListeners();
     }
 

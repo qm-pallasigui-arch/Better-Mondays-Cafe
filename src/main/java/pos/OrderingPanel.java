@@ -296,27 +296,6 @@ public class OrderingPanel extends JPanel {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // Public hook: call this after saving a menu item to refresh
-    // the ordering panel's product grid with the latest image.
-    // ═══════════════════════════════════════════════════════════════
-
-    /**
-     * Call this whenever a MenuItem is added or edited (especially when its
-     * imagePath changes). It clears the image cache
-     * and rebuilds the product grid so the new image is immediately visible.
-     *
-     * @param itemName the MenuItem name that was added/edited; currently only
-     *                 used as a refresh signal.
-     */
-    public void onMenuItemSaved(String itemName) {
-        imageCache.clear();
-        SwingUtilities.invokeLater(() -> {
-            syncDynamicMenuItems();
-            rebuildProductGrid();
-        });
-    }
-
-    // ----------------------------------------------------------------
     // UI Construction
     // ═══════════════════════════════════════════════════════════════
 
@@ -629,12 +608,8 @@ public class OrderingPanel extends JPanel {
         productGridPanel.repaint();
     }
 
-    /**
-     * Public wrapper to rebuild product grid when external data (Menu) changes.
-     * Clears the full image cache so fresh images are loaded from disk.
-     */
+    /** Public wrapper to rebuild product grid when external data (Menu) changes. */
     public void rebuildProducts() {
-        imageCache.clear();
         rebuildProductGrid();
     }
 
@@ -653,6 +628,8 @@ public class OrderingPanel extends JPanel {
                 categoryItems = new ArrayList<>();
                 CATEGORY_ITEMS.put(orderingCategory, categoryItems);
             } else if (!(categoryItems instanceof ArrayList)) {
+                // Static seeds use fixed-size lists; copy them so dynamic menu sync can append
+                // safely.
                 categoryItems = new ArrayList<>(categoryItems);
                 CATEGORY_ITEMS.put(orderingCategory, categoryItems);
             }
@@ -735,7 +712,7 @@ public class OrderingPanel extends JPanel {
         imageLabel.setMaximumSize(new Dimension(120, 160));
         imageLabel.setOpaque(true);
         imageLabel.setBackground(BG_SURFACE);
-        ImageIcon img = loadProductImage(activeCategory, spec.displayName, spec.baseName);
+        ImageIcon img = loadProductImage(activeCategory, spec.displayName);
         if (img != null) {
             imageLabel.setIcon(scaleToFit(img, 120, 160));
         } else {
@@ -1156,7 +1133,7 @@ public class OrderingPanel extends JPanel {
                 BorderFactory.createLineBorder(BORDER, 1, true),
                 new EmptyBorder(5, 6, 5, 6)));
 
-        // Thumbnail — try the item's custom image path first, then fallback
+        // Thumbnail
         JLabel thumb = new JLabel("\u2615", SwingConstants.CENTER);
         thumb.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         thumb.setForeground(FG_MUTED);
@@ -1164,7 +1141,7 @@ public class OrderingPanel extends JPanel {
         thumb.setBackground(BG_SURFACE);
         thumb.setOpaque(true);
 
-        ImageIcon img = loadProductImage(findCategory(entry.displayName), entry.displayName, entry.baseName);
+        ImageIcon img = loadProductImage(findCategory(entry.displayName), entry.displayName);
         if (img != null) {
             thumb.setText("");
             thumb.setIcon(new ImageIcon(img.getImage().getScaledInstance(26, 26, java.awt.Image.SCALE_SMOOTH)));
@@ -1218,6 +1195,7 @@ public class OrderingPanel extends JPanel {
         ql.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(BORDER, 1, true),
                 new EmptyBorder(0, 2, 0, 2)));
+        // Allow typed quantities with live validation
         ql.getDocument().addDocumentListener(new DocumentListener() {
             private void apply() {
                 String txt = ql.getText().trim();
@@ -1226,6 +1204,7 @@ public class OrderingPanel extends JPanel {
                 try {
                     int v = Integer.parseInt(txt);
                     if (v <= 0) {
+                        // remove item
                         orderEntries.remove(entry);
                         refreshOrderDisplay();
                         return;
@@ -1234,6 +1213,7 @@ public class OrderingPanel extends JPanel {
                         SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(row,
                                 "Insufficient ingredients for requested quantity.", "Unavailable",
                                 JOptionPane.WARNING_MESSAGE));
+                        // revert
                         ql.setText(String.valueOf(entry.quantity));
                         return;
                     }
@@ -1564,6 +1544,7 @@ public class OrderingPanel extends JPanel {
         sb.append("         Thank you! Come again!\n");
         sb.append("         *** Have a nice day ***\n");
 
+        // Show receipt in a dialog with Print option
         JDialog rd = new JDialog(SwingUtilities.getWindowAncestor(this), "RECEIPT - " + txnRef,
                 JDialog.ModalityType.APPLICATION_MODAL);
         rd.getContentPane().setBackground(BG_PRIMARY);
@@ -1638,6 +1619,7 @@ public class OrderingPanel extends JPanel {
         body.setBackground(BG_PRIMARY);
         body.setBorder(new EmptyBorder(16, 16, 16, 16));
 
+        // Header
         JPanel hdr = new JPanel(new BorderLayout(0, 2));
         hdr.setOpaque(false);
         JLabel oid = new JLabel("Order " + fmtOrder(co.orderId));
@@ -1650,6 +1632,7 @@ public class OrderingPanel extends JPanel {
         hdr.add(cust, BorderLayout.SOUTH);
         body.add(hdr, BorderLayout.NORTH);
 
+        // Items list
         JPanel list = new JPanel(new GridBagLayout());
         list.setOpaque(false);
         GridBagConstraints cx = new GridBagConstraints();
@@ -1682,6 +1665,7 @@ public class OrderingPanel extends JPanel {
         sp.getViewport().setBackground(BG_PRIMARY);
         body.add(sp, BorderLayout.CENTER);
 
+        // Close button
         JButton close = new JButton("Close");
         close.setFont(FONT_BODY);
         close.setForeground(Color.WHITE);
@@ -1806,64 +1790,33 @@ public class OrderingPanel extends JPanel {
     // Helpers
     // ═══════════════════════════════════════════════════════════════
 
-    /**
-     * Loads a product image for the given display name and base name.
-     *
-     * Priority order:
-     * 1. Custom absolute image path stored on the MenuItem (set via MenuItemDialog)
-     * 2. Bundled classpath images under /images/<category>/<filename>
-     *
-     * The baseName parameter is used to look up the MenuItem's custom image path.
-     * Previously, createProductCard only passed category+displayName and never
-     * resolved the baseName, so custom paths on dynamically-added items were
-     * never found. Passing baseName explicitly fixes that.
-     */
-    private ImageIcon loadProductImage(String category, String prodName, String baseName) {
+    private ImageIcon loadProductImage(String category, String prodName) {
         String key = category + "|" + prodName;
-        if (imageCache.containsKey(key)) {
-            return imageCache.get(key); // may be null (cached miss)
-        }
+        ImageIcon cached = imageCache.get(key);
+        if (cached != null)
+            return cached;
 
-        // ── Priority 1: custom image path on the MenuItem ──────────────────
-        // Try baseName first (the backend/menu name), then fall back to prodName
-        // (the display name, e.g. "Hot Latte") so both seeded and dynamic items work.
-        ImageIcon customIcon = tryLoadCustomPath(baseName);
-        if (customIcon == null && baseName != null && !baseName.equals(prodName)) {
-            customIcon = tryLoadCustomPath(prodName);
-        }
-        // Also try the display name resolved through NAME_MAP
-        if (customIcon == null) {
-            String mapped = NAME_MAP.getOrDefault(prodName, null);
-            if (mapped != null)
-                customIcon = tryLoadCustomPath(mapped);
-        }
-        if (customIcon != null) {
-            imageCache.put(key, customIcon);
-            return customIcon;
-        }
-
-        // ── Priority 2: bundled classpath images ────────────────────────────
-        String base = IMAGE_MAP.getOrDefault(prodName, prodName);
+        String baseName = IMAGE_MAP.getOrDefault(prodName, prodName);
         List<String> attempts = new ArrayList<>();
-        String lc = base.toLowerCase();
+        String lc = baseName.toLowerCase();
         if (lc.startsWith("hot ") || lc.startsWith("iced ")) {
-            attempts.add(base + ".jpg");
-            attempts.add(base + " .jpg");
-            attempts.add(base + ".png");
-            attempts.add(base + " .png");
+            attempts.add(baseName + ".jpg");
+            attempts.add(baseName + " .jpg");
+            attempts.add(baseName + ".png");
+            attempts.add(baseName + " .png");
         } else {
-            attempts.add("Hot " + base + ".jpg");
-            attempts.add("Hot " + base + " .jpg");
-            attempts.add("Iced " + base + ".jpg");
-            attempts.add("Iced " + base + " .jpg");
-            attempts.add(base + ".jpg");
-            attempts.add(base + " .jpg");
-            attempts.add(base + ".png");
-            attempts.add(base + " .png");
-            attempts.add(base.toLowerCase() + ".jpg");
-            attempts.add(base.toLowerCase() + " .jpg");
-            attempts.add(base.toLowerCase() + ".png");
-            attempts.add(base.toLowerCase() + " .png");
+            attempts.add("Hot " + baseName + ".jpg");
+            attempts.add("Hot " + baseName + " .jpg");
+            attempts.add("Iced " + baseName + ".jpg");
+            attempts.add("Iced " + baseName + " .jpg");
+            attempts.add(baseName + ".jpg");
+            attempts.add(baseName + " .jpg");
+            attempts.add(baseName + ".png");
+            attempts.add(baseName + " .png");
+            attempts.add(baseName.toLowerCase() + ".jpg");
+            attempts.add(baseName.toLowerCase() + " .jpg");
+            attempts.add(baseName.toLowerCase() + ".png");
+            attempts.add(baseName.toLowerCase() + " .png");
         }
         for (String fn : attempts) {
             try {
@@ -1876,48 +1829,11 @@ public class OrderingPanel extends JPanel {
                         return icon;
                     }
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
             }
         }
-
-        // Cache the miss so we don't retry every repaint
         imageCache.put(key, null);
         return null;
-    }
-
-    /**
-     * Looks up the MenuItem by name and attempts to load its custom image path.
-     * Returns null if the item has no custom path or the file doesn't exist/load.
-     */
-    private ImageIcon tryLoadCustomPath(String itemName) {
-        if (itemName == null || itemName.isBlank())
-            return null;
-        MenuItem menuItem = Menu.getInstance().getMenuItem(itemName);
-        if (menuItem == null)
-            return null;
-        String path = menuItem.getImagePath();
-        if (path == null || path.isBlank())
-            return null;
-        return loadImageFromPath(path);
-    }
-
-    private ImageIcon loadImageFromPath(String path) {
-        try {
-            if (path == null || path.isBlank()) {
-                return null;
-            }
-            java.io.File file = new java.io.File(path);
-            if (!file.exists()) {
-                return null;
-            }
-            BufferedImage image = ImageIO.read(file);
-            if (image == null) {
-                return null;
-            }
-            return new ImageIcon(image);
-        } catch (Exception ignored) {
-            return null;
-        }
     }
 
     private ImageIcon scaleToFit(ImageIcon icon, int targetWidth, int targetHeight) {
@@ -1958,10 +1874,12 @@ public class OrderingPanel extends JPanel {
             if (required <= 0)
                 continue;
 
+            // fast path: aggregate quantity check
             inventory.InventoryItem stock = inventory.getItem(ing.getKey());
             if (stock == null || stock.getQuantity() < required)
                 return false;
 
+            // expiry check: sum only non-archived, non-expired batch quantities
             try {
                 List<InventoryBatch> batches = batchRepo.findBatchesForItem(ing.getKey());
                 double fresh = 0;
@@ -1986,6 +1904,10 @@ public class OrderingPanel extends JPanel {
         return true;
     }
 
+    /**
+     * Returns true if the item is unavailable specifically because an ingredient is
+     * expired.
+     */
     private boolean hasExpiredIngredient(String baseName) {
         MenuItem item = Menu.getInstance().getMenuItem(baseName);
         if (item == null || item.getIngredients().isEmpty())
@@ -1998,7 +1920,7 @@ public class OrderingPanel extends JPanel {
                 continue;
             inventory.InventoryItem stock = inventory.getItem(ing.getKey());
             if (stock == null || stock.getQuantity() < required)
-                continue;
+                continue; // missing, not expired
             try {
                 List<InventoryBatch> batches = batchRepo.findBatchesForItem(ing.getKey());
                 double fresh = 0;

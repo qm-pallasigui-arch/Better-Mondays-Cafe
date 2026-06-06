@@ -4,7 +4,6 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Cursor;
-import java.awt.Dialog;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
@@ -12,7 +11,6 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.RenderingHints;
-import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.util.*;
 import java.util.List;
@@ -29,11 +27,6 @@ import pos.MenuItem;
 import util.StringUtil;
 
 public class MenuMaintenancePanel extends JPanel {
-
-    @FunctionalInterface
-    public interface OnMenuItemSavedCallback {
-        void onSaved(String itemName);
-    }
 
     // ── Colors ──────────────────────────────────────────────────────────────
     private static final Color BG_PAGE = new Color(0xF9F9F8);
@@ -64,7 +57,6 @@ public class MenuMaintenancePanel extends JPanel {
     private final JComboBox<String> categoryFilter;
     private final JTextField searchField;
     private List<MenuItem> cachedItems = new ArrayList<>();
-    private OnMenuItemSavedCallback onItemSavedCallback = null;
 
     // Detail panel components
     private final JLabel detailName = makeDetailValue();
@@ -74,7 +66,6 @@ public class MenuMaintenancePanel extends JPanel {
     private final JLabel priceLarge = makePriceLabel();
     private final JPanel ingredientList = new JPanel();
     private final JLabel statusLabel = new JLabel("0 items");
-    private final JLabel detailImage = new JLabel(); // item photo thumbnail
 
     // ── Constructor ──────────────────────────────────────────────────────────
     public MenuMaintenancePanel() throws Exception {
@@ -83,8 +74,7 @@ public class MenuMaintenancePanel extends JPanel {
         repo = new SQLiteMenuRepository();
 
         // Table model
-        model = new DefaultTableModel(
-                new String[] { "Name", "Category", "Hot", "Iced Regular", "Iced Large" }, 0) {
+        model = new DefaultTableModel(new String[] { "Name", "Category", "Hot", "Iced Regular", "Iced Large" }, 0) {
             @Override
             public boolean isCellEditable(int r, int c) {
                 return false;
@@ -105,29 +95,31 @@ public class MenuMaintenancePanel extends JPanel {
         styleComboBox(categoryFilter);
         styleTextField(searchField, "Search items…");
 
-        // Build main panel directly (no tabs)
-        add(buildMenuPanel(), BorderLayout.CENTER);
+        // Tabs
+        JTabbedPane tabs = buildTabs();
+        add(tabs, BorderLayout.CENTER);
 
         reload();
     }
 
-    /**
-     * Set a callback to be invoked when a menu item is saved.
-     * 
-     * @param callback the callback, or null to disable
-     */
-    public void setOnMenuItemSavedCallback(OnMenuItemSavedCallback callback) {
-        this.onItemSavedCallback = callback;
+    // ── Tab setup ────────────────────────────────────────────────────────────
+    private JTabbedPane buildTabs() {
+        JTabbedPane tabs = new JTabbedPane(JTabbedPane.TOP);
+        tabs.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        tabs.setBackground(BG_SURFACE);
+        tabs.addTab("Menu Maintenance", buildMenuTab());
+        tabs.addTab("Backup & Restore", new BackupPanel());
+        return tabs;
     }
 
-    // ── Main Panel ────────────────────────────────────────────────────────────
-    private JPanel buildMenuPanel() {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBackground(BG_PAGE);
-        panel.add(buildToolbar(), BorderLayout.NORTH);
-        panel.add(buildContentArea(), BorderLayout.CENTER);
-        panel.add(buildStatusBar(), BorderLayout.SOUTH);
-        return panel;
+    // ── Menu Tab ─────────────────────────────────────────────────────────────
+    private JPanel buildMenuTab() {
+        JPanel tab = new JPanel(new BorderLayout());
+        tab.setBackground(BG_PAGE);
+        tab.add(buildToolbar(), BorderLayout.NORTH);
+        tab.add(buildContentArea(), BorderLayout.CENTER);
+        tab.add(buildStatusBar(), BorderLayout.SOUTH);
+        return tab;
     }
 
     private JPanel buildToolbar() {
@@ -193,7 +185,7 @@ public class MenuMaintenancePanel extends JPanel {
         return wrap;
     }
 
-    // ── Content Area ──────────────────────────────────────────────────────────
+    // ── Content Area (fixed split — detail panel not moveable) ───────────────
     private JPanel buildContentArea() {
         JScrollPane tableScroll = new JScrollPane(table);
         tableScroll.setBorder(BorderFactory.createEmptyBorder());
@@ -201,6 +193,7 @@ public class MenuMaintenancePanel extends JPanel {
 
         JPanel detailPanel = buildDetailPanel();
 
+        // Use BorderLayout instead of JSplitPane so the right panel is truly fixed
         JPanel content = new JPanel(new BorderLayout());
         content.setBackground(BORDER_COLOR);
         content.add(tableScroll, BorderLayout.CENTER);
@@ -208,7 +201,7 @@ public class MenuMaintenancePanel extends JPanel {
         return content;
     }
 
-    // ── Detail Panel ──────────────────────────────────────────────────────────
+    // ── Detail Panel ─────────────────────────────────────────────────────────
     private JPanel buildDetailPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(BG_SURFACE);
@@ -232,12 +225,8 @@ public class MenuMaintenancePanel extends JPanel {
         scroll.setBorder(BorderFactory.createEmptyBorder());
         scroll.getViewport().setBackground(BG_SURFACE);
 
-        // Footer with Backup & Restore button
-        JPanel footer = buildDetailFooter();
-
         panel.add(header, BorderLayout.NORTH);
         panel.add(scroll, BorderLayout.CENTER);
-        panel.add(footer, BorderLayout.SOUTH);
         return panel;
     }
 
@@ -246,15 +235,6 @@ public class MenuMaintenancePanel extends JPanel {
         body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
         body.setBackground(BG_SURFACE);
         body.setBorder(new EmptyBorder(14, 14, 14, 14));
-
-        // Item image thumbnail (hidden when no image)
-        detailImage.setAlignmentX(LEFT_ALIGNMENT);
-        detailImage.setVisible(false);
-        detailImage.setBorder(new CompoundBorder(
-                new LineBorder(BORDER_COLOR, 1, true),
-                new EmptyBorder(0, 0, 0, 0)));
-        body.add(detailImage);
-        body.add(Box.createVerticalStrut(10));
 
         // Name
         body.add(makeFieldRow("NAME", detailName));
@@ -294,56 +274,6 @@ public class MenuMaintenancePanel extends JPanel {
         // Default state
         setDetailEmpty();
         return body;
-    }
-
-    private JPanel buildDetailFooter() {
-        JPanel footer = new JPanel(new BorderLayout());
-        footer.setBackground(BG_SUBTLE);
-        footer.setBorder(new CompoundBorder(
-                new MatteBorder(1, 0, 0, 0, BORDER_COLOR),
-                new EmptyBorder(8, 12, 8, 12)));
-
-        JButton backupBtn = new JButton("🗄  Backup & Restore") {
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(getModel().isRollover() ? BG_SUBTLE : BG_SURFACE);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
-                g2.dispose();
-                super.paintComponent(g);
-            }
-        };
-        backupBtn.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        backupBtn.setForeground(TEXT_MUTED);
-        backupBtn.setBorder(new CompoundBorder(
-                new LineBorder(BORDER_COLOR, 1, true),
-                new EmptyBorder(5, 10, 5, 10)));
-        backupBtn.setOpaque(false);
-        backupBtn.setContentAreaFilled(false);
-        backupBtn.setFocusPainted(false);
-        backupBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        backupBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
-        backupBtn.addActionListener(e -> openBackupDialog());
-
-        footer.add(backupBtn, BorderLayout.CENTER);
-        return footer;
-    }
-
-    private void openBackupDialog() {
-        Window owner = SwingUtilities.getWindowAncestor(this);
-        JDialog dlg = new JDialog(owner, "Backup & Restore", Dialog.ModalityType.APPLICATION_MODAL);
-        dlg.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
-        try {
-            dlg.getContentPane().add(new BackupPanel());
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Could not open Backup panel: " + ex.getMessage());
-            return;
-        }
-        dlg.pack();
-        dlg.setMinimumSize(new Dimension(680, 520));
-        dlg.setLocationRelativeTo(this);
-        dlg.setVisible(true);
     }
 
     private JPanel buildPriceChips() {
@@ -388,8 +318,6 @@ public class MenuMaintenancePanel extends JPanel {
         priceHot.setText("—");
         priceReg.setText("—");
         priceLarge.setText("—");
-        detailImage.setIcon(null);
-        detailImage.setVisible(false);
         ingredientList.removeAll();
         JLabel none = new JLabel("Select a menu item");
         none.setFont(new Font("Segoe UI", Font.ITALIC, 12));
@@ -421,35 +349,6 @@ public class MenuMaintenancePanel extends JPanel {
         priceHot.setText(item.getHotPrice() > 0 ? "₱" + (int) item.getHotPrice() : "—");
         priceReg.setText(item.getIcedRegularPrice() > 0 ? "₱" + (int) item.getIcedRegularPrice() : "—");
         priceLarge.setText(item.getIcedLargePrice() > 0 ? "₱" + (int) item.getIcedLargePrice() : "—");
-
-        // Image thumbnail
-        String imgPath = item.getImagePath();
-        if (imgPath != null && !imgPath.isBlank()) {
-            try {
-                java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(new java.io.File(imgPath));
-                if (img != null) {
-                    int tw = 242, th = 130;
-                    double scale = Math.min((double) tw / img.getWidth(), (double) th / img.getHeight());
-                    int iw = (int) (img.getWidth() * scale), ih = (int) (img.getHeight() * scale);
-                    java.awt.image.BufferedImage scaled = new java.awt.image.BufferedImage(iw, ih,
-                            java.awt.image.BufferedImage.TYPE_INT_ARGB);
-                    java.awt.Graphics2D g2 = scaled.createGraphics();
-                    g2.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
-                            java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                    g2.drawImage(img, 0, 0, iw, ih, null);
-                    g2.dispose();
-                    detailImage.setIcon(new ImageIcon(scaled));
-                    detailImage.setVisible(true);
-                } else {
-                    detailImage.setVisible(false);
-                }
-            } catch (Exception ignored) {
-                detailImage.setVisible(false);
-            }
-        } else {
-            detailImage.setIcon(null);
-            detailImage.setVisible(false);
-        }
 
         ingredientList.removeAll();
         if (item.getIngredients().isEmpty()) {
@@ -533,7 +432,6 @@ public class MenuMaintenancePanel extends JPanel {
         for (int i = 0; i < widths.length; i++) {
             t.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
         }
-
         // Right-align price columns
         DefaultTableCellRenderer right = new DefaultTableCellRenderer();
         right.setHorizontalAlignment(SwingConstants.RIGHT);
@@ -568,6 +466,7 @@ public class MenuMaintenancePanel extends JPanel {
                 cachedItems = new ArrayList<>();
             }
 
+            // If database is empty, try to seed it
             if (cachedItems.isEmpty()) {
                 try {
                     persistence.Phase2Bootstrap.seedCatalogIfEmpty();
@@ -591,6 +490,7 @@ public class MenuMaintenancePanel extends JPanel {
         model.setRowCount(0);
         String cat = categoryFilter.getSelectedItem() == null ? "All" : categoryFilter.getSelectedItem().toString();
         String fieldText = searchField.getText() == null ? "" : searchField.getText().trim();
+        // Treat placeholder text as empty search
         String q = fieldText.equals("Search items…") ? "" : fieldText.toLowerCase();
         int count = 0;
 
@@ -598,8 +498,7 @@ public class MenuMaintenancePanel extends JPanel {
             for (MenuItem item : cachedItems) {
                 boolean catOk = "All".equalsIgnoreCase(cat)
                         || normalizeCategory(item.getCategory()).equalsIgnoreCase(normalizeCategory(cat));
-                boolean srchOk = q.isEmpty()
-                        || item.getName().toLowerCase().contains(q)
+                boolean srchOk = q.isEmpty() || item.getName().toLowerCase().contains(q)
                         || item.getCategory().toLowerCase().contains(q);
                 if (catOk && srchOk) {
                     model.addRow(new Object[] {
@@ -633,15 +532,10 @@ public class MenuMaintenancePanel extends JPanel {
         if (!dlg.isConfirmed())
             return;
         try {
-            MenuItem item = createMenuItem(
-                    normalizeCategory(dlg.getCategory().trim()), dlg.getName().trim(),
+            MenuItem item = createMenuItem(normalizeCategory(dlg.getCategory().trim()), dlg.getName().trim(),
                     dlg.getHot(), dlg.getIcedRegular(), dlg.getIcedLarge());
             applyIngredientsToItem(item, dlg);
-            if (dlg.getImagePath() != null)
-                item.setImagePath(dlg.getImagePath());
             Menu.getInstance().saveItem(item);
-            if (onItemSavedCallback != null)
-                onItemSavedCallback.onSaved(item.getName());
             reload();
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Error adding item: " + ex.getMessage());
@@ -672,15 +566,9 @@ public class MenuMaintenancePanel extends JPanel {
                     StringUtil.normalizeName(dlg.getName().trim()),
                     dlg.getHot(), dlg.getIcedRegular(), dlg.getIcedLarge());
             applyIngredientsToItem(edited, dlg);
-            if (dlg.getImagePath() != null)
-                edited.setImagePath(dlg.getImagePath());
-            else
-                edited.setImagePath(item.getImagePath());
             if (!StringUtil.normalizeName(name).equals(StringUtil.normalizeName(dlg.getName().trim())))
                 Menu.getInstance().removeItem(name);
             Menu.getInstance().saveItem(edited);
-            if (onItemSavedCallback != null)
-                onItemSavedCallback.onSaved(edited.getName());
             reload();
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Error editing item: " + ex.getMessage());
@@ -701,8 +589,6 @@ public class MenuMaintenancePanel extends JPanel {
             return;
         try {
             Menu.getInstance().removeItem(name);
-            if (onItemSavedCallback != null)
-                onItemSavedCallback.onSaved(null);
             reload();
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Delete failed: " + e.getMessage());
@@ -724,8 +610,7 @@ public class MenuMaintenancePanel extends JPanel {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
-    private MenuItem createMenuItem(String category, String name,
-            double hot, double reg, double large) {
+    private MenuItem createMenuItem(String category, String name, double hot, double reg, double large) {
         return switch (category) {
             case "Coffee" -> new CoffeeItem(name, hot, reg, large);
             case "Non-Coffee" -> new NonCoffeeItem(name, hot, reg, large);
@@ -754,8 +639,7 @@ public class MenuMaintenancePanel extends JPanel {
             String[] kv = p.split(":", 2);
             if (kv.length == 2) {
                 try {
-                    item.addIngredient(StringUtil.normalizeName(kv[0].trim()),
-                            Double.parseDouble(kv[1].trim()));
+                    item.addIngredient(StringUtil.normalizeName(kv[0].trim()), Double.parseDouble(kv[1].trim()));
                 } catch (Exception ignored) {
                 }
             }
@@ -802,6 +686,7 @@ public class MenuMaintenancePanel extends JPanel {
                 new LineBorder(BORDER_COLOR, 1, true),
                 new EmptyBorder(5, 8, 5, 8)));
         field.setPreferredSize(new Dimension(200, 30));
+        // Placeholder
         field.addFocusListener(new java.awt.event.FocusAdapter() {
             @Override
             public void focusGained(java.awt.event.FocusEvent e) {
@@ -866,10 +751,9 @@ public class MenuMaintenancePanel extends JPanel {
     // ── Category pill renderer ────────────────────────────────────────────────
     private static class CategoryPillRenderer extends DefaultTableCellRenderer {
         @Override
-        public Component getTableCellRendererComponent(JTable table, Object value,
-                boolean isSelected, boolean hasFocus, int row, int col) {
-            JLabel label = (JLabel) super.getTableCellRendererComponent(
-                    table, value, isSelected, hasFocus, row, col);
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus,
+                int row, int col) {
+            JLabel label = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, col);
             String cat = value == null ? "" : value.toString();
             Color[] colors = PILL_COLORS.getOrDefault(cat, new Color[] { BG_SUBTLE, TEXT_MUTED });
             label.setOpaque(true);

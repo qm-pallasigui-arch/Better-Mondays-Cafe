@@ -8,8 +8,8 @@ public abstract class MenuItem {
     protected double hotPrice;
     protected double icedRegularPrice;
     protected double icedLargePrice;
+    protected String imagePath;
     protected Map<String, Double> ingredients;
-    protected String imagePath; // relative or absolute path to item image, may be null
 
     public MenuItem(String name,
             double hotPrice,
@@ -20,10 +20,7 @@ public abstract class MenuItem {
         this.icedRegularPrice = icedRegularPrice;
         this.icedLargePrice = icedLargePrice;
         this.ingredients = new HashMap<>();
-        this.imagePath = null;
     }
-
-    // ── Ingredients ───────────────────────────────────────────────────────────
 
     public Map<String, Double> getIngredients() {
         return new HashMap<>(ingredients);
@@ -40,20 +37,6 @@ public abstract class MenuItem {
         ingredients.put(ingredient, quantity);
     }
 
-    // ── Image ─────────────────────────────────────────────────────────────────
-
-    /** Returns the stored image path, or {@code null} if none has been set. */
-    public String getImagePath() {
-        return imagePath;
-    }
-
-    /** Sets the image path (relative or absolute). Pass {@code null} to clear. */
-    public void setImagePath(String imagePath) {
-        this.imagePath = (imagePath == null || imagePath.isBlank()) ? null : imagePath.trim();
-    }
-
-    // ── Accessors ─────────────────────────────────────────────────────────────
-
     public String getName() {
         return name;
     }
@@ -68,6 +51,14 @@ public abstract class MenuItem {
 
     public double getIcedLargePrice() {
         return icedLargePrice;
+    }
+
+    public String getImagePath() {
+        return imagePath;
+    }
+
+    public void setImagePath(String imagePath) {
+        this.imagePath = imagePath;
     }
 
     public abstract String getCategory();

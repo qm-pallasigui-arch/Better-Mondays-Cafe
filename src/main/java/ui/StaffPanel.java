@@ -4,6 +4,7 @@ import loginregister.UserAccount;
 import loginregister.UserDataManager;
 import loginregister.UserDataManager.Role;
 import persistence.AccountRoleRepository;
+import persistence.ProfilePictureRepository;
 import persistence.StaffShiftRepository;
 import staff.PasswordResetRequest;
 import staff.StaffShift;
@@ -24,6 +25,7 @@ public class StaffPanel extends JPanel {
     private final String username;
     private final Role currentRole;
     private final AccountRoleRepository accountRoleRepository;
+    private final ProfilePictureRepository profilePictureRepository;
 
     // --- Shift controls ---
     private final JButton startBtn = new JButton("Start Shift");
@@ -106,11 +108,13 @@ public class StaffPanel extends JPanel {
     public StaffPanel(
             StaffShiftRepository shiftRepo,
             AccountRoleRepository accountRoleRepository,
+            ProfilePictureRepository profilePictureRepository,
             String username,
             Role currentRole) {
 
         this.shiftRepo = shiftRepo;
         this.accountRoleRepository = accountRoleRepository;
+        this.profilePictureRepository = profilePictureRepository;
         this.username = username;
         this.currentRole = currentRole;
 
@@ -845,111 +849,13 @@ public class StaffPanel extends JPanel {
     }
 
     private void onCreateAccount() {
-        // --- Form fields ---
-        JTextField fullNameField     = new JTextField(24);
-        JTextField usernameField     = new JTextField(24);
-        JPasswordField passwordField = new JPasswordField(24);
-        JPasswordField confirmField  = new JPasswordField(24);
-        JTextField ageField          = new JTextField(24);
-        JTextField birthdateField    = new JTextField(24);
-        birthdateField.setToolTipText("YYYY-MM-DD");
-        JTextField addressField      = new JTextField(24);
-        JTextField mobileField       = new JTextField(24);
-        JComboBox<String> genderBox  = new JComboBox<>(new String[]{"Male", "Female", "Other"});
-        JComboBox<String> roleBox    = new JComboBox<>(new String[]{"STAFF", "ADMIN"});
-
-        JPanel form = new JPanel(new GridLayout(0, 2, 8, 8));
-        form.add(new JLabel("Full Name:"));       form.add(fullNameField);
-        form.add(new JLabel("Username:"));        form.add(usernameField);
-        form.add(new JLabel("Password:"));        form.add(passwordField);
-        form.add(new JLabel("Confirm Password:")); form.add(confirmField);
-        form.add(new JLabel("Age:"));             form.add(ageField);
-        form.add(new JLabel("Birthdate (YYYY-MM-DD):")); form.add(birthdateField);
-        form.add(new JLabel("Address:"));         form.add(addressField);
-        form.add(new JLabel("Mobile Number:"));   form.add(mobileField);
-        form.add(new JLabel("Gender:"));          form.add(genderBox);
-        form.add(new JLabel("Role:"));            form.add(roleBox);
-
-        JPanel wrapper = new JPanel(new BorderLayout(0, 8));
-        wrapper.add(new JLabel("Fill in the new account details:"), BorderLayout.NORTH);
-        wrapper.add(form, BorderLayout.CENTER);
-
-        int result = JOptionPane.showConfirmDialog(
-                this, wrapper,
-                "Create New Account",
-                JOptionPane.OK_CANCEL_OPTION,
-                JOptionPane.PLAIN_MESSAGE);
-
-        if (result != JOptionPane.OK_OPTION) return;
-
-        String fullName  = fullNameField.getText().trim();
-        String uname     = usernameField.getText().trim();
-        String password  = new String(passwordField.getPassword()).trim();
-        String confirm   = new String(confirmField.getPassword()).trim();
-        String ageText   = ageField.getText().trim();
-        String birthdate = birthdateField.getText().trim();
-        String address   = addressField.getText().trim();
-        String mobile    = mobileField.getText().trim();
-        String gender    = (String) genderBox.getSelectedItem();
-        Role   role      = Role.valueOf((String) roleBox.getSelectedItem());
-
-        if (fullName.isEmpty() || uname.isEmpty() || password.isEmpty()) {
-            JOptionPane.showMessageDialog(this,
-                    "Full name, username, and password are required.",
-                    "Validation", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        if (!password.equals(confirm)) {
-            JOptionPane.showMessageDialog(this,
-                    "Passwords do not match.",
-                    "Validation", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        if (password.length() < 8
-                || !password.matches(".*\\d.*")
-                || !password.matches(".*[!@#$%^&*(),.?\":{}|<>].*")) {
-            JOptionPane.showMessageDialog(this,
-                    "Password must be at least 8 characters and include a number and a special character.",
-                    "Validation", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        int age = 0;
-        if (!ageText.isEmpty()) {
-            try { age = Integer.parseInt(ageText); }
-            catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(this,
-                        "Age must be a number.", "Validation", JOptionPane.WARNING_MESSAGE);
-                return;
-            }
-        }
-
-        final int finalAge = age;
-        new SwingWorker<Void, Void>() {
-            private String errorMsg;
-
-            @Override
-            protected Void doInBackground() {
-                try {
-                    UserDataManager.createUser(uname, password, role,
-                            fullName, finalAge, birthdate, address, mobile, gender);
-                } catch (Exception ex) {
-                    errorMsg = ex.getMessage();
-                }
-                return null;
-            }
-
-            @Override
-            protected void done() {
-                if (errorMsg != null) {
-                    showError("Failed to create account:\n" + errorMsg);
-                } else {
-                    loadUsers();
-                    JOptionPane.showMessageDialog(StaffPanel.this,
-                            "Account \"" + uname + "\" created successfully.",
-                            "Success", JOptionPane.INFORMATION_MESSAGE);
-                }
-            }
-        }.execute();
+        Window owner = SwingUtilities.getWindowAncestor(this);
+        StaffRegistrationDialog dialog = new StaffRegistrationDialog(
+                owner,
+                accountRoleRepository,
+                profilePictureRepository,
+                this::loadUsers);
+        dialog.setVisible(true);
     }
 
     private void loadPasswordRequests() {
@@ -1188,50 +1094,21 @@ public class StaffPanel extends JPanel {
         if (viewRow < 0) return;
         int modelRow = usersTable.convertRowIndexToModel(viewRow);
 
-        // Pull every column from the model (0=StaffID, 1=Username, 2=FullName,
-        // 3=Role, 4=Gender, 5=Mobile, 6=CreatedAt)
-        String staffId   = usersModel.getValueAt(modelRow, 0).toString();
-        String uname     = usersModel.getValueAt(modelRow, 1).toString();
-        String fullName  = usersModel.getValueAt(modelRow, 2).toString();
-        String role      = usersModel.getValueAt(modelRow, 3).toString();
-        String gender    = usersModel.getValueAt(modelRow, 4).toString();
-        String mobile    = usersModel.getValueAt(modelRow, 5).toString();
-        String createdAt = usersModel.getValueAt(modelRow, 6).toString();
+        String uname = usersModel.getValueAt(modelRow, 1).toString();
 
-        // Fetch age, birthdate, address from the live user list (not in table columns)
-        String age = "", birthdate = "", address = "";
         try {
             for (UserAccount u : accountRoleRepository.listUsers()) {
                 if (u.getUsername().equals(uname)) {
-                    age       = String.valueOf(u.getAge());
-                    birthdate = u.getBirthdate();
-                    address   = u.getAddress();
-                    break;
+                    Window owner = SwingUtilities.getWindowAncestor(this);
+                    new StaffProfileDialog(owner, u, accountRoleRepository,
+                            profilePictureRepository, username, this::loadUsers).setVisible(true);
+                    return;
                 }
             }
-        } catch (Exception ignored) {}
-
-        JPanel form = new JPanel(new GridLayout(0, 2, 8, 8));
-        form.add(new JLabel("Staff ID:"));      form.add(readOnlyField(staffId));
-        form.add(new JLabel("Username:"));      form.add(readOnlyField(uname));
-        form.add(new JLabel("Full Name:"));     form.add(readOnlyField(fullName));
-        form.add(new JLabel("Role:"));          form.add(readOnlyField(role));
-        form.add(new JLabel("Gender:"));        form.add(readOnlyField(gender));
-        form.add(new JLabel("Age:"));           form.add(readOnlyField(age));
-        form.add(new JLabel("Birthdate:"));     form.add(readOnlyField(birthdate));
-        form.add(new JLabel("Mobile Number:")); form.add(readOnlyField(mobile));
-        form.add(new JLabel("Address:"));       form.add(readOnlyField(address));
-        form.add(new JLabel("Created At:"));    form.add(readOnlyField(createdAt));
-
-        JOptionPane.showMessageDialog(this, form,
-                "Account Details — " + uname,
-                JOptionPane.PLAIN_MESSAGE);
-    }
-
-    private static JTextField readOnlyField(String value) {
-        JTextField f = new JTextField(value != null ? value : "", 24);
-        f.setEditable(false);
-        return f;
+            showError("Unable to find account details for \"" + uname + "\".");
+        } catch (Exception ex) {
+            showError("Failed to load account details:\n" + ex.getMessage());
+        }
     }
 
     /** Enables or disables both shift action buttons together. */

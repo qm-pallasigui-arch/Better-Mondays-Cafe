@@ -31,6 +31,11 @@ public final class SchemaInitializer {
                                         + "gender TEXT NOT NULL DEFAULT '', "
                                         + "created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
                                         + ")");
+                        statement.execute("CREATE TABLE IF NOT EXISTS profile_pictures ("
+                                        + "username TEXT PRIMARY KEY, "
+                                        + "image_data BLOB NOT NULL, "
+                                        + "FOREIGN KEY(username) REFERENCES users(username) ON DELETE CASCADE"
+                                        + ")");
                         // Migrations for existing databases
                         for (String colDef : new String[]{
                                 "staff_id INTEGER NOT NULL DEFAULT 0",
@@ -68,6 +73,10 @@ public final class SchemaInitializer {
                         try {
                                 statement.execute(
                                                 "ALTER TABLE menu_items ADD COLUMN is_available INTEGER NOT NULL DEFAULT 1");
+                        } catch (SQLException ignored) {
+                        }
+                        try {
+                                statement.execute("ALTER TABLE menu_items ADD COLUMN image_path TEXT");
                         } catch (SQLException ignored) {
                         }
                         statement.execute("CREATE TABLE IF NOT EXISTS menu_item_ingredients ("

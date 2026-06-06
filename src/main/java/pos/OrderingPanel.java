@@ -58,38 +58,38 @@ import java.time.LocalDate;
 public class OrderingPanel extends JPanel {
 
     // ─── Dark Slate Cafe palette ───
-    private static final Color BG_PRIMARY       = AppTheme.BG_PRIMARY;
-    private static final Color BG_SURFACE       = AppTheme.BG_SURFACE;
-    private static final Color BG_CARD          = AppTheme.BG_SURFACE;
-    private static final Color BG_INPUT         = AppTheme.BG_SURFACE;
-    private static final Color FG_PRIMARY       = AppTheme.FG_PRIMARY;
-    private static final Color FG_MUTED         = AppTheme.FG_MUTED;
-    private static final Color ACCENT           = AppTheme.ACCENT;
-    private static final Color ACCENT_HOVER     = AppTheme.ACCENT_DARK;
-    private static final Color SUCCESS          = AppTheme.SUCCESS;
-    private static final Color DANGER           = AppTheme.DANGER;
-    private static final Color BORDER           = AppTheme.BORDER;
-    private static final Color TEXT_MUTED       = AppTheme.FG_SUBTLE;
-    private static final Color LOG_BG           = AppTheme.BG_PRIMARY;
+    private static final Color BG_PRIMARY = AppTheme.BG_PRIMARY;
+    private static final Color BG_SURFACE = AppTheme.BG_SURFACE;
+    private static final Color BG_CARD = AppTheme.BG_SURFACE;
+    private static final Color BG_INPUT = AppTheme.BG_SURFACE;
+    private static final Color FG_PRIMARY = AppTheme.FG_PRIMARY;
+    private static final Color FG_MUTED = AppTheme.FG_MUTED;
+    private static final Color ACCENT = AppTheme.ACCENT;
+    private static final Color ACCENT_HOVER = AppTheme.ACCENT_DARK;
+    private static final Color SUCCESS = AppTheme.SUCCESS;
+    private static final Color DANGER = AppTheme.DANGER;
+    private static final Color BORDER = AppTheme.BORDER;
+    private static final Color TEXT_MUTED = AppTheme.FG_SUBTLE;
+    private static final Color LOG_BG = AppTheme.BG_PRIMARY;
 
     // Status colors
-    private static final Color ST_WAITING_BG  = AppTheme.BG_BADGE_YELLOW;
-    private static final Color ST_WAITING_FG  = AppTheme.WARNING;
-    private static final Color ST_READY_BG    = AppTheme.BG_BADGE_GREEN;
-    private static final Color ST_READY_FG    = AppTheme.SUCCESS;
-    private static final Color ST_DONE_BG     = AppTheme.BG_BADGE_BLUE;
-    private static final Color ST_DONE_FG     = AppTheme.ACCENT;
-    private static final Color ST_CANCEL_BG   = AppTheme.BG_BADGE_RED;
-    private static final Color ST_CANCEL_FG   = AppTheme.DANGER;
+    private static final Color ST_WAITING_BG = AppTheme.BG_BADGE_YELLOW;
+    private static final Color ST_WAITING_FG = AppTheme.WARNING;
+    private static final Color ST_READY_BG = AppTheme.BG_BADGE_GREEN;
+    private static final Color ST_READY_FG = AppTheme.SUCCESS;
+    private static final Color ST_DONE_BG = AppTheme.BG_BADGE_BLUE;
+    private static final Color ST_DONE_FG = AppTheme.ACCENT;
+    private static final Color ST_CANCEL_BG = AppTheme.BG_BADGE_RED;
+    private static final Color ST_CANCEL_FG = AppTheme.DANGER;
 
-    private static final Font FONT_TITLE    = new Font("Segoe UI", Font.BOLD, 16);
+    private static final Font FONT_TITLE = new Font("Segoe UI", Font.BOLD, 16);
     private static final Font FONT_SUBTITLE = new Font("Segoe UI", Font.BOLD, 13);
-    private static final Font FONT_BODY     = new Font("Segoe UI", Font.PLAIN, 12);
-    private static final Font FONT_SMALL    = new Font("Segoe UI", Font.PLAIN, 11);
-    private static final Font FONT_BOLD_SM  = new Font("Segoe UI", Font.BOLD, 11);
-    private static final Font FONT_XSMALL   = new Font("Segoe UI", Font.PLAIN, 9);
-    private static final Font FONT_BADGE    = new Font("Segoe UI", Font.BOLD, 9);
-    private static final Font FONT_PRICE    = new Font("Segoe UI", Font.BOLD, 14);
+    private static final Font FONT_BODY = new Font("Segoe UI", Font.PLAIN, 12);
+    private static final Font FONT_SMALL = new Font("Segoe UI", Font.PLAIN, 11);
+    private static final Font FONT_BOLD_SM = new Font("Segoe UI", Font.BOLD, 11);
+    private static final Font FONT_XSMALL = new Font("Segoe UI", Font.PLAIN, 9);
+    private static final Font FONT_BADGE = new Font("Segoe UI", Font.BOLD, 9);
+    private static final Font FONT_PRICE = new Font("Segoe UI", Font.BOLD, 14);
 
     // ─── Menu Data ───
     private static final Map<String, List<String>> BASE_CATEGORY_ITEMS = new LinkedHashMap<>();
@@ -100,41 +100,41 @@ public class OrderingPanel extends JPanel {
 
     static {
         BASE_CATEGORY_ITEMS.put("Espresso & Coffee", Arrays.asList(
-            "Hot Brewed Coffee",
-            "Hot Americano", "Iced Americano",
-            "Hot Latte", "Iced Latte",
-            "Hot Cappuccino", "Iced Cappuccino",
-            "Hot Salted Cream Latte", "Iced Salted Cream Latte",
-            "Hot Spanish Latte", "Iced Spanish Latte",
-            "Hot Dark Mocha", "Iced Dark Mocha",
-            "Hot White Mocha", "Iced White Mocha",
-            "Hot Caramel Macchiato", "Iced Caramel Macchiato"));
+                "Hot Brewed Coffee",
+                "Hot Americano", "Iced Americano",
+                "Hot Latte", "Iced Latte",
+                "Hot Cappuccino", "Iced Cappuccino",
+                "Hot Salted Cream Latte", "Iced Salted Cream Latte",
+                "Hot Spanish Latte", "Iced Spanish Latte",
+                "Hot Dark Mocha", "Iced Dark Mocha",
+                "Hot White Mocha", "Iced White Mocha",
+                "Hot Caramel Macchiato", "Iced Caramel Macchiato"));
         BASE_CATEGORY_ITEMS.put("Specialty Drinks", Arrays.asList(
-            "Vietnamese Coffee", "Ube Espresso", "Manila Latte",
-            "Iced Pumpkin Spiced Latte", "Iced Spiced Cookie Latte"));
+                "Vietnamese Coffee", "Ube Espresso", "Manila Latte",
+                "Iced Pumpkin Spiced Latte", "Iced Spiced Cookie Latte"));
         BASE_CATEGORY_ITEMS.put("Tea Latte", Arrays.asList(
-            "Hot Matcha Latte", "Iced Matcha Latte",
-            "Hot Chocolate Matcha", "Iced Chocolate Matcha",
-            "Hot Matcha Espresso", "Iced Matcha Espresso",
-            "Hot Hojicha Latte", "Iced Hojicha Latte",
-            "Hot Chai Latte", "Iced Chai Latte"));
+                "Hot Matcha Latte", "Iced Matcha Latte",
+                "Hot Chocolate Matcha", "Iced Chocolate Matcha",
+                "Hot Matcha Espresso", "Iced Matcha Espresso",
+                "Hot Hojicha Latte", "Iced Hojicha Latte",
+                "Hot Chai Latte", "Iced Chai Latte"));
         BASE_CATEGORY_ITEMS.put("Non-Coffee", Arrays.asList(
-            "Hot Chocolate Latte", "Iced Chocolate Latte",
-            "Strawberry Latte", "Iced Mango Latte",
-            "Iced Dragon Fruit Coconut Latte", "Ube Latte"));
+                "Hot Chocolate Latte", "Iced Chocolate Latte",
+                "Strawberry Latte", "Iced Mango Latte",
+                "Iced Dragon Fruit Coconut Latte", "Ube Latte"));
         BASE_CATEGORY_ITEMS.put("Fruit Tea", Arrays.asList(
-            "Strawberry Green Tea", "Mango Green Tea",
-            "Peach Green Tea", "Passion Fruit Green Tea"));
+                "Strawberry Green Tea", "Mango Green Tea",
+                "Peach Green Tea", "Passion Fruit Green Tea"));
         BASE_CATEGORY_ITEMS.put("Herbal Tea", Arrays.asList(
-            "Peppermint", "Chamomile", "Earl Grey", "Cinnamon"));
+                "Peppermint", "Chamomile", "Earl Grey", "Cinnamon"));
         BASE_CATEGORY_ITEMS.put("Sandwiches", Arrays.asList(
-            "Signature Ham & Cheese", "Classic Grilled Cheese", "Homestyle Pesto & Cheese"));
+                "Signature Ham & Cheese", "Classic Grilled Cheese", "Homestyle Pesto & Cheese"));
         BASE_CATEGORY_ITEMS.put("Pandesal Pairs", Arrays.asList(
-            "Ham & Cheese", "Cheesy Pesto", "Spam & Cheese"));
+                "Ham & Cheese", "Cheesy Pesto", "Spam & Cheese"));
         BASE_CATEGORY_ITEMS.put("Pastries", Arrays.asList(
-            "Chocolate Crinkles", "Signature Chocolate Cookies", "S'mores Cookie",
-            "Red Velvet Cream Cheese Cookie", "Brownies", "Banana Loaf Slice",
-            "Chocolate Tiramisu", "Matcha Tiramisu", "Creamy Spinach", "Blueberry Cheesecake"));
+                "Chocolate Crinkles", "Signature Chocolate Cookies", "S'mores Cookie",
+                "Red Velvet Cream Cheese Cookie", "Brownies", "Banana Loaf Slice",
+                "Chocolate Tiramisu", "Matcha Tiramisu", "Creamy Spinach", "Blueberry Cheesecake"));
 
         resetCategoryItemsToSeed();
 
@@ -159,6 +159,7 @@ public class OrderingPanel extends JPanel {
         String baseName;
         String variant;
         double price;
+
         ItemSpec(String displayName, String baseName, String variant, double price) {
             this.displayName = displayName;
             this.baseName = baseName;
@@ -182,7 +183,8 @@ public class OrderingPanel extends JPanel {
         }
         String backendName = NAME_MAP.getOrDefault(baseName, baseName);
         MenuItem item = Menu.getInstance().getMenuItem(backendName);
-        if (item == null) return new ItemSpec(name, "", variant, 0);
+        if (item == null)
+            return new ItemSpec(name, "", variant, 0);
 
         double price;
         switch (variant) {
@@ -190,15 +192,21 @@ public class OrderingPanel extends JPanel {
             case "Regular Iced" -> price = item.getIcedRegularPrice();
             default -> {
                 price = item.getIcedRegularPrice();
-                if (price <= 0) price = item.getHotPrice();
-                if (price <= 0) price = item.getIcedLargePrice();
-                if (price <= 0) { baseName = ""; }
+                if (price <= 0)
+                    price = item.getHotPrice();
+                if (price <= 0)
+                    price = item.getIcedLargePrice();
+                if (price <= 0) {
+                    baseName = "";
+                }
             }
         }
         if (price <= 0) {
             price = item.getIcedRegularPrice();
-            if (price <= 0) price = item.getHotPrice();
-            if (price <= 0) price = item.getIcedLargePrice();
+            if (price <= 0)
+                price = item.getHotPrice();
+            if (price <= 0)
+                price = item.getIcedLargePrice();
         }
         return new ItemSpec(name, backendName, variant, price);
     }
@@ -210,6 +218,7 @@ public class OrderingPanel extends JPanel {
         String variant;
         int quantity;
         double unitPrice;
+
         OrderEntry(String displayName, String baseName, String variant, int quantity, double unitPrice) {
             this.displayName = displayName;
             this.baseName = baseName;
@@ -217,10 +226,14 @@ public class OrderingPanel extends JPanel {
             this.quantity = quantity;
             this.unitPrice = unitPrice;
         }
+
         String orderLabel() {
             return variant.isEmpty() ? displayName : displayName + " (" + variant + ")";
         }
-        double lineTotal() { return quantity * unitPrice; }
+
+        double lineTotal() {
+            return quantity * unitPrice;
+        }
     }
 
     // ─── Completed Order Record ───
@@ -230,6 +243,7 @@ public class OrderingPanel extends JPanel {
         String timestamp;
         String status;
         List<OrderEntry> items;
+
         CompletedOrder(int orderId, String customerName, String timestamp, String status, List<OrderEntry> items) {
             this.orderId = orderId;
             this.customerName = customerName;
@@ -277,11 +291,33 @@ public class OrderingPanel extends JPanel {
                 rebuildProductGrid();
                 refreshOrderDisplay();
             }));
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  UI Construction
+    // Public hook: call this after saving a menu item to refresh
+    // the ordering panel's product grid with the latest image.
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Call this whenever a MenuItem is added or edited (especially when its
+     * imagePath changes). It clears the image cache
+     * and rebuilds the product grid so the new image is immediately visible.
+     *
+     * @param itemName the MenuItem name that was added/edited; currently only
+     *                 used as a refresh signal.
+     */
+    public void onMenuItemSaved(String itemName) {
+        imageCache.clear();
+        SwingUtilities.invokeLater(() -> {
+            syncDynamicMenuItems();
+            rebuildProductGrid();
+        });
+    }
+
+    // ----------------------------------------------------------------
+    // UI Construction
     // ═══════════════════════════════════════════════════════════════
 
     private void buildUI() {
@@ -296,8 +332,8 @@ public class OrderingPanel extends JPanel {
         JPanel bar = new JPanel(new BorderLayout());
         bar.setBackground(BG_PRIMARY);
         bar.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER),
-            new EmptyBorder(10, 18, 10, 18)));
+                BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER),
+                new EmptyBorder(10, 18, 10, 18)));
 
         JLabel title = new JLabel("Better Mondays \u2615");
         title.setFont(FONT_TITLE);
@@ -339,8 +375,8 @@ public class OrderingPanel extends JPanel {
         JPanel strip = new JPanel(new BorderLayout(0, 6));
         strip.setBackground(LOG_BG);
         strip.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(BORDER, 1, true),
-            new EmptyBorder(12, 14, 12, 14)));
+                BorderFactory.createLineBorder(BORDER, 1, true),
+                new EmptyBorder(12, 14, 12, 14)));
 
         // Header row
         JPanel hdr = new JPanel(new BorderLayout());
@@ -358,9 +394,17 @@ public class OrderingPanel extends JPanel {
         seeAll.setForeground(ACCENT);
         seeAll.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         seeAll.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) { showSeeAllModal(); }
-            public void mouseEntered(MouseEvent e) { seeAll.setForeground(ACCENT_HOVER); }
-            public void mouseExited(MouseEvent e) { seeAll.setForeground(ACCENT); }
+            public void mouseClicked(MouseEvent e) {
+                showSeeAllModal();
+            }
+
+            public void mouseEntered(MouseEvent e) {
+                seeAll.setForeground(ACCENT_HOVER);
+            }
+
+            public void mouseExited(MouseEvent e) {
+                seeAll.setForeground(ACCENT);
+            }
         });
 
         JButton clearAll = new JButton("Clear All");
@@ -368,14 +412,14 @@ public class OrderingPanel extends JPanel {
         clearAll.setForeground(Color.WHITE);
         clearAll.setBackground(DANGER);
         clearAll.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(DANGER, 1, true),
-            new EmptyBorder(6, 10, 6, 10)));
+                BorderFactory.createLineBorder(DANGER, 1, true),
+                new EmptyBorder(6, 10, 6, 10)));
         clearAll.setFocusPainted(false);
         clearAll.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         clearAll.addActionListener(e -> {
             if (!orderEntries.isEmpty()) {
                 int ok = JOptionPane.showConfirmDialog(this, "Clear all items from the order?", "Confirm",
-                    JOptionPane.YES_NO_OPTION);
+                        JOptionPane.YES_NO_OPTION);
                 if (ok == JOptionPane.YES_OPTION) {
                     orderEntries.clear();
                     refreshOrderDisplay();
@@ -438,8 +482,8 @@ public class OrderingPanel extends JPanel {
         JPanel card = new JPanel(new BorderLayout(0, 2));
         card.setBackground(BG_SURFACE);
         card.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(BORDER, 1, true),
-            new EmptyBorder(10, 10, 10, 10)));
+                BorderFactory.createLineBorder(BORDER, 1, true),
+                new EmptyBorder(10, 10, 10, 10)));
         card.setPreferredSize(new Dimension(140, 60));
 
         JLabel name = new JLabel(co.customerName);
@@ -459,10 +503,22 @@ public class OrderingPanel extends JPanel {
         badge.setFont(FONT_BADGE);
         badge.setBorder(new EmptyBorder(2, 7, 2, 7));
         switch (co.status) {
-            case "Waiting" -> { badge.setBackground(ST_WAITING_BG); badge.setForeground(ST_WAITING_FG); }
-            case "Ready to Serve" -> { badge.setBackground(ST_READY_BG); badge.setForeground(ST_READY_FG); }
-            case "Completed" -> { badge.setBackground(ST_DONE_BG); badge.setForeground(ST_DONE_FG); }
-            default -> { badge.setBackground(ST_CANCEL_BG); badge.setForeground(ST_CANCEL_FG); }
+            case "Waiting" -> {
+                badge.setBackground(ST_WAITING_BG);
+                badge.setForeground(ST_WAITING_FG);
+            }
+            case "Ready to Serve" -> {
+                badge.setBackground(ST_READY_BG);
+                badge.setForeground(ST_READY_FG);
+            }
+            case "Completed" -> {
+                badge.setBackground(ST_DONE_BG);
+                badge.setForeground(ST_DONE_FG);
+            }
+            default -> {
+                badge.setBackground(ST_CANCEL_BG);
+                badge.setForeground(ST_CANCEL_FG);
+            }
         }
         badge.setOpaque(true);
         meta.add(badge);
@@ -470,7 +526,9 @@ public class OrderingPanel extends JPanel {
         card.add(meta, BorderLayout.SOUTH);
         card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         card.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) { showOrderDetailModal(co); }
+            public void mouseClicked(MouseEvent e) {
+                showOrderDetailModal(co);
+            }
         });
         return card;
     }
@@ -502,8 +560,8 @@ public class OrderingPanel extends JPanel {
             btn.setFocusPainted(false);
             btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             btn.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(BORDER, 1, true),
-                new EmptyBorder(6, 14, 6, 14)));
+                    BorderFactory.createLineBorder(BORDER, 1, true),
+                    new EmptyBorder(6, 14, 6, 14)));
             btn.setContentAreaFilled(true);
             btn.setOpaque(true);
             updatePillStyle(btn, cat.equals(activeCategory));
@@ -519,14 +577,14 @@ public class OrderingPanel extends JPanel {
             btn.setBackground(ACCENT);
             btn.setForeground(Color.WHITE);
             btn.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(ACCENT, 1, true),
-                new EmptyBorder(6, 14, 6, 14)));
+                    BorderFactory.createLineBorder(ACCENT, 1, true),
+                    new EmptyBorder(6, 14, 6, 14)));
         } else {
             btn.setBackground(BG_SURFACE);
             btn.setForeground(FG_MUTED);
             btn.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(BORDER, 1, true),
-                new EmptyBorder(6, 14, 6, 14)));
+                    BorderFactory.createLineBorder(BORDER, 1, true),
+                    new EmptyBorder(6, 14, 6, 14)));
         }
     }
 
@@ -555,7 +613,8 @@ public class OrderingPanel extends JPanel {
 
         for (String name : names) {
             ItemSpec spec = resolveItem(name);
-            if (spec.price <= 0 || spec.baseName.isEmpty()) continue;
+            if (spec.price <= 0 || spec.baseName.isEmpty())
+                continue;
             productGridPanel.add(createProductCard(spec));
         }
 
@@ -570,8 +629,12 @@ public class OrderingPanel extends JPanel {
         productGridPanel.repaint();
     }
 
-    /** Public wrapper to rebuild product grid when external data (Menu) changes. */
+    /**
+     * Public wrapper to rebuild product grid when external data (Menu) changes.
+     * Clears the full image cache so fresh images are loaded from disk.
+     */
     public void rebuildProducts() {
+        imageCache.clear();
         rebuildProductGrid();
     }
 
@@ -590,7 +653,6 @@ public class OrderingPanel extends JPanel {
                 categoryItems = new ArrayList<>();
                 CATEGORY_ITEMS.put(orderingCategory, categoryItems);
             } else if (!(categoryItems instanceof ArrayList)) {
-                // Static seeds use fixed-size lists; copy them so dynamic menu sync can append safely.
                 categoryItems = new ArrayList<>(categoryItems);
                 CATEGORY_ITEMS.put(orderingCategory, categoryItems);
             }
@@ -611,7 +673,8 @@ public class OrderingPanel extends JPanel {
     }
 
     private String mapMenuCategoryToOrderingCategory(String menuCategory, String itemName) {
-        if (menuCategory == null) return "Espresso & Coffee";
+        if (menuCategory == null)
+            return "Espresso & Coffee";
         return switch (menuCategory.trim()) {
             case "Coffee" -> "Espresso & Coffee";
             case "Food" -> mapFoodItemCategory(itemName);
@@ -639,14 +702,18 @@ public class OrderingPanel extends JPanel {
     }
 
     private boolean containsBaseItemName(List<String> names, String targetBaseName) {
-        if (targetBaseName == null || targetBaseName.isBlank()) return false;
+        if (targetBaseName == null || targetBaseName.isBlank())
+            return false;
         String target = NAME_MAP.getOrDefault(targetBaseName, targetBaseName).toLowerCase();
         for (String existing : names) {
             String base = existing;
-            if (base.toLowerCase().startsWith("hot ")) base = base.substring(4);
-            else if (base.toLowerCase().startsWith("iced ")) base = base.substring(5);
+            if (base.toLowerCase().startsWith("hot "))
+                base = base.substring(4);
+            else if (base.toLowerCase().startsWith("iced "))
+                base = base.substring(5);
             base = NAME_MAP.getOrDefault(base, base).toLowerCase();
-            if (base.equals(target)) return true;
+            if (base.equals(target))
+                return true;
         }
         return false;
     }
@@ -656,8 +723,8 @@ public class OrderingPanel extends JPanel {
         JPanel card = new JPanel(new BorderLayout(0, 0));
         card.setBackground(Color.WHITE);
         card.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(0xE5E7EB), 1, true),
-            new EmptyBorder(0, 0, 8, 0)));
+                BorderFactory.createLineBorder(new Color(0xE5E7EB), 1, true),
+                new EmptyBorder(0, 0, 8, 0)));
         card.setPreferredSize(new Dimension(0, 160));
         card.setMinimumSize(new Dimension(260, 160));
         card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 160));
@@ -668,11 +735,12 @@ public class OrderingPanel extends JPanel {
         imageLabel.setMaximumSize(new Dimension(120, 160));
         imageLabel.setOpaque(true);
         imageLabel.setBackground(BG_SURFACE);
-        ImageIcon img = loadProductImage(activeCategory, spec.displayName);
+        ImageIcon img = loadProductImage(activeCategory, spec.displayName, spec.baseName);
         if (img != null) {
             imageLabel.setIcon(scaleToFit(img, 120, 160));
         } else {
-            imageLabel.setText(spec.displayName == null || spec.displayName.isBlank() ? "?" : spec.displayName.substring(0, 1).toUpperCase());
+            imageLabel.setText(spec.displayName == null || spec.displayName.isBlank() ? "?"
+                    : spec.displayName.substring(0, 1).toUpperCase());
             imageLabel.setFont(new Font("Segoe UI", Font.BOLD, 34));
             imageLabel.setForeground(FG_MUTED);
         }
@@ -723,8 +791,8 @@ public class OrderingPanel extends JPanel {
         addBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         addBtn.setEnabled(available);
         addBtn.setToolTipText(available
-            ? "Add this item to the order"
-            : buildUnavailableIngredientsTooltip(spec.baseName, hasExpiredIngredient(spec.baseName)));
+                ? "Add this item to the order"
+                : buildUnavailableIngredientsTooltip(spec.baseName, hasExpiredIngredient(spec.baseName)));
         addBtn.addActionListener(e -> addOrderItem(spec));
         content.add(addBtn, BorderLayout.SOUTH);
 
@@ -740,8 +808,8 @@ public class OrderingPanel extends JPanel {
         JPanel col = new JPanel(new GridBagLayout());
         col.setBackground(BG_SURFACE);
         col.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0, 1, 0, 0, BORDER),
-            new EmptyBorder(12, 12, 12, 12)));
+                BorderFactory.createMatteBorder(0, 1, 0, 0, BORDER),
+                new EmptyBorder(12, 12, 12, 12)));
         col.setPreferredSize(new Dimension(340, 0));
         col.setMinimumSize(new Dimension(320, 0));
 
@@ -750,7 +818,9 @@ public class OrderingPanel extends JPanel {
         cx.weightx = 1.0;
         cx.gridx = 0;
 
-        cx.gridy = 0; cx.weighty = 0; cx.insets = new Insets(0, 0, 0, 0);
+        cx.gridy = 0;
+        cx.weighty = 0;
+        cx.insets = new Insets(0, 0, 0, 0);
         col.add(buildCustomerSection(), cx);
 
         orderItemsPanel = new JPanel();
@@ -776,13 +846,13 @@ public class OrderingPanel extends JPanel {
         clearOrderBtn.setForeground(Color.WHITE);
         clearOrderBtn.setBackground(DANGER);
         clearOrderBtn.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(DANGER, 1, true), new EmptyBorder(6, 10, 6, 10)));
+                BorderFactory.createLineBorder(DANGER, 1, true), new EmptyBorder(6, 10, 6, 10)));
         clearOrderBtn.setFocusPainted(false);
         clearOrderBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         clearOrderBtn.addActionListener(e -> {
             if (!orderEntries.isEmpty()) {
                 int ok = JOptionPane.showConfirmDialog(this, "Clear all items from the order?", "Confirm",
-                    JOptionPane.YES_NO_OPTION);
+                        JOptionPane.YES_NO_OPTION);
                 if (ok == JOptionPane.YES_OPTION) {
                     orderEntries.clear();
                     refreshOrderDisplay();
@@ -793,7 +863,10 @@ public class OrderingPanel extends JPanel {
         orderDetailsSection.add(odHdrRow, BorderLayout.NORTH);
         orderDetailsSection.add(itemsScroll, BorderLayout.CENTER);
 
-        cx.gridy = 1; cx.fill = GridBagConstraints.BOTH; cx.weighty = 1; cx.insets = new Insets(6, 0, 0, 0);
+        cx.gridy = 1;
+        cx.fill = GridBagConstraints.BOTH;
+        cx.weighty = 1;
+        cx.insets = new Insets(6, 0, 0, 0);
         col.add(orderDetailsSection, cx);
 
         JPanel bottom = new JPanel(new BorderLayout(0, 8));
@@ -801,7 +874,10 @@ public class OrderingPanel extends JPanel {
         bottom.add(buildSummarySection(), BorderLayout.CENTER);
         bottom.add(buildProcessBtn(), BorderLayout.SOUTH);
 
-        cx.gridy = 2; cx.fill = GridBagConstraints.HORIZONTAL; cx.weighty = 0; cx.insets = new Insets(8, 0, 0, 0);
+        cx.gridy = 2;
+        cx.fill = GridBagConstraints.HORIZONTAL;
+        cx.weighty = 0;
+        cx.insets = new Insets(8, 0, 0, 0);
         col.add(bottom, cx);
 
         return col;
@@ -825,13 +901,21 @@ public class OrderingPanel extends JPanel {
         customerNameField.setBackground(BG_INPUT);
         customerNameField.setCaretColor(FG_PRIMARY);
         customerNameField.getDocument().addDocumentListener(new DocumentListener() {
-            public void insertUpdate(DocumentEvent e) { updateProcessBtnState(); }
-            public void removeUpdate(DocumentEvent e) { updateProcessBtnState(); }
-            public void changedUpdate(DocumentEvent e) { updateProcessBtnState(); }
+            public void insertUpdate(DocumentEvent e) {
+                updateProcessBtnState();
+            }
+
+            public void removeUpdate(DocumentEvent e) {
+                updateProcessBtnState();
+            }
+
+            public void changedUpdate(DocumentEvent e) {
+                updateProcessBtnState();
+            }
         });
         customerNameField.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(BORDER, 1, true),
-            new EmptyBorder(7, 10, 7, 10)));
+                BorderFactory.createLineBorder(BORDER, 1, true),
+                new EmptyBorder(7, 10, 7, 10)));
 
         orderNumLabel = new JLabel("Order " + fmtOrder(orderCount + 1));
         orderNumLabel.setFont(FONT_SMALL);
@@ -848,39 +932,49 @@ public class OrderingPanel extends JPanel {
         JPanel sec = new JPanel(new GridBagLayout());
         sec.setBackground(BG_INPUT);
         sec.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(BORDER, 1, true),
-            new EmptyBorder(10, 12, 10, 12)));
+                BorderFactory.createLineBorder(BORDER, 1, true),
+                new EmptyBorder(10, 12, 10, 12)));
 
         GridBagConstraints c = new GridBagConstraints();
         c.fill = GridBagConstraints.HORIZONTAL;
         c.insets = new Insets(2, 0, 2, 0);
         c.weightx = 1.0;
 
-        c.gridx = 0; c.gridy = 0; c.gridwidth = 2;
+        c.gridx = 0;
+        c.gridy = 0;
+        c.gridwidth = 2;
         JLabel osHdr = new JLabel("Order Summary");
         osHdr.setFont(FONT_SUBTITLE);
         osHdr.setForeground(FG_PRIMARY);
         sec.add(osHdr, c);
 
         c.gridwidth = 1;
-        c.gridx = 0; c.gridy = 1;
+        c.gridx = 0;
+        c.gridy = 1;
         JLabel sttl = new JLabel("Subtotal");
-        sttl.setFont(FONT_SMALL); sttl.setForeground(FG_MUTED);
+        sttl.setFont(FONT_SMALL);
+        sttl.setForeground(FG_MUTED);
         sec.add(sttl, c);
 
-        c.gridx = 1; c.gridy = 1;
+        c.gridx = 1;
+        c.gridy = 1;
         subtotalLabel = new JLabel("\u20B10.00", SwingConstants.RIGHT);
-        subtotalLabel.setFont(FONT_SMALL); subtotalLabel.setForeground(FG_PRIMARY);
+        subtotalLabel.setFont(FONT_SMALL);
+        subtotalLabel.setForeground(FG_PRIMARY);
         sec.add(subtotalLabel, c);
 
-        c.gridx = 0; c.gridy = 2;
+        c.gridx = 0;
+        c.gridy = 2;
         JLabel tx = new JLabel("Tax (12%)");
-        tx.setFont(FONT_SMALL); tx.setForeground(FG_MUTED);
+        tx.setFont(FONT_SMALL);
+        tx.setForeground(FG_MUTED);
         sec.add(tx, c);
 
-        c.gridx = 1; c.gridy = 2;
+        c.gridx = 1;
+        c.gridy = 2;
         taxLabel = new JLabel("\u20B10.00", SwingConstants.RIGHT);
-        taxLabel.setFont(FONT_SMALL); taxLabel.setForeground(FG_PRIMARY);
+        taxLabel.setFont(FONT_SMALL);
+        taxLabel.setForeground(FG_PRIMARY);
         sec.add(taxLabel, c);
 
         // Dashed separator
@@ -889,25 +983,30 @@ public class OrderingPanel extends JPanel {
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setColor(BORDER);
-                float[] d = {4f, 4f};
+                float[] d = { 4f, 4f };
                 g2.setStroke(new java.awt.BasicStroke(1f, java.awt.BasicStroke.CAP_BUTT,
-                    java.awt.BasicStroke.JOIN_MITER, 1f, d, 0f));
+                        java.awt.BasicStroke.JOIN_MITER, 1f, d, 0f));
                 g2.drawLine(0, getHeight() / 2, getWidth(), getHeight() / 2);
                 g2.dispose();
             }
         };
         dash.setOpaque(false);
         dash.setPreferredSize(new Dimension(0, 6));
-        c.gridx = 0; c.gridy = 2; c.gridwidth = 2;
+        c.gridx = 0;
+        c.gridy = 2;
+        c.gridwidth = 2;
         sec.add(dash, c);
 
         c.gridwidth = 1;
-        c.gridx = 0; c.gridy = 3;
+        c.gridx = 0;
+        c.gridy = 3;
         JLabel ttl = new JLabel("TOTAL");
-        ttl.setFont(FONT_BOLD_SM); ttl.setForeground(ACCENT);
+        ttl.setFont(FONT_BOLD_SM);
+        ttl.setForeground(ACCENT);
         sec.add(ttl, c);
 
-        c.gridx = 1; c.gridy = 3;
+        c.gridx = 1;
+        c.gridy = 3;
         totalLabel = new JLabel("\u20B10.00", SwingConstants.RIGHT);
         totalLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
         totalLabel.setForeground(ACCENT);
@@ -922,8 +1021,8 @@ public class OrderingPanel extends JPanel {
         processBtn.setForeground(Color.WHITE);
         processBtn.setBackground(SUCCESS);
         processBtn.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(SUCCESS, 1, true),
-            new EmptyBorder(12, 20, 12, 20)));
+                BorderFactory.createLineBorder(SUCCESS, 1, true),
+                new EmptyBorder(12, 20, 12, 20)));
         processBtn.setFocusPainted(false);
         processBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         processBtn.addActionListener(e -> processTransaction());
@@ -932,7 +1031,7 @@ public class OrderingPanel extends JPanel {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  Order Management
+    // Order Management
     // ═══════════════════════════════════════════════════════════════
 
     private void addOrderItem(ItemSpec spec) {
@@ -973,12 +1072,14 @@ public class OrderingPanel extends JPanel {
 
         regularBtn.addActionListener(e -> {
             dialog.dispose();
-            doAddOrderItem(new ItemSpec(spec.displayName, spec.baseName, "Regular Iced", menuItem.getIcedRegularPrice()));
+            doAddOrderItem(
+                    new ItemSpec(spec.displayName, spec.baseName, "Regular Iced", menuItem.getIcedRegularPrice()));
         });
         largeBtn.addActionListener(e -> {
             dialog.dispose();
             String largeDisplay = spec.displayName.replaceFirst("(?i)^iced\\s+", "Iced Large ");
-            if (largeDisplay.equals(spec.displayName)) largeDisplay = spec.displayName + " (Large)";
+            if (largeDisplay.equals(spec.displayName))
+                largeDisplay = spec.displayName + " (Large)";
             doAddOrderItem(new ItemSpec(largeDisplay, spec.baseName, "Large Iced", menuItem.getIcedLargePrice()));
         });
 
@@ -1009,13 +1110,15 @@ public class OrderingPanel extends JPanel {
 
     private void doAddOrderItem(ItemSpec spec) {
         if (!isMenuItemAvailableForQuantity(spec.baseName, 1)) {
-            JOptionPane.showMessageDialog(this, "Insufficient ingredients to add this item.", "Unavailable", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Insufficient ingredients to add this item.", "Unavailable",
+                    JOptionPane.WARNING_MESSAGE);
             return;
         }
         for (OrderEntry e : orderEntries) {
             if (e.displayName.equals(spec.displayName) && e.variant.equals(spec.variant)) {
                 if (!isMenuItemAvailableForQuantity(spec.baseName, e.quantity + 1)) {
-                    JOptionPane.showMessageDialog(this, "Insufficient ingredients to increase quantity.", "Unavailable", JOptionPane.WARNING_MESSAGE);
+                    JOptionPane.showMessageDialog(this, "Insufficient ingredients to increase quantity.", "Unavailable",
+                            JOptionPane.WARNING_MESSAGE);
                     return;
                 }
                 e.quantity++;
@@ -1050,10 +1153,10 @@ public class OrderingPanel extends JPanel {
         JPanel row = new JPanel(new BorderLayout(6, 0));
         row.setBackground(BG_INPUT);
         row.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(BORDER, 1, true),
-            new EmptyBorder(5, 6, 5, 6)));
+                BorderFactory.createLineBorder(BORDER, 1, true),
+                new EmptyBorder(5, 6, 5, 6)));
 
-        // Thumbnail
+        // Thumbnail — try the item's custom image path first, then fallback
         JLabel thumb = new JLabel("\u2615", SwingConstants.CENTER);
         thumb.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         thumb.setForeground(FG_MUTED);
@@ -1061,7 +1164,7 @@ public class OrderingPanel extends JPanel {
         thumb.setBackground(BG_SURFACE);
         thumb.setOpaque(true);
 
-        ImageIcon img = loadProductImage(findCategory(entry.displayName), entry.displayName);
+        ImageIcon img = loadProductImage(findCategory(entry.displayName), entry.displayName, entry.baseName);
         if (img != null) {
             thumb.setText("");
             thumb.setIcon(new ImageIcon(img.getImage().getScaledInstance(26, 26, java.awt.Image.SCALE_SMOOTH)));
@@ -1072,12 +1175,14 @@ public class OrderingPanel extends JPanel {
         JPanel np = new JPanel(new BorderLayout(0, 1));
         np.setOpaque(false);
         JLabel nl = new JLabel(entry.orderLabel());
-        nl.setFont(FONT_SMALL); nl.setForeground(FG_PRIMARY);
+        nl.setFont(FONT_SMALL);
+        nl.setForeground(FG_PRIMARY);
         np.add(nl, BorderLayout.NORTH);
 
         double lt = entry.lineTotal();
         JLabel tl = new JLabel("\u20B1" + String.format("%.2f", lt));
-        tl.setFont(FONT_SMALL); tl.setForeground(ACCENT);
+        tl.setFont(FONT_SMALL);
+        tl.setForeground(ACCENT);
         np.add(tl, BorderLayout.SOUTH);
         row.add(np, BorderLayout.CENTER);
 
@@ -1093,13 +1198,15 @@ public class OrderingPanel extends JPanel {
         minus.setBackground(AppTheme.BG_BADGE_BLUE);
         minus.setPreferredSize(new Dimension(18, 18));
         minus.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(BORDER, 1),
-            new EmptyBorder(0, 2, 0, 2)));
+                BorderFactory.createLineBorder(BORDER, 1),
+                new EmptyBorder(0, 2, 0, 2)));
         minus.setFocusPainted(false);
         minus.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         minus.addActionListener(e -> {
-            if (entry.quantity > 1) entry.quantity--;
-            else orderEntries.remove(entry);
+            if (entry.quantity > 1)
+                entry.quantity--;
+            else
+                orderEntries.remove(entry);
             refreshOrderDisplay();
         });
 
@@ -1109,25 +1216,24 @@ public class OrderingPanel extends JPanel {
         ql.setHorizontalAlignment(SwingConstants.CENTER);
         ql.setPreferredSize(new Dimension(26, 18));
         ql.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(BORDER, 1, true),
-            new EmptyBorder(0, 2, 0, 2)));
-        // Allow typed quantities with live validation
+                BorderFactory.createLineBorder(BORDER, 1, true),
+                new EmptyBorder(0, 2, 0, 2)));
         ql.getDocument().addDocumentListener(new DocumentListener() {
             private void apply() {
                 String txt = ql.getText().trim();
-                if (txt.isEmpty()) return;
+                if (txt.isEmpty())
+                    return;
                 try {
                     int v = Integer.parseInt(txt);
                     if (v <= 0) {
-                        // remove item
                         orderEntries.remove(entry);
                         refreshOrderDisplay();
                         return;
                     }
                     if (!isMenuItemAvailableForQuantity(entry.baseName, v)) {
                         SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(row,
-                            "Insufficient ingredients for requested quantity.", "Unavailable", JOptionPane.WARNING_MESSAGE));
-                        // revert
+                                "Insufficient ingredients for requested quantity.", "Unavailable",
+                                JOptionPane.WARNING_MESSAGE));
                         ql.setText(String.valueOf(entry.quantity));
                         return;
                     }
@@ -1137,9 +1243,18 @@ public class OrderingPanel extends JPanel {
                     // ignore until valid
                 }
             }
-            public void insertUpdate(DocumentEvent e) { apply(); }
-            public void removeUpdate(DocumentEvent e) { apply(); }
-            public void changedUpdate(DocumentEvent e) { apply(); }
+
+            public void insertUpdate(DocumentEvent e) {
+                apply();
+            }
+
+            public void removeUpdate(DocumentEvent e) {
+                apply();
+            }
+
+            public void changedUpdate(DocumentEvent e) {
+                apply();
+            }
         });
 
         JButton plus = new JButton("+");
@@ -1148,20 +1263,23 @@ public class OrderingPanel extends JPanel {
         plus.setBackground(ACCENT);
         plus.setPreferredSize(new Dimension(18, 18));
         plus.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(AppTheme.ACCENT_DARK, 1),
-            new EmptyBorder(0, 2, 0, 2)));
+                BorderFactory.createLineBorder(AppTheme.ACCENT_DARK, 1),
+                new EmptyBorder(0, 2, 0, 2)));
         plus.setFocusPainted(false);
         plus.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         plus.addActionListener(e -> {
             if (!isMenuItemAvailableForQuantity(entry.baseName, entry.quantity + 1)) {
-                JOptionPane.showMessageDialog(row, "Insufficient ingredients to increase quantity.", "Unavailable", JOptionPane.WARNING_MESSAGE);
+                JOptionPane.showMessageDialog(row, "Insufficient ingredients to increase quantity.", "Unavailable",
+                        JOptionPane.WARNING_MESSAGE);
                 return;
             }
             entry.quantity++;
             refreshOrderDisplay();
         });
 
-        qp.add(minus); qp.add(ql); qp.add(plus);
+        qp.add(minus);
+        qp.add(ql);
+        qp.add(plus);
         row.add(qp, BorderLayout.EAST);
 
         row.setMaximumSize(new Dimension(9999, 44));
@@ -1170,7 +1288,8 @@ public class OrderingPanel extends JPanel {
 
     private void updateSummary() {
         double total = 0;
-        for (OrderEntry e : orderEntries) total += e.lineTotal();
+        for (OrderEntry e : orderEntries)
+            total += e.lineTotal();
         double sub = total / 1.12;
         double vat = total - sub;
         subtotalLabel.setText("\u20B1" + String.format("%.2f", sub));
@@ -1181,25 +1300,28 @@ public class OrderingPanel extends JPanel {
 
     private void updateProcessBtnState() {
         processBtn.setEnabled(!orderEntries.isEmpty()
-            && !customerNameField.getText().trim().isEmpty());
+                && !customerNameField.getText().trim().isEmpty());
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  Transaction
+    // Transaction
     // ═══════════════════════════════════════════════════════════════
 
     private void processTransaction() {
-        if (orderEntries.isEmpty()) return;
+        if (orderEntries.isEmpty())
+            return;
 
         final String customerName = customerNameField.getText().trim().isEmpty()
-            ? "Walk-in Customer" : customerNameField.getText().trim();
+                ? "Walk-in Customer"
+                : customerNameField.getText().trim();
 
         double sum = 0;
-        for (OrderEntry e : orderEntries) sum += e.lineTotal();
+        for (OrderEntry e : orderEntries)
+            sum += e.lineTotal();
         final double totalInclusive = sum;
 
         JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), "Payment",
-            JDialog.ModalityType.APPLICATION_MODAL);
+                JDialog.ModalityType.APPLICATION_MODAL);
         dialog.getContentPane().setBackground(BG_PRIMARY);
 
         JPanel mp = new JPanel(new BorderLayout(0, 16));
@@ -1218,19 +1340,25 @@ public class OrderingPanel extends JPanel {
         cx.insets = new Insets(6, 0, 6, 0);
         cx.weightx = 1.0;
 
-        cx.gridx = 0; cx.gridy = 0; cx.gridwidth = 2;
+        cx.gridx = 0;
+        cx.gridy = 0;
+        cx.gridwidth = 2;
         JLabel cl = new JLabel("Customer: " + customerName);
-        cl.setFont(FONT_BODY); cl.setForeground(FG_PRIMARY);
+        cl.setFont(FONT_BODY);
+        cl.setForeground(FG_PRIMARY);
         center.add(cl, cx);
 
         cx.gridy = 1;
         JLabel ol = new JLabel("Order " + fmtOrder(orderCount + 1));
-        ol.setFont(FONT_BODY); ol.setForeground(FG_MUTED);
+        ol.setFont(FONT_BODY);
+        ol.setForeground(FG_MUTED);
         center.add(ol, cx);
 
-        cx.gridy = 2; cx.gridwidth = 1;
+        cx.gridy = 2;
+        cx.gridwidth = 1;
         JLabel tdl = new JLabel("Total Due:");
-        tdl.setFont(FONT_BODY); tdl.setForeground(FG_MUTED);
+        tdl.setFont(FONT_BODY);
+        tdl.setForeground(FG_MUTED);
         center.add(tdl, cx);
         cx.gridx = 1;
         JLabel tdv = new JLabel("\u20B1" + String.format("%.2f", totalInclusive), SwingConstants.RIGHT);
@@ -1238,9 +1366,11 @@ public class OrderingPanel extends JPanel {
         tdv.setForeground(ACCENT);
         center.add(tdv, cx);
 
-        cx.gridx = 0; cx.gridy = 3;
+        cx.gridx = 0;
+        cx.gridy = 3;
         JLabel csh = new JLabel("Cash Amount:");
-        csh.setFont(FONT_BODY); csh.setForeground(FG_PRIMARY);
+        csh.setFont(FONT_BODY);
+        csh.setForeground(FG_PRIMARY);
         center.add(csh, cx);
 
         cx.gridx = 1;
@@ -1251,13 +1381,15 @@ public class OrderingPanel extends JPanel {
         cf.setCaretColor(FG_PRIMARY);
         cf.setHorizontalAlignment(JTextField.RIGHT);
         cf.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(BORDER, 1, true),
-            new EmptyBorder(7, 10, 7, 10)));
+                BorderFactory.createLineBorder(BORDER, 1, true),
+                new EmptyBorder(7, 10, 7, 10)));
         center.add(cf, cx);
 
-        cx.gridx = 0; cx.gridy = 4;
+        cx.gridx = 0;
+        cx.gridy = 4;
         JLabel chl = new JLabel("Change:");
-        chl.setFont(FONT_BODY); chl.setForeground(FG_MUTED);
+        chl.setFont(FONT_BODY);
+        chl.setForeground(FG_MUTED);
         center.add(chl, cx);
         cx.gridx = 1;
         JLabel chv = new JLabel("\u20B10.00", SwingConstants.RIGHT);
@@ -1282,8 +1414,8 @@ public class OrderingPanel extends JPanel {
         cancel.setForeground(FG_MUTED);
         cancel.setBackground(BG_SURFACE);
         cancel.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(BORDER, 1, true),
-            new EmptyBorder(10, 24, 10, 24)));
+                BorderFactory.createLineBorder(BORDER, 1, true),
+                new EmptyBorder(10, 24, 10, 24)));
         cancel.setFocusPainted(false);
         cancel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         cancel.addActionListener(e -> dialog.dispose());
@@ -1293,8 +1425,8 @@ public class OrderingPanel extends JPanel {
         confirm.setForeground(Color.WHITE);
         confirm.setBackground(SUCCESS);
         confirm.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(SUCCESS, 1, true),
-            new EmptyBorder(10, 24, 10, 24)));
+                BorderFactory.createLineBorder(SUCCESS, 1, true),
+                new EmptyBorder(10, 24, 10, 24)));
         confirm.setFocusPainted(false);
         confirm.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         final JDialog dialogRef = dialog;
@@ -1319,7 +1451,8 @@ public class OrderingPanel extends JPanel {
             }
         });
 
-        bp.add(cancel); bp.add(confirm);
+        bp.add(cancel);
+        bp.add(confirm);
         mp.add(bp, BorderLayout.SOUTH);
 
         dialog.getContentPane().add(mp);
@@ -1332,13 +1465,23 @@ public class OrderingPanel extends JPanel {
     private void calcChange(JTextField cf, double total, JLabel chv) {
         try {
             String t = cf.getText().trim();
-            if (t.isEmpty()) { chv.setText("\u20B10.00"); chv.setForeground(SUCCESS); return; }
+            if (t.isEmpty()) {
+                chv.setText("\u20B10.00");
+                chv.setForeground(SUCCESS);
+                return;
+            }
             double cash = Double.parseDouble(t);
             double change = cash - total;
-            if (change >= 0) { chv.setText("\u20B1" + String.format("%.2f", change)); chv.setForeground(SUCCESS); }
-            else { chv.setText("\u20B1" + String.format("%.2f", change)); chv.setForeground(DANGER); }
+            if (change >= 0) {
+                chv.setText("\u20B1" + String.format("%.2f", change));
+                chv.setForeground(SUCCESS);
+            } else {
+                chv.setText("\u20B1" + String.format("%.2f", change));
+                chv.setForeground(DANGER);
+            }
         } catch (NumberFormatException e) {
-            chv.setText("\u20B10.00"); chv.setForeground(FG_MUTED);
+            chv.setText("\u20B10.00");
+            chv.setForeground(FG_MUTED);
         }
     }
 
@@ -1365,16 +1508,17 @@ public class OrderingPanel extends JPanel {
 
         try {
             controller.OrderController oc = new controller.OrderController(
-                new persistence.sqlite.SQLiteSalesRepository());
+                    new persistence.sqlite.SQLiteSalesRepository());
             oc.persistCompletedTransaction(txnRef, sales, totalInclusive, cash, change);
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Save error: " + ex.getMessage(),
-                "Database", JOptionPane.WARNING_MESSAGE);
+                    "Database", JOptionPane.WARNING_MESSAGE);
         }
 
         // Add to completed orders list
         String ts = new SimpleDateFormat("MM/dd HH:mm").format(new Date());
-        completedOrders.add(0, new CompletedOrder(orderCount + 1, customerName, ts, "Completed", new ArrayList<>(orderEntries)));
+        completedOrders.add(0,
+                new CompletedOrder(orderCount + 1, customerName, ts, "Completed", new ArrayList<>(orderEntries)));
         refreshOrderListCards();
 
         showReceipt(customerName, txnRef, subtotal, vat, totalInclusive, cash, change);
@@ -1385,11 +1529,12 @@ public class OrderingPanel extends JPanel {
         orderNumLabel.setText("Order " + fmtOrder(orderCount + 1));
         refreshOrderDisplay();
 
-        if (onRefresh != null) onRefresh.run();
+        if (onRefresh != null)
+            onRefresh.run();
     }
 
     private void showReceipt(String customer, String txnRef,
-                             double sub, double vat, double total, double cash, double change) {
+            double sub, double vat, double total, double cash, double change) {
         String line = "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n";
         String dbl = "\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n";
 
@@ -1406,7 +1551,7 @@ public class OrderingPanel extends JPanel {
         sb.append(line);
         for (OrderEntry entry : orderEntries) {
             sb.append(String.format(" %-16s %2d %8.2f\n",
-                trunc(entry.orderLabel(), 16), entry.quantity, entry.lineTotal()));
+                    trunc(entry.orderLabel(), 16), entry.quantity, entry.lineTotal()));
         }
         sb.append(line);
         sb.append(String.format(" %-22s %8.2f\n", "Subtotal (excl VAT):", sub));
@@ -1419,9 +1564,8 @@ public class OrderingPanel extends JPanel {
         sb.append("         Thank you! Come again!\n");
         sb.append("         *** Have a nice day ***\n");
 
-        // Show receipt in a dialog with Print option
         JDialog rd = new JDialog(SwingUtilities.getWindowAncestor(this), "RECEIPT - " + txnRef,
-            JDialog.ModalityType.APPLICATION_MODAL);
+                JDialog.ModalityType.APPLICATION_MODAL);
         rd.getContentPane().setBackground(BG_PRIMARY);
         JPanel panel = new JPanel(new BorderLayout(0, 8));
         panel.setBackground(BG_PRIMARY);
@@ -1440,17 +1584,19 @@ public class OrderingPanel extends JPanel {
         print.setForeground(Color.WHITE);
         print.setBackground(ACCENT);
         print.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(ACCENT, 1, true), new EmptyBorder(8, 20, 8, 20)));
+                BorderFactory.createLineBorder(ACCENT, 1, true), new EmptyBorder(8, 20, 8, 20)));
         print.setFocusPainted(false);
         print.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         print.addActionListener(ev -> {
             try {
                 boolean ok = ta.print();
                 if (!ok) {
-                    JOptionPane.showMessageDialog(rd, "Printer cancelled or failed.", "Print", JOptionPane.WARNING_MESSAGE);
+                    JOptionPane.showMessageDialog(rd, "Printer cancelled or failed.", "Print",
+                            JOptionPane.WARNING_MESSAGE);
                 }
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(rd, "Print error: " + ex.getMessage(), "Print", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(rd, "Print error: " + ex.getMessage(), "Print",
+                        JOptionPane.ERROR_MESSAGE);
             }
         });
 
@@ -1459,22 +1605,25 @@ public class OrderingPanel extends JPanel {
         close.setForeground(Color.WHITE);
         close.setBackground(ACCENT);
         close.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(ACCENT, 1, true), new EmptyBorder(8, 20, 8, 20)));
+                BorderFactory.createLineBorder(ACCENT, 1, true), new EmptyBorder(8, 20, 8, 20)));
         close.setFocusPainted(false);
         close.addActionListener(ev -> rd.dispose());
 
-        bp.add(print); bp.add(close);
+        bp.add(print);
+        bp.add(close);
         panel.add(bp, BorderLayout.SOUTH);
         rd.add(panel);
         rd.pack();
         java.awt.Window win = SwingUtilities.getWindowAncestor(this);
-        if (win != null) rd.setLocationRelativeTo(win);
-        else rd.setLocationRelativeTo(null);
+        if (win != null)
+            rd.setLocationRelativeTo(win);
+        else
+            rd.setLocationRelativeTo(null);
         rd.setVisible(true);
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  See All Modal
+    // See All Modal
     // ═══════════════════════════════════════════════════════════════
 
     private void showOrderDetailModal(CompletedOrder co) {
@@ -1489,35 +1638,39 @@ public class OrderingPanel extends JPanel {
         body.setBackground(BG_PRIMARY);
         body.setBorder(new EmptyBorder(16, 16, 16, 16));
 
-        // Header
         JPanel hdr = new JPanel(new BorderLayout(0, 2));
         hdr.setOpaque(false);
         JLabel oid = new JLabel("Order " + fmtOrder(co.orderId));
-        oid.setFont(FONT_TITLE); oid.setForeground(FG_PRIMARY);
+        oid.setFont(FONT_TITLE);
+        oid.setForeground(FG_PRIMARY);
         hdr.add(oid, BorderLayout.NORTH);
         JLabel cust = new JLabel(co.customerName + " \u2022 " + co.timestamp);
-        cust.setFont(FONT_SMALL); cust.setForeground(FG_MUTED);
+        cust.setFont(FONT_SMALL);
+        cust.setForeground(FG_MUTED);
         hdr.add(cust, BorderLayout.SOUTH);
         body.add(hdr, BorderLayout.NORTH);
 
-        // Items list
         JPanel list = new JPanel(new GridBagLayout());
         list.setOpaque(false);
         GridBagConstraints cx = new GridBagConstraints();
         cx.fill = GridBagConstraints.HORIZONTAL;
         cx.weightx = 1.0;
         cx.insets = new Insets(2, 0, 2, 0);
-        cx.gridx = 0; cx.gridy = 0;
+        cx.gridx = 0;
+        cx.gridy = 0;
         if (co.items != null) {
             for (OrderEntry e : co.items) {
-                if (cx.gridy > 0) cx.insets.top = 4;
+                if (cx.gridy > 0)
+                    cx.insets.top = 4;
                 JPanel row = new JPanel(new BorderLayout());
                 row.setOpaque(false);
                 JLabel nl = new JLabel(e.orderLabel());
-                nl.setFont(FONT_BODY); nl.setForeground(FG_PRIMARY);
+                nl.setFont(FONT_BODY);
+                nl.setForeground(FG_PRIMARY);
                 row.add(nl, BorderLayout.CENTER);
                 JLabel ql = new JLabel("x" + e.quantity);
-                ql.setFont(FONT_BODY); ql.setForeground(TEXT_MUTED);
+                ql.setFont(FONT_BODY);
+                ql.setForeground(TEXT_MUTED);
                 row.add(ql, BorderLayout.EAST);
                 list.add(row, cx);
                 cx.gridy++;
@@ -1529,14 +1682,13 @@ public class OrderingPanel extends JPanel {
         sp.getViewport().setBackground(BG_PRIMARY);
         body.add(sp, BorderLayout.CENTER);
 
-        // Close button
         JButton close = new JButton("Close");
         close.setFont(FONT_BODY);
         close.setForeground(Color.WHITE);
         close.setBackground(ACCENT);
         close.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(ACCENT, 1, true),
-            new EmptyBorder(8, 20, 8, 20)));
+                BorderFactory.createLineBorder(ACCENT, 1, true),
+                new EmptyBorder(8, 20, 8, 20)));
         close.setFocusPainted(false);
         close.addActionListener(ev -> d.dispose());
         JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.CENTER));
@@ -1550,7 +1702,7 @@ public class OrderingPanel extends JPanel {
 
     private void showSeeAllModal() {
         JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this),
-            "All Orders", JDialog.ModalityType.APPLICATION_MODAL);
+                "All Orders", JDialog.ModalityType.APPLICATION_MODAL);
         dialog.getContentPane().setBackground(BG_PRIMARY);
 
         JPanel mp = new JPanel(new BorderLayout(0, 12));
@@ -1575,8 +1727,8 @@ public class OrderingPanel extends JPanel {
                 JPanel card = new JPanel(new BorderLayout(0, 4));
                 card.setBackground(BG_CARD);
                 card.setBorder(BorderFactory.createCompoundBorder(
-                    BorderFactory.createLineBorder(BORDER, 1, true),
-                    new EmptyBorder(12, 12, 12, 12)));
+                        BorderFactory.createLineBorder(BORDER, 1, true),
+                        new EmptyBorder(12, 12, 12, 12)));
 
                 JLabel orderTitle = new JLabel("Order " + fmtOrder(co.orderId));
                 orderTitle.setFont(FONT_BOLD_SM);
@@ -1586,20 +1738,34 @@ public class OrderingPanel extends JPanel {
                 JPanel info = new JPanel(new GridLayout(0, 1, 0, 2));
                 info.setOpaque(false);
                 JLabel cn = new JLabel(co.customerName);
-                cn.setFont(FONT_SMALL); cn.setForeground(FG_PRIMARY);
+                cn.setFont(FONT_SMALL);
+                cn.setForeground(FG_PRIMARY);
                 info.add(cn);
                 JLabel ts = new JLabel(co.timestamp);
-                ts.setFont(FONT_SMALL); ts.setForeground(FG_MUTED);
+                ts.setFont(FONT_SMALL);
+                ts.setForeground(FG_MUTED);
                 info.add(ts);
 
                 JLabel badge = new JLabel(co.status);
                 badge.setFont(FONT_BADGE);
                 badge.setBorder(new EmptyBorder(2, 7, 2, 7));
                 switch (co.status) {
-                    case "Completed" -> { badge.setBackground(ST_DONE_BG); badge.setForeground(ST_DONE_FG); }
-                    case "Ready to Serve" -> { badge.setBackground(ST_READY_BG); badge.setForeground(ST_READY_FG); }
-                    case "Waiting" -> { badge.setBackground(ST_WAITING_BG); badge.setForeground(ST_WAITING_FG); }
-                    default -> { badge.setBackground(ST_CANCEL_BG); badge.setForeground(ST_CANCEL_FG); }
+                    case "Completed" -> {
+                        badge.setBackground(ST_DONE_BG);
+                        badge.setForeground(ST_DONE_FG);
+                    }
+                    case "Ready to Serve" -> {
+                        badge.setBackground(ST_READY_BG);
+                        badge.setForeground(ST_READY_FG);
+                    }
+                    case "Waiting" -> {
+                        badge.setBackground(ST_WAITING_BG);
+                        badge.setForeground(ST_WAITING_FG);
+                    }
+                    default -> {
+                        badge.setBackground(ST_CANCEL_BG);
+                        badge.setForeground(ST_CANCEL_FG);
+                    }
                 }
                 badge.setOpaque(true);
                 info.add(badge);
@@ -1619,8 +1785,8 @@ public class OrderingPanel extends JPanel {
         close.setForeground(Color.WHITE);
         close.setBackground(ACCENT);
         close.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(ACCENT, 1, true),
-            new EmptyBorder(8, 20, 8, 20)));
+                BorderFactory.createLineBorder(ACCENT, 1, true),
+                new EmptyBorder(8, 20, 8, 20)));
         close.setFocusPainted(false);
         close.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         close.addActionListener(e -> dialog.dispose());
@@ -1637,35 +1803,67 @@ public class OrderingPanel extends JPanel {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  Helpers
+    // Helpers
     // ═══════════════════════════════════════════════════════════════
 
-    private ImageIcon loadProductImage(String category, String prodName) {
+    /**
+     * Loads a product image for the given display name and base name.
+     *
+     * Priority order:
+     * 1. Custom absolute image path stored on the MenuItem (set via MenuItemDialog)
+     * 2. Bundled classpath images under /images/<category>/<filename>
+     *
+     * The baseName parameter is used to look up the MenuItem's custom image path.
+     * Previously, createProductCard only passed category+displayName and never
+     * resolved the baseName, so custom paths on dynamically-added items were
+     * never found. Passing baseName explicitly fixes that.
+     */
+    private ImageIcon loadProductImage(String category, String prodName, String baseName) {
         String key = category + "|" + prodName;
-        ImageIcon cached = imageCache.get(key);
-        if (cached != null) return cached;
+        if (imageCache.containsKey(key)) {
+            return imageCache.get(key); // may be null (cached miss)
+        }
 
-        String baseName = IMAGE_MAP.getOrDefault(prodName, prodName);
+        // ── Priority 1: custom image path on the MenuItem ──────────────────
+        // Try baseName first (the backend/menu name), then fall back to prodName
+        // (the display name, e.g. "Hot Latte") so both seeded and dynamic items work.
+        ImageIcon customIcon = tryLoadCustomPath(baseName);
+        if (customIcon == null && baseName != null && !baseName.equals(prodName)) {
+            customIcon = tryLoadCustomPath(prodName);
+        }
+        // Also try the display name resolved through NAME_MAP
+        if (customIcon == null) {
+            String mapped = NAME_MAP.getOrDefault(prodName, null);
+            if (mapped != null)
+                customIcon = tryLoadCustomPath(mapped);
+        }
+        if (customIcon != null) {
+            imageCache.put(key, customIcon);
+            return customIcon;
+        }
+
+        // ── Priority 2: bundled classpath images ────────────────────────────
+        String base = IMAGE_MAP.getOrDefault(prodName, prodName);
         List<String> attempts = new ArrayList<>();
-        String lc = baseName.toLowerCase();
+        String lc = base.toLowerCase();
         if (lc.startsWith("hot ") || lc.startsWith("iced ")) {
-            attempts.add(baseName + ".jpg");
-            attempts.add(baseName + " .jpg");
-            attempts.add(baseName + ".png");
-            attempts.add(baseName + " .png");
+            attempts.add(base + ".jpg");
+            attempts.add(base + " .jpg");
+            attempts.add(base + ".png");
+            attempts.add(base + " .png");
         } else {
-            attempts.add("Hot " + baseName + ".jpg");
-            attempts.add("Hot " + baseName + " .jpg");
-            attempts.add("Iced " + baseName + ".jpg");
-            attempts.add("Iced " + baseName + " .jpg");
-            attempts.add(baseName + ".jpg");
-            attempts.add(baseName + " .jpg");
-            attempts.add(baseName + ".png");
-            attempts.add(baseName + " .png");
-            attempts.add(baseName.toLowerCase() + ".jpg");
-            attempts.add(baseName.toLowerCase() + " .jpg");
-            attempts.add(baseName.toLowerCase() + ".png");
-            attempts.add(baseName.toLowerCase() + " .png");
+            attempts.add("Hot " + base + ".jpg");
+            attempts.add("Hot " + base + " .jpg");
+            attempts.add("Iced " + base + ".jpg");
+            attempts.add("Iced " + base + " .jpg");
+            attempts.add(base + ".jpg");
+            attempts.add(base + " .jpg");
+            attempts.add(base + ".png");
+            attempts.add(base + " .png");
+            attempts.add(base.toLowerCase() + ".jpg");
+            attempts.add(base.toLowerCase() + " .jpg");
+            attempts.add(base.toLowerCase() + ".png");
+            attempts.add(base.toLowerCase() + " .png");
         }
         for (String fn : attempts) {
             try {
@@ -1678,10 +1876,48 @@ public class OrderingPanel extends JPanel {
                         return icon;
                     }
                 }
-            } catch (Exception e) {}
+            } catch (Exception ignored) {
+            }
         }
+
+        // Cache the miss so we don't retry every repaint
         imageCache.put(key, null);
         return null;
+    }
+
+    /**
+     * Looks up the MenuItem by name and attempts to load its custom image path.
+     * Returns null if the item has no custom path or the file doesn't exist/load.
+     */
+    private ImageIcon tryLoadCustomPath(String itemName) {
+        if (itemName == null || itemName.isBlank())
+            return null;
+        MenuItem menuItem = Menu.getInstance().getMenuItem(itemName);
+        if (menuItem == null)
+            return null;
+        String path = menuItem.getImagePath();
+        if (path == null || path.isBlank())
+            return null;
+        return loadImageFromPath(path);
+    }
+
+    private ImageIcon loadImageFromPath(String path) {
+        try {
+            if (path == null || path.isBlank()) {
+                return null;
+            }
+            java.io.File file = new java.io.File(path);
+            if (!file.exists()) {
+                return null;
+            }
+            BufferedImage image = ImageIO.read(file);
+            if (image == null) {
+                return null;
+            }
+            return new ImageIcon(image);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private ImageIcon scaleToFit(ImageIcon icon, int targetWidth, int targetHeight) {
@@ -1710,72 +1946,91 @@ public class OrderingPanel extends JPanel {
 
     private boolean isMenuItemAvailable(String baseName) {
         MenuItem item = Menu.getInstance().getMenuItem(baseName);
-        if (item == null) return false;
-        if (item.getIngredients().isEmpty()) return true;
+        if (item == null)
+            return false;
+        if (item.getIngredients().isEmpty())
+            return true;
 
         Inventory inventory = Inventory.getInstance();
         LocalDate today = LocalDate.now();
         for (Map.Entry<String, Double> ing : item.getIngredients().entrySet()) {
             double required = ing.getValue() == null ? 0.0 : ing.getValue();
-            if (required <= 0) continue;
+            if (required <= 0)
+                continue;
 
-            // fast path: aggregate quantity check
             inventory.InventoryItem stock = inventory.getItem(ing.getKey());
-            if (stock == null || stock.getQuantity() < required) return false;
+            if (stock == null || stock.getQuantity() < required)
+                return false;
 
-            // expiry check: sum only non-archived, non-expired batch quantities
             try {
                 List<InventoryBatch> batches = batchRepo.findBatchesForItem(ing.getKey());
                 double fresh = 0;
                 for (InventoryBatch b : batches) {
-                    if (b.isArchived()) continue;
+                    if (b.isArchived())
+                        continue;
                     String exp = b.getExpiryDate();
                     if (exp != null && !exp.isBlank()) {
-                        try { if (LocalDate.parse(exp).isBefore(today)) continue; }
-                        catch (Exception ignored) {}
+                        try {
+                            if (LocalDate.parse(exp).isBefore(today))
+                                continue;
+                        } catch (Exception ignored) {
+                        }
                     }
                     fresh += b.getQuantity();
                 }
-                if (fresh < required) return false;
-            } catch (Exception ignored) {}
+                if (fresh < required)
+                    return false;
+            } catch (Exception ignored) {
+            }
         }
         return true;
     }
 
-    /** Returns true if the item is unavailable specifically because an ingredient is expired. */
     private boolean hasExpiredIngredient(String baseName) {
         MenuItem item = Menu.getInstance().getMenuItem(baseName);
-        if (item == null || item.getIngredients().isEmpty()) return false;
+        if (item == null || item.getIngredients().isEmpty())
+            return false;
         Inventory inventory = Inventory.getInstance();
         LocalDate today = LocalDate.now();
         for (Map.Entry<String, Double> ing : item.getIngredients().entrySet()) {
             double required = ing.getValue() == null ? 0.0 : ing.getValue();
-            if (required <= 0) continue;
+            if (required <= 0)
+                continue;
             inventory.InventoryItem stock = inventory.getItem(ing.getKey());
-            if (stock == null || stock.getQuantity() < required) continue; // missing, not expired
+            if (stock == null || stock.getQuantity() < required)
+                continue;
             try {
                 List<InventoryBatch> batches = batchRepo.findBatchesForItem(ing.getKey());
                 double fresh = 0;
                 for (InventoryBatch b : batches) {
-                    if (b.isArchived()) continue;
+                    if (b.isArchived())
+                        continue;
                     String exp = b.getExpiryDate();
                     if (exp != null && !exp.isBlank()) {
-                        try { if (LocalDate.parse(exp).isBefore(today)) continue; }
-                        catch (Exception ignored) {}
+                        try {
+                            if (LocalDate.parse(exp).isBefore(today))
+                                continue;
+                        } catch (Exception ignored) {
+                        }
                     }
                     fresh += b.getQuantity();
                 }
-                if (fresh < required) return true;
-            } catch (Exception ignored) {}
+                if (fresh < required)
+                    return true;
+            } catch (Exception ignored) {
+            }
         }
         return false;
     }
 
     private boolean isMenuItemAvailableForQuantity(String baseName, int qty) {
-        if (qty <= 0) return false;
+        if (qty <= 0)
+            return false;
         MenuItem item = Menu.getInstance().getMenuItem(baseName);
-        if (item == null) return false;
-        if (item.getIngredients().isEmpty()) return true;
+        if (item == null)
+            return false;
+        if (item.getIngredients().isEmpty())
+            return true;
 
         Inventory inventory = Inventory.getInstance();
         for (Map.Entry<String, Double> ingredient : item.getIngredients().entrySet()) {
@@ -1790,7 +2045,8 @@ public class OrderingPanel extends JPanel {
 
     private String buildUnavailableIngredientsTooltip(String baseName, boolean hasExpired) {
         MenuItem item = Menu.getInstance().getMenuItem(baseName);
-        if (item == null) return htmlTooltip("Item not found in menu.");
+        if (item == null)
+            return htmlTooltip("Item not found in menu.");
 
         Inventory inventory = Inventory.getInstance();
         LocalDate today = LocalDate.now();
@@ -1806,25 +2062,33 @@ public class OrderingPanel extends JPanel {
                     List<InventoryBatch> batches = batchRepo.findBatchesForItem(ingredient.getKey());
                     double fresh = 0;
                     for (InventoryBatch b : batches) {
-                        if (b.isArchived()) continue;
+                        if (b.isArchived())
+                            continue;
                         String exp = b.getExpiryDate();
                         if (exp != null && !exp.isBlank()) {
-                            try { if (LocalDate.parse(exp).isBefore(today)) continue; }
-                            catch (Exception ignored) {}
+                            try {
+                                if (LocalDate.parse(exp).isBefore(today))
+                                    continue;
+                            } catch (Exception ignored) {
+                            }
                         }
                         fresh += b.getQuantity();
                     }
                     insufficientFresh = fresh < required;
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
 
             if (stock == null || available < required || insufficientFresh) {
-                if (details.length() > 0) details.append("<br>");
+                if (details.length() > 0)
+                    details.append("<br>");
                 details.append("<b>").append(escapeHtml(ingredient.getKey()))
                         .append("</b>: need ").append(formatAmount(required))
                         .append(", have ").append(formatAmount(available));
-                if (stock == null) details.append(" (missing)");
-                else if (insufficientFresh) details.append(" (expired)");
+                if (stock == null)
+                    details.append(" (missing)");
+                else if (insufficientFresh)
+                    details.append(" (expired)");
             }
         }
 
@@ -1838,11 +2102,12 @@ public class OrderingPanel extends JPanel {
     }
 
     private String escapeHtml(String text) {
-        return text == null ? "" : text
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;");
+        return text == null ? ""
+                : text
+                        .replace("&", "&amp;")
+                        .replace("<", "&lt;")
+                        .replace(">", "&gt;")
+                        .replace("\"", "&quot;");
     }
 
     private String formatAmount(double amount) {
@@ -1855,7 +2120,8 @@ public class OrderingPanel extends JPanel {
     private String findCategory(String itemName) {
         for (Map.Entry<String, List<String>> e : CATEGORY_ITEMS.entrySet()) {
             for (String n : e.getValue()) {
-                if (n.equals(itemName)) return e.getKey();
+                if (n.equals(itemName))
+                    return e.getKey();
             }
         }
         return "";
@@ -1867,9 +2133,9 @@ public class OrderingPanel extends JPanel {
 
     private int loadTransactionCounter() {
         try (java.sql.Connection conn = AppDatabase.openConnection();
-             java.sql.PreparedStatement ps = conn.prepareStatement(
-                     "SELECT transaction_ref FROM sales_transactions ORDER BY id DESC LIMIT 1");
-             java.sql.ResultSet rs = ps.executeQuery()) {
+                java.sql.PreparedStatement ps = conn.prepareStatement(
+                        "SELECT transaction_ref FROM sales_transactions ORDER BY id DESC LIMIT 1");
+                java.sql.ResultSet rs = ps.executeQuery()) {
             if (rs.next()) {
                 String ref = rs.getString(1);
                 return parseTransactionNumber(ref);
@@ -1880,9 +2146,11 @@ public class OrderingPanel extends JPanel {
     }
 
     private int parseTransactionNumber(String ref) {
-        if (ref == null) return 1000;
+        if (ref == null)
+            return 1000;
         String digits = ref.replaceAll("\\D", "");
-        if (digits.isEmpty()) return 1000;
+        if (digits.isEmpty())
+            return 1000;
         try {
             return Integer.parseInt(digits);
         } catch (NumberFormatException ex) {

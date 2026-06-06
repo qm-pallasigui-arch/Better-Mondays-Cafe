@@ -5,24 +5,28 @@ import java.util.Map;
 
 public abstract class MenuItem {
     protected String name;
-    protected double hotPrice;          
-    protected double icedRegularPrice; 
-    protected double icedLargePrice;   
+    protected double hotPrice;
+    protected double icedRegularPrice;
+    protected double icedLargePrice;
     protected Map<String, Double> ingredients;
+    protected String imagePath; // relative or absolute path to item image, may be null
 
     public MenuItem(String name,
-                    double hotPrice,
-                    double icedRegularPrice,
-                    double icedLargePrice) {
+            double hotPrice,
+            double icedRegularPrice,
+            double icedLargePrice) {
         this.name = name;
         this.hotPrice = hotPrice;
         this.icedRegularPrice = icedRegularPrice;
         this.icedLargePrice = icedLargePrice;
         this.ingredients = new HashMap<>();
+        this.imagePath = null;
     }
 
+    // ── Ingredients ───────────────────────────────────────────────────────────
+
     public Map<String, Double> getIngredients() {
-        return new HashMap<>(ingredients);   
+        return new HashMap<>(ingredients);
     }
 
     public void replaceIngredients(Map<String, Double> newIngredients) {
@@ -36,10 +40,35 @@ public abstract class MenuItem {
         ingredients.put(ingredient, quantity);
     }
 
-    public String getName()               { return name; }
-    public double getHotPrice()           { return hotPrice; }
-    public double getIcedRegularPrice()   { return icedRegularPrice; }
-    public double getIcedLargePrice()     { return icedLargePrice; }
+    // ── Image ─────────────────────────────────────────────────────────────────
+
+    /** Returns the stored image path, or {@code null} if none has been set. */
+    public String getImagePath() {
+        return imagePath;
+    }
+
+    /** Sets the image path (relative or absolute). Pass {@code null} to clear. */
+    public void setImagePath(String imagePath) {
+        this.imagePath = (imagePath == null || imagePath.isBlank()) ? null : imagePath.trim();
+    }
+
+    // ── Accessors ─────────────────────────────────────────────────────────────
+
+    public String getName() {
+        return name;
+    }
+
+    public double getHotPrice() {
+        return hotPrice;
+    }
+
+    public double getIcedRegularPrice() {
+        return icedRegularPrice;
+    }
+
+    public double getIcedLargePrice() {
+        return icedLargePrice;
+    }
 
     public abstract String getCategory();
 }

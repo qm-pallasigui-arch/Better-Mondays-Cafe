@@ -51,18 +51,22 @@ public class Menu {
         menuItems.put(StringUtil.normalizeName("Americano"), new CoffeeItem("Americano", 125, 140, 155));
         menuItems.put(StringUtil.normalizeName("Latte"), new CoffeeItem("Latte", 145, 160, 175));
         menuItems.put(StringUtil.normalizeName("Cappuccino"), new CoffeeItem("Cappuccino", 145, 160, 175));
-        menuItems.put(StringUtil.normalizeName("Salted Cream Latte"), new CoffeeItem("Salted Cream Latte", 160, 175, 190));
+        menuItems.put(StringUtil.normalizeName("Salted Cream Latte"),
+                new CoffeeItem("Salted Cream Latte", 160, 175, 190));
         menuItems.put(StringUtil.normalizeName("Spanish Latte"), new CoffeeItem("Spanish Latte", 175, 190, 205));
         menuItems.put(StringUtil.normalizeName("Dark Mocha"), new CoffeeItem("Dark Mocha", 175, 190, 205));
         menuItems.put(StringUtil.normalizeName("White Mocha"), new CoffeeItem("White Mocha", 175, 190, 205));
-        menuItems.put(StringUtil.normalizeName("Caramel Macchiato"), new CoffeeItem("Caramel Macchiato", 175, 190, 205));
+        menuItems.put(StringUtil.normalizeName("Caramel Macchiato"),
+                new CoffeeItem("Caramel Macchiato", 175, 190, 205));
         menuItems.put(StringUtil.normalizeName("Brewed Coffee"), new CoffeeItem("Brewed Coffee", 115, 0, 0));
 
         // Specialty Drinks (Iced Regular only)
         menuItems.put(StringUtil.normalizeName("Vietnamese Coffee"), new CoffeeItem("Vietnamese Coffee", 0, 190, 0));
         menuItems.put(StringUtil.normalizeName("Ube Espresso"), new CoffeeItem("Ube Espresso", 0, 210, 0));
-        menuItems.put(StringUtil.normalizeName("Pumpkin Spice Latte"), new CoffeeItem("Pumpkin Spice Latte", 0, 220, 0));
-        menuItems.put(StringUtil.normalizeName("Spiced Cookie Latte"), new CoffeeItem("Spiced Cookie Latte", 0, 225, 0));
+        menuItems.put(StringUtil.normalizeName("Pumpkin Spice Latte"),
+                new CoffeeItem("Pumpkin Spice Latte", 0, 220, 0));
+        menuItems.put(StringUtil.normalizeName("Spiced Cookie Latte"),
+                new CoffeeItem("Spiced Cookie Latte", 0, 225, 0));
 
         // Tea Latte (Hot + Iced Regular only)
         menuItems.put(StringUtil.normalizeName("Matcha Latte"), new NonCoffeeItem("Matcha Latte", 205, 220, 0));
@@ -78,10 +82,12 @@ public class Menu {
         menuItems.put(StringUtil.normalizeName("Ube Latte"), new NonCoffeeItem("Ube Latte", 0, 200, 215));
 
         // Fruit Tea (Iced Regular + Iced Large)
-        menuItems.put(StringUtil.normalizeName("Strawberry Green Tea"), new FruitTeaItem("Strawberry Green Tea", 0, 180, 195));
+        menuItems.put(StringUtil.normalizeName("Strawberry Green Tea"),
+                new FruitTeaItem("Strawberry Green Tea", 0, 180, 195));
         menuItems.put(StringUtil.normalizeName("Mango Green Tea"), new FruitTeaItem("Mango Green Tea", 0, 180, 195));
         menuItems.put(StringUtil.normalizeName("Peach Green Tea"), new FruitTeaItem("Peach Green Tea", 0, 180, 195));
-        menuItems.put(StringUtil.normalizeName("Passion Fruit Green Tea"), new FruitTeaItem("Passion Fruit Green Tea", 0, 180, 195));
+        menuItems.put(StringUtil.normalizeName("Passion Fruit Green Tea"),
+                new FruitTeaItem("Passion Fruit Green Tea", 0, 180, 195));
 
         // Herbal Tea (Hot only)
         menuItems.put(StringUtil.normalizeName("Peppermint"), new HerbalTeaItem("Peppermint", 120, 0, 0));
@@ -98,19 +104,24 @@ public class Menu {
             extra.put(StringUtil.normalizeName("Manila Latte"), new CoffeeItem("Manila Latte", 0, 215, 0));
         }
         if (!menuItems.containsKey("Pumpkin Spice Latte")) {
-            extra.put(StringUtil.normalizeName("Pumpkin Spice Latte"), new CoffeeItem("Pumpkin Spice Latte", 0, 220, 0));
+            extra.put(StringUtil.normalizeName("Pumpkin Spice Latte"),
+                    new CoffeeItem("Pumpkin Spice Latte", 0, 220, 0));
         }
         if (!menuItems.containsKey("Spiced Cookie Latte")) {
-            extra.put(StringUtil.normalizeName("Spiced Cookie Latte"), new CoffeeItem("Spiced Cookie Latte", 0, 225, 0));
+            extra.put(StringUtil.normalizeName("Spiced Cookie Latte"),
+                    new CoffeeItem("Spiced Cookie Latte", 0, 225, 0));
         }
         if (!menuItems.containsKey("Dragon Fruit Coconut Latte")) {
-            extra.put(StringUtil.normalizeName("Dragon Fruit Coconut Latte"), new NonCoffeeItem("Dragon Fruit Coconut Latte", 0, 190, 210));
+            extra.put(StringUtil.normalizeName("Dragon Fruit Coconut Latte"),
+                    new NonCoffeeItem("Dragon Fruit Coconut Latte", 0, 190, 210));
         }
         if (!menuItems.containsKey("Pumpkin Spice Latte")) {
-            extra.put(StringUtil.normalizeName("Pumpkin Spice Latte"), new CoffeeItem("Pumpkin Spice Latte", 0, 220, 0));
+            extra.put(StringUtil.normalizeName("Pumpkin Spice Latte"),
+                    new CoffeeItem("Pumpkin Spice Latte", 0, 220, 0));
         }
         if (!menuItems.containsKey("Spiced Cookie Latte")) {
-            extra.put(StringUtil.normalizeName("Spiced Cookie Latte"), new CoffeeItem("Spiced Cookie Latte", 0, 225, 0));
+            extra.put(StringUtil.normalizeName("Spiced Cookie Latte"),
+                    new CoffeeItem("Spiced Cookie Latte", 0, 225, 0));
         }
         if (!menuItems.containsKey("Hojicha Latte")) {
             extra.put(StringUtil.normalizeName("Hojicha Latte"), new NonCoffeeItem("Hojicha Latte", 200, 215, 0));
@@ -121,20 +132,24 @@ public class Menu {
         if (!menuItems.containsKey("Earl Grey") && menuItems.containsKey("Early Grey")) {
             MenuItem old = menuItems.remove("Early Grey");
             if (old != null) {
-                menuItems.put(StringUtil.normalizeName("Earl Grey"), new HerbalTeaItem("Earl Grey", old.getHotPrice(), 0, 0));
+                menuItems.put(StringUtil.normalizeName("Earl Grey"),
+                        new HerbalTeaItem("Earl Grey", old.getHotPrice(), 0, 0));
                 changed = true;
             }
         }
 
         // Sandwiches
         if (!menuItems.containsKey("Signature Ham & Cheese")) {
-            extra.put(StringUtil.normalizeName("Signature Ham & Cheese"), new FoodItem("Signature Ham & Cheese", "Food", 290));
+            extra.put(StringUtil.normalizeName("Signature Ham & Cheese"),
+                    new FoodItem("Signature Ham & Cheese", "Food", 290));
         }
         if (!menuItems.containsKey("Classic Grilled Cheese")) {
-            extra.put(StringUtil.normalizeName("Classic Grilled Cheese"), new FoodItem("Classic Grilled Cheese", "Food", 280));
+            extra.put(StringUtil.normalizeName("Classic Grilled Cheese"),
+                    new FoodItem("Classic Grilled Cheese", "Food", 280));
         }
         if (!menuItems.containsKey("Homestyle Pesto & Cheese")) {
-            extra.put(StringUtil.normalizeName("Homestyle Pesto & Cheese"), new FoodItem("Homestyle Pesto & Cheese", "Food", 270));
+            extra.put(StringUtil.normalizeName("Homestyle Pesto & Cheese"),
+                    new FoodItem("Homestyle Pesto & Cheese", "Food", 270));
         }
 
         // Pandesal Pairs
@@ -159,7 +174,8 @@ public class Menu {
             extra.put(StringUtil.normalizeName("S'mores Cookie"), new FoodItem("S'mores Cookie", "Food", 75));
         }
         if (!menuItems.containsKey("Red Velvet Cream Cheese Cookie")) {
-            extra.put(StringUtil.normalizeName("Red Velvet Cream Cheese Cookie"), new FoodItem("Red Velvet Cream Cheese Cookie", "Food", 85));
+            extra.put(StringUtil.normalizeName("Red Velvet Cream Cheese Cookie"),
+                    new FoodItem("Red Velvet Cream Cheese Cookie", "Food", 85));
         }
         if (!menuItems.containsKey("Brownies")) {
             extra.put(StringUtil.normalizeName("Brownies"), new FoodItem("Brownies", "Food", 80));
@@ -177,7 +193,8 @@ public class Menu {
             extra.put(StringUtil.normalizeName("Creamy Spinach"), new FoodItem("Creamy Spinach", "Food", 150));
         }
         if (!menuItems.containsKey("Blueberry Cheesecake")) {
-            extra.put(StringUtil.normalizeName("Blueberry Cheesecake"), new FoodItem("Blueberry Cheesecake", "Food", 145));
+            extra.put(StringUtil.normalizeName("Blueberry Cheesecake"),
+                    new FoodItem("Blueberry Cheesecake", "Food", 145));
         }
 
         if (!extra.isEmpty()) {
@@ -256,17 +273,22 @@ public class Menu {
         notifyChangeListeners();
     }
 
-    // --- Change listener support for UI components that need to refresh on menu changes ---
+    // --- Change listener support for UI components that need to refresh on menu
+    // changes ---
     private final List<Runnable> changeListeners = new ArrayList<>();
 
     public void addChangeListener(Runnable r) {
-        if (r == null) return;
+        if (r == null)
+            return;
         changeListeners.add(r);
     }
 
     private void notifyChangeListeners() {
         for (Runnable r : new ArrayList<>(changeListeners)) {
-            try { r.run(); } catch (Exception ignored) {}
+            try {
+                r.run();
+            } catch (Exception ignored) {
+            }
         }
     }
 
@@ -291,7 +313,8 @@ public class Menu {
         }
 
         if (price <= 0) {
-            JOptionPane.showMessageDialog(null, "This option is not available for " + name, "Option Unavailable", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(null, "This option is not available for " + name, "Option Unavailable",
+                    JOptionPane.WARNING_MESSAGE);
             return 0;
         }
 

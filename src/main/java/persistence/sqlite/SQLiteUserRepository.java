@@ -28,9 +28,9 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
     public void saveUser(String username, String plainPassword, Role role) throws Exception {
         String passwordHash = PasswordHasher.hashPassword(plainPassword);
         try (Connection connection = AppDatabase.openConnection();
-             PreparedStatement statement = connection.prepareStatement(
-                     "INSERT INTO users(username, password_hash, role) VALUES (?, ?, ?) "
-                     + "ON CONFLICT(username) DO UPDATE SET password_hash = excluded.password_hash, role = excluded.role")) {
+                PreparedStatement statement = connection.prepareStatement(
+                        "INSERT INTO users(username, password_hash, role) VALUES (?, ?, ?) "
+                                + "ON CONFLICT(username) DO UPDATE SET password_hash = excluded.password_hash, role = excluded.role")) {
             statement.setString(1, username);
             statement.setString(2, passwordHash);
             statement.setString(3, role.name());
@@ -38,8 +38,8 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
         }
         // Set staff_id = id on the same connection if it is still 0
         try (Connection connection = AppDatabase.openConnection();
-             PreparedStatement fix = connection.prepareStatement(
-                     "UPDATE users SET staff_id = id WHERE username = ? AND staff_id = 0")) {
+                PreparedStatement fix = connection.prepareStatement(
+                        "UPDATE users SET staff_id = id WHERE username = ? AND staff_id = 0")) {
             fix.setString(1, username);
             fix.executeUpdate();
         }
@@ -53,8 +53,8 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
         try (Connection connection = AppDatabase.openConnection()) {
             // Insert the row first (staff_id defaults to 0 temporarily)
             try (PreparedStatement stmt = connection.prepareStatement(
-                     "INSERT INTO users(username, password_hash, role, full_name, age, birthdate, address, mobile, gender) "
-                     + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                    "INSERT INTO users(username, password_hash, role, full_name, age, birthdate, address, mobile, gender) "
+                            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
                 stmt.setString(1, username);
                 stmt.setString(2, passwordHash);
                 stmt.setString(3, role.name());
@@ -69,7 +69,7 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
             // Immediately set staff_id = id on the same connection, so there
             // is never a window where two rows both hold staff_id = 0
             try (PreparedStatement fix = connection.prepareStatement(
-                     "UPDATE users SET staff_id = id WHERE username = ? AND staff_id = 0")) {
+                    "UPDATE users SET staff_id = id WHERE username = ? AND staff_id = 0")) {
                 fix.setString(1, username);
                 fix.executeUpdate();
             }
@@ -79,8 +79,8 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
     @Override
     public boolean verifyCredentials(String username, String plainPassword) throws Exception {
         try (Connection connection = AppDatabase.openConnection();
-             PreparedStatement statement = connection.prepareStatement(
-                     "SELECT password_hash FROM users WHERE username = ?")) {
+                PreparedStatement statement = connection.prepareStatement(
+                        "SELECT password_hash FROM users WHERE username = ?")) {
             statement.setString(1, username);
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (!resultSet.next()) {
@@ -94,8 +94,8 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
     @Override
     public Role getUserRole(String username) throws Exception {
         try (Connection connection = AppDatabase.openConnection();
-             PreparedStatement statement = connection.prepareStatement(
-                     "SELECT role FROM users WHERE username = ?")) {
+                PreparedStatement statement = connection.prepareStatement(
+                        "SELECT role FROM users WHERE username = ?")) {
             statement.setString(1, username);
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (!resultSet.next()) {
@@ -114,10 +114,10 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
     public List<UserAccount> listUsers() throws Exception {
         List<UserAccount> users = new ArrayList<>();
         try (Connection connection = AppDatabase.openConnection();
-             PreparedStatement statement = connection.prepareStatement(
-                     "SELECT staff_id, username, role, full_name, age, birthdate, address, mobile, gender, created_at "
-                     + "FROM users ORDER BY username ASC");
-             ResultSet resultSet = statement.executeQuery()) {
+                PreparedStatement statement = connection.prepareStatement(
+                        "SELECT staff_id, username, role, full_name, age, birthdate, address, mobile, gender, created_at "
+                                + "FROM users ORDER BY username ASC");
+                ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
                 Role role;
                 try {
@@ -135,8 +135,7 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
                         resultSet.getString("address"),
                         resultSet.getString("mobile"),
                         resultSet.getString("gender"),
-                        resultSet.getString("created_at")
-                ));
+                        resultSet.getString("created_at")));
             }
         }
         return users;
@@ -145,8 +144,8 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
     @Override
     public void updateUserRole(String username, Role role) throws Exception {
         try (Connection connection = AppDatabase.openConnection();
-             PreparedStatement statement = connection.prepareStatement(
-                     "UPDATE users SET role = ? WHERE username = ?")) {
+                PreparedStatement statement = connection.prepareStatement(
+                        "UPDATE users SET role = ? WHERE username = ?")) {
             statement.setString(1, role.name());
             statement.setString(2, username);
             statement.executeUpdate();
@@ -156,8 +155,8 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
     @Override
     public void deleteUser(String username) throws Exception {
         try (Connection connection = AppDatabase.openConnection();
-             PreparedStatement statement = connection.prepareStatement(
-                     "DELETE FROM users WHERE username = ?")) {
+                PreparedStatement statement = connection.prepareStatement(
+                        "DELETE FROM users WHERE username = ?")) {
             statement.setString(1, username);
             int affected = statement.executeUpdate();
             if (affected == 0) {
@@ -168,10 +167,10 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
 
     public void updateUsername(String currentUsername, String newUsername, String currentPassword) throws Exception {
         try (Connection connection = AppDatabase.openConnection();
-             PreparedStatement verify = connection.prepareStatement(
-                     "SELECT password_hash FROM users WHERE username = ?");
-             PreparedStatement update = connection.prepareStatement(
-                     "UPDATE users SET username = ? WHERE username = ?")) {
+                PreparedStatement verify = connection.prepareStatement(
+                        "SELECT password_hash FROM users WHERE username = ?");
+                PreparedStatement update = connection.prepareStatement(
+                        "UPDATE users SET username = ? WHERE username = ?")) {
             verify.setString(1, currentUsername);
             try (ResultSet resultSet = verify.executeQuery()) {
                 if (!resultSet.next()) {
@@ -194,10 +193,10 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
     @Override
     public void updatePassword(String username, String currentPassword, String newPassword) throws Exception {
         try (Connection connection = AppDatabase.openConnection();
-             PreparedStatement verify = connection.prepareStatement(
-                     "SELECT password_hash FROM users WHERE username = ?");
-             PreparedStatement update = connection.prepareStatement(
-                     "UPDATE users SET password_hash = ? WHERE username = ?")) {
+                PreparedStatement verify = connection.prepareStatement(
+                        "SELECT password_hash FROM users WHERE username = ?");
+                PreparedStatement update = connection.prepareStatement(
+                        "UPDATE users SET password_hash = ? WHERE username = ?")) {
             verify.setString(1, username);
             try (ResultSet resultSet = verify.executeQuery()) {
                 if (!resultSet.next()) {
@@ -219,8 +218,8 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
 
     public void resetPassword(String username, String newPassword) throws Exception {
         try (Connection connection = AppDatabase.openConnection();
-             PreparedStatement update = connection.prepareStatement(
-                     "UPDATE users SET password_hash = ? WHERE username = ?")) {
+                PreparedStatement update = connection.prepareStatement(
+                        "UPDATE users SET password_hash = ? WHERE username = ?")) {
             update.setString(1, PasswordHasher.hashPassword(newPassword));
             update.setString(2, username);
             int affected = update.executeUpdate();

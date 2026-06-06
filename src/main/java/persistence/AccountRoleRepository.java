@@ -6,7 +6,8 @@ import loginregister.UserDataManager.Role;
 
 /**
  * Firebase-ready abstraction for account and role management.
- * A future Firebase adapter can implement this interface without changing UI code.
+ * A future Firebase adapter can implement this interface without changing UI
+ * code.
  */
 public interface AccountRoleRepository {
 

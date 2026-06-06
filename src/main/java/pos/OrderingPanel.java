@@ -668,7 +668,7 @@ public class OrderingPanel extends JPanel {
         imageLabel.setMaximumSize(new Dimension(120, 160));
         imageLabel.setOpaque(true);
         imageLabel.setBackground(BG_SURFACE);
-        ImageIcon img = loadProductImage(activeCategory, spec.displayName);
+        ImageIcon img = loadProductImage(activeCategory, spec.displayName, spec.baseName);
         if (img != null) {
             imageLabel.setIcon(scaleToFit(img, 120, 160));
         } else {
@@ -1061,7 +1061,7 @@ public class OrderingPanel extends JPanel {
         thumb.setBackground(BG_SURFACE);
         thumb.setOpaque(true);
 
-        ImageIcon img = loadProductImage(findCategory(entry.displayName), entry.displayName);
+        ImageIcon img = loadProductImage(findCategory(entry.displayName), entry.displayName, entry.baseName);
         if (img != null) {
             thumb.setText("");
             thumb.setIcon(new ImageIcon(img.getImage().getScaledInstance(26, 26, java.awt.Image.SCALE_SMOOTH)));
@@ -1640,32 +1640,44 @@ public class OrderingPanel extends JPanel {
     //  Helpers
     // ═══════════════════════════════════════════════════════════════
 
-    private ImageIcon loadProductImage(String category, String prodName) {
-        String key = category + "|" + prodName;
-        ImageIcon cached = imageCache.get(key);
-        if (cached != null) return cached;
+    private ImageIcon loadProductImage(String category, String prodName, String baseName) {
+        MenuItem menuItem = Menu.getInstance().getMenuItem(baseName);
+        String imagePath = menuItem == null ? null : menuItem.getImagePath();
+        String key = category + "|" + prodName + "|" + baseName + "|" + (imagePath == null ? "" : imagePath);
+        if (imageCache.containsKey(key)) return imageCache.get(key);
 
-        String baseName = IMAGE_MAP.getOrDefault(prodName, prodName);
+        if (imagePath != null && !imagePath.isBlank()) {
+            try {
+                BufferedImage img = ImageIO.read(new java.io.File(imagePath));
+                if (img != null) {
+                    ImageIcon icon = new ImageIcon(img);
+                    imageCache.put(key, icon);
+                    return icon;
+                }
+            } catch (Exception e) {}
+        }
+
+        String resourceBaseName = IMAGE_MAP.getOrDefault(prodName, prodName);
         List<String> attempts = new ArrayList<>();
-        String lc = baseName.toLowerCase();
+        String lc = resourceBaseName.toLowerCase();
         if (lc.startsWith("hot ") || lc.startsWith("iced ")) {
-            attempts.add(baseName + ".jpg");
-            attempts.add(baseName + " .jpg");
-            attempts.add(baseName + ".png");
-            attempts.add(baseName + " .png");
+            attempts.add(resourceBaseName + ".jpg");
+            attempts.add(resourceBaseName + " .jpg");
+            attempts.add(resourceBaseName + ".png");
+            attempts.add(resourceBaseName + " .png");
         } else {
-            attempts.add("Hot " + baseName + ".jpg");
-            attempts.add("Hot " + baseName + " .jpg");
-            attempts.add("Iced " + baseName + ".jpg");
-            attempts.add("Iced " + baseName + " .jpg");
-            attempts.add(baseName + ".jpg");
-            attempts.add(baseName + " .jpg");
-            attempts.add(baseName + ".png");
-            attempts.add(baseName + " .png");
-            attempts.add(baseName.toLowerCase() + ".jpg");
-            attempts.add(baseName.toLowerCase() + " .jpg");
-            attempts.add(baseName.toLowerCase() + ".png");
-            attempts.add(baseName.toLowerCase() + " .png");
+            attempts.add("Hot " + resourceBaseName + ".jpg");
+            attempts.add("Hot " + resourceBaseName + " .jpg");
+            attempts.add("Iced " + resourceBaseName + ".jpg");
+            attempts.add("Iced " + resourceBaseName + " .jpg");
+            attempts.add(resourceBaseName + ".jpg");
+            attempts.add(resourceBaseName + " .jpg");
+            attempts.add(resourceBaseName + ".png");
+            attempts.add(resourceBaseName + " .png");
+            attempts.add(resourceBaseName.toLowerCase() + ".jpg");
+            attempts.add(resourceBaseName.toLowerCase() + " .jpg");
+            attempts.add(resourceBaseName.toLowerCase() + ".png");
+            attempts.add(resourceBaseName.toLowerCase() + " .png");
         }
         for (String fn : attempts) {
             try {

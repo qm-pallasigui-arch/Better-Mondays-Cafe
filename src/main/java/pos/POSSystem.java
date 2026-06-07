@@ -71,7 +71,12 @@ import controller.OrderController;
 
 public class POSSystem extends javax.swing.JFrame {
 
+    // Zebra-striping colors — kept consistent with the Register Product batch table
+    private static final Color INVENTORY_ROW_ALT = new Color(0xF3F4F6);
+    private static final Color INVENTORY_SELECTION_BG = new Color(0x1A3A5C);
+
     private MonitoringPanel monitoringPanel;
+    private InventoryRegistrationPanel inventoryRegistrationPanel;
     private UserDataManager.Role currentUserRole;
     private String currentUsername;
     private InventoryController inventoryController;
@@ -996,7 +1001,15 @@ public class POSSystem extends javax.swing.JFrame {
         jScrollPane3.setBorder(null);
         jScrollPane3.getViewport().setBackground(AppTheme.BG_SURFACE);
 
-        inventoryTable = new javax.swing.JTable();
+        inventoryTable = new javax.swing.JTable() {
+            @Override
+            public Component prepareRenderer(javax.swing.table.TableCellRenderer r, int row, int col) {
+                Component c = super.prepareRenderer(r, row, col);
+                if (!isRowSelected(row))
+                    c.setBackground(row % 2 == 0 ? AppTheme.BG_SURFACE : INVENTORY_ROW_ALT);
+                return c;
+            }
+        };
         inventoryTable.setModel(new DefaultTableModel(
                 new Object[][] {},
                 new String[] { "Item Name", "Quantity", "Alert Level", "Batches", "Status", "Actions" }) {
@@ -1007,9 +1020,10 @@ public class POSSystem extends javax.swing.JFrame {
             }
         });
         AppTheme.applyTableDefaults(inventoryTable);
-        inventoryTable.setShowHorizontalLines(true);
-        inventoryTable.setShowVerticalLines(false);
-        inventoryTable.setRowMargin(4);
+        inventoryTable.setShowGrid(false);
+        inventoryTable.setIntercellSpacing(new Dimension(0, 0));
+        inventoryTable.setSelectionBackground(INVENTORY_SELECTION_BG);
+        inventoryTable.setSelectionForeground(AppTheme.FG_PRIMARY);
         inventoryTable.getTableHeader().setReorderingAllowed(false);
 
         // Column widths: Name | Quantity | Alert Level | Last Updated | Status |
@@ -1050,7 +1064,12 @@ public class POSSystem extends javax.swing.JFrame {
                     if (inventoryController == null)
                         return;
                     new ui.InventoryBatchModal(POSSystem.this, rv.getName(),
-                            inventoryController, POSSystem.this::loadInventoryTable).setVisible(true);
+                            inventoryController, () -> {
+                                loadInventoryTable();
+                                if (inventoryRegistrationPanel != null) {
+                                    inventoryRegistrationPanel.refreshFromRepository();
+                                }
+                            }).setVisible(true);
                 } else if (col == 5) {
                     inventoryTable.editCellAt(row, col);
                 }
@@ -1114,14 +1133,15 @@ public class POSSystem extends javax.swing.JFrame {
             System.err.println("MenuMaintenancePanel init failed: " + e.getMessage());
         }
         try {
-            contentPanel.add(new InventoryRegistrationPanel(
+            inventoryRegistrationPanel = new InventoryRegistrationPanel(
                     new SQLiteInventoryRepository(),
                     this::loadInventoryTable,
                     () -> {
                         if (monitoringPanel != null) {
                             monitoringPanel.refreshData();
                         }
-                    }), "Register Product");
+                    });
+            contentPanel.add(inventoryRegistrationPanel, "Register Product");
         } catch (Exception e) {
             System.err.println("InventoryRegistrationPanel init failed: " + e.getMessage());
         }

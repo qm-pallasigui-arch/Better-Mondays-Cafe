@@ -8,7 +8,6 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
 import java.awt.*;
-import java.awt.event.ActionEvent;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
 import java.awt.geom.RoundRectangle2D;
@@ -31,7 +30,6 @@ public class SearchModule extends JPanel {
     private static final Color TEXT_SECONDARY = AppTheme.ACCENT_DARK;
     private static final Color TEXT_HINT = AppTheme.FG_SUBTLE;
     private static final Color ACCENT = AppTheme.ACCENT;
-    private static final Color ACCENT_HOVER = AppTheme.ACCENT_DARK;
     private static final Color ROW_ALT = new Color(0xF3F4F6);
     private static final Color ROW_HOVER_CLR = new Color(0xE5E7EB);
     private static final Color HEADER_BG = AppTheme.ACCENT;
@@ -54,7 +52,6 @@ public class SearchModule extends JPanel {
     private static final Font FONT_TITLE = new Font("Segoe UI", Font.PLAIN, 17);
     private static final Font FONT_LABEL = new Font("Segoe UI", Font.PLAIN, 12);
     private static final Font FONT_INPUT = new Font("Segoe UI", Font.PLAIN, 13);
-    private static final Font FONT_BTN = new Font("Segoe UI", Font.PLAIN, 13);
     private static final Font FONT_BADGE = new Font("Segoe UI", Font.BOLD, 10);
     private static final Font FONT_TABLE = new Font("Segoe UI", Font.PLAIN, 13);
     private static final Font FONT_HEADER = new Font("Segoe UI", Font.PLAIN, 12);
@@ -82,6 +79,20 @@ public class SearchModule extends JPanel {
         add(buildTopBar(), BorderLayout.NORTH);
         add(buildTableArea(), BorderLayout.CENTER);
         add(buildStatusBar(), BorderLayout.SOUTH);
+
+        // Show every item for the selected target right away — the user
+        // shouldn't have to press Search just to see what's there.
+        runSearch();
+
+        // The panel is created once and reused via CardLayout, so re-run the
+        // search whenever it's switched back into view — otherwise it keeps
+        // showing whatever was true the last time it was built/visited.
+        addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentShown(java.awt.event.ComponentEvent e) {
+                runSearch();
+            }
+        });
     }
 
     // ── Top bar: title + controls ─────────────────────────────────────────────
@@ -113,6 +124,9 @@ public class SearchModule extends JPanel {
         g.gridx = 1;
         g.weightx = 1;
         AppTheme.styleSearchField(queryField);
+        // Fix the column count so the field's preferred width — and therefore
+        // the layout of the fields to its right — doesn't shift as the user types.
+        queryField.setColumns(20);
         card.add(queryField, g);
 
         // Target
@@ -137,6 +151,7 @@ public class SearchModule extends JPanel {
         g.gridx = 1;
         g.weightx = 1;
         AppTheme.styleSearchField(fromDateField);
+        fromDateField.setColumns(20);
         card.add(fromDateField, g);
         g.gridx = 2;
         g.weightx = 0;
@@ -144,17 +159,22 @@ public class SearchModule extends JPanel {
         g.gridx = 3;
         g.weightx = 0.3;
         AppTheme.styleSearchField(toDateField);
+        toDateField.setColumns(10);
         card.add(toDateField, g);
 
-        // Search button
-        JButton btn = buildSearchButton();
-        g.gridx = 4;
-        g.weightx = 0;
-        g.insets = new Insets(10, 0, 0, 0);
-        card.add(btn, g);
+        // Live search — re-run as the user types or edits dates, no button needed.
+        javax.swing.event.DocumentListener liveSearch = new javax.swing.event.DocumentListener() {
+            @Override public void insertUpdate(javax.swing.event.DocumentEvent e) { runSearch(); }
+            @Override public void removeUpdate(javax.swing.event.DocumentEvent e) { runSearch(); }
+            @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { runSearch(); }
+        };
+        queryField.getDocument().addDocumentListener(liveSearch);
+        fromDateField.getDocument().addDocumentListener(liveSearch);
+        toDateField.getDocument().addDocumentListener(liveSearch);
 
-        // Allow Enter key on query field
-        queryField.addActionListener(e -> runSearch());
+        // Re-run immediately when the target changes so the full list for
+        // the newly selected category shows without requiring another click.
+        targetBox.addActionListener(e -> runSearch());
 
         wrapper.add(card, BorderLayout.CENTER);
         return wrapper;
@@ -185,54 +205,12 @@ public class SearchModule extends JPanel {
         });
     }
 
-    private JButton buildSearchButton() {
-        JButton btn = new JButton("Search") {
-            private boolean hovered = false;
-            {
-                addMouseListener(new java.awt.event.MouseAdapter() {
-                    public void mouseEntered(java.awt.event.MouseEvent e) {
-                        hovered = true;
-                        repaint();
-                    }
-
-                    public void mouseExited(java.awt.event.MouseEvent e) {
-                        hovered = false;
-                        repaint();
-                    }
-                });
-            }
-
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(hovered ? ACCENT_HOVER : ACCENT);
-                g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 8, 8));
-                g2.setFont(FONT_BTN);
-                g2.setColor(Color.WHITE);
-                FontMetrics fm = g2.getFontMetrics();
-                g2.drawString(getText(), (getWidth() - fm.stringWidth(getText())) / 2,
-                        (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
-                g2.dispose();
-            }
-        };
-        btn.setPreferredSize(new Dimension(100, 34));
-        btn.setFocusPainted(false);
-        btn.setBorderPainted(false);
-        btn.setContentAreaFilled(false);
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.addActionListener((ActionEvent e) -> runSearch());
-        return btn;
-    }
-
     // ── Table area ────────────────────────────────────────────────────────────
     private JPanel buildTableArea() {
         JTable table = new JTable(tableModel);
         table.setFont(FONT_TABLE);
-        table.setRowHeight(38);
-        table.setShowVerticalLines(false);
-        table.setShowHorizontalLines(true);
-        table.setGridColor(new Color(0xEEEDE8));
+        table.setRowHeight(40);
+        table.setShowGrid(false);
         table.setSelectionBackground(new Color(0x1A3A5C));
         table.setSelectionForeground(TEXT_PRIMARY);
         table.setFocusable(false);
@@ -346,7 +324,10 @@ public class SearchModule extends JPanel {
             while (rs.next()) {
                 String name = rs.getString("name");
                 String unit = rs.getString("unit");
-                if (!matches(q, name, unit))
+                // Match on the item name only — unit abbreviations like "kg"
+                // or "ml" would otherwise let unrelated items surface just
+                // because the query happens to be a substring of their unit.
+                if (!matches(q, name))
                     continue;
                 double quantity = rs.getDouble("quantity");
                 double alert = rs.getDouble("alert_level");
@@ -373,7 +354,11 @@ public class SearchModule extends JPanel {
                 LocalDate d = parseDateSafe(soldAt);
                 if ((from != null && d.isBefore(from)) || (to != null && d.isAfter(to)))
                     continue;
-                if (!matches(q, name, soldAt))
+                // Match on the product name only — the raw timestamp string
+                // would otherwise let unrelated keywords (e.g. "10", "2026")
+                // match products that have nothing to do with the keyword.
+                // Date filtering is handled separately via the From/To fields.
+                if (!matches(q, name))
                     continue;
                 String details = "Qty: " + rs.getInt("quantity")
                         + "  ·  Total: ₱" + String.format("%.2f", rs.getDouble("total"));

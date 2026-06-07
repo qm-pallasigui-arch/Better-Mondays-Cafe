@@ -19,6 +19,11 @@ public class InventoryBatchModal extends JDialog {
     private static final Color EXPIRED_FG  = new Color(200, 50,  50);
     private static final Color ARCHIVED_FG = new Color(180, 180, 180);
 
+    // Zebra-striping colors — kept consistent with the Register Product batch table
+    private static final Color ROW_BASE = AppTheme.BG_SURFACE;
+    private static final Color ROW_ALT = new Color(0xF3F4F6);
+    private static final Color SELECTION_BG = new Color(0x1A3A5C);
+
     private static final String[] COLS = {"Batch ID", "SKU", "Quantity", "Expiry", "Status", "Actions"};
 
     private final String itemName;
@@ -53,11 +58,20 @@ public class InventoryBatchModal extends JDialog {
         tableModel = new DefaultTableModel(COLS, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
-        table = new JTable(tableModel);
+        table = new JTable(tableModel) {
+            @Override
+            public Component prepareRenderer(javax.swing.table.TableCellRenderer r, int row, int col) {
+                Component c = super.prepareRenderer(r, row, col);
+                if (!isRowSelected(row))
+                    c.setBackground(row % 2 == 0 ? ROW_BASE : ROW_ALT);
+                return c;
+            }
+        };
         AppTheme.applyTableDefaults(table);
-        table.setShowHorizontalLines(true);
-        table.setShowVerticalLines(false);
-        table.setRowMargin(4);
+        table.setShowGrid(false);
+        table.setIntercellSpacing(new Dimension(0, 0));
+        table.setSelectionBackground(SELECTION_BG);
+        table.setSelectionForeground(AppTheme.FG_PRIMARY);
         table.getTableHeader().setReorderingAllowed(false);
         table.setRowHeight(32);
 

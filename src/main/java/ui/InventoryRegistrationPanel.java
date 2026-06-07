@@ -131,8 +131,8 @@ public class InventoryRegistrationPanel extends JPanel {
     }
 
     public InventoryRegistrationPanel(InventoryRepository inventoryRepository,
-                                      Runnable inventoryRefreshCallback,
-                                      Runnable monitoringRefreshCallback) {
+            Runnable inventoryRefreshCallback,
+            Runnable monitoringRefreshCallback) {
         super(new BorderLayout());
         this.inventoryRepository = inventoryRepository;
         this.inventoryRefreshCallback = inventoryRefreshCallback;
@@ -263,7 +263,7 @@ public class InventoryRegistrationPanel extends JPanel {
         AppTheme.applyToComponent(table);
         header.setReorderingAllowed(false);
         ((DefaultTableCellRenderer) header.getDefaultRenderer())
-            .setHorizontalAlignment(SwingConstants.LEFT);
+                .setHorizontalAlignment(SwingConstants.LEFT);
 
         // Column widths — last column is narrow (delete button)
         int[] widths = { 95, 190, 140, 70, 110, 110, 72 };
@@ -330,7 +330,8 @@ public class InventoryRegistrationPanel extends JPanel {
         }
 
         String finalSku = sku.isEmpty() ? autoSku(name) : sku;
-        InventoryBatch batch = new InventoryBatch(finalSku, qty, (normExpiry == null || normExpiry.isBlank()) ? null : normExpiry);
+        InventoryBatch batch = new InventoryBatch(finalSku, qty,
+                (normExpiry == null || normExpiry.isBlank()) ? null : normExpiry);
 
         // 1. Primary: persist to SQLite via repository
         boolean dbOk = false;
@@ -625,8 +626,6 @@ public class InventoryRegistrationPanel extends JPanel {
         return l;
     }
 
-    
-
     private void styleInput(JTextField f) {
         f.setFont(FONT_INPUT);
         f.setForeground(TEXT_PRIMARY);
@@ -793,9 +792,10 @@ public class InventoryRegistrationPanel extends JPanel {
             };
             badge.setBackground(bc[0]);
             badge.setForeground(bc[1]);
-                badge.setBorder(BorderFactory.createCompoundBorder(
-                new RoundedLineBorder(new Color(bc[1].getRed(), bc[1].getGreen(), bc[1].getBlue(), 70), AppTheme.BORDER_THICKNESS, AppTheme.BORDER_RADIUS),
-                new EmptyBorder(3, 6, 3, 6)));
+            badge.setBorder(BorderFactory.createCompoundBorder(
+                    new RoundedLineBorder(new Color(bc[1].getRed(), bc[1].getGreen(), bc[1].getBlue(), 70),
+                            AppTheme.BORDER_THICKNESS, AppTheme.BORDER_RADIUS),
+                    new EmptyBorder(3, 6, 3, 6)));
             return this;
         }
     }
@@ -813,8 +813,10 @@ public class InventoryRegistrationPanel extends JPanel {
             btn.setHorizontalAlignment(SwingConstants.CENTER);
             btn.setBackground(BTN_DEL_BG);
             btn.setForeground(BTN_DEL_FG);
-                btn.setBorder(BorderFactory.createCompoundBorder(
-                    new RoundedLineBorder(new Color(BTN_DEL_FG.getRed(), BTN_DEL_FG.getGreen(), BTN_DEL_FG.getBlue(), 80), AppTheme.BORDER_THICKNESS, AppTheme.BORDER_RADIUS),
+            btn.setBorder(BorderFactory.createCompoundBorder(
+                    new RoundedLineBorder(
+                            new Color(BTN_DEL_FG.getRed(), BTN_DEL_FG.getGreen(), BTN_DEL_FG.getBlue(), 80),
+                            AppTheme.BORDER_THICKNESS, AppTheme.BORDER_RADIUS),
                     new EmptyBorder(3, 8, 3, 8)));
             add(btn);
         }
@@ -845,8 +847,10 @@ public class InventoryRegistrationPanel extends JPanel {
             btn.setHorizontalAlignment(SwingConstants.CENTER);
             btn.setBackground(BTN_DEL_HOV_BG);
             btn.setForeground(BTN_DEL_FG);
-                btn.setBorder(BorderFactory.createCompoundBorder(
-                    new RoundedLineBorder(new Color(BTN_DEL_FG.getRed(), BTN_DEL_FG.getGreen(), BTN_DEL_FG.getBlue(), 80), AppTheme.BORDER_THICKNESS, AppTheme.BORDER_RADIUS),
+            btn.setBorder(BorderFactory.createCompoundBorder(
+                    new RoundedLineBorder(
+                            new Color(BTN_DEL_FG.getRed(), BTN_DEL_FG.getGreen(), BTN_DEL_FG.getBlue(), 80),
+                            AppTheme.BORDER_THICKNESS, AppTheme.BORDER_RADIUS),
                     new EmptyBorder(3, 8, 3, 8)));
             btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
@@ -877,7 +881,8 @@ public class InventoryRegistrationPanel extends JPanel {
         }
 
         private void openEditDialog(int modelRow) {
-            if (modelRow < 0 || modelRow >= batchCache.size()) return;
+            if (modelRow < 0 || modelRow >= batchCache.size())
+                return;
             String[] row = batchCache.get(modelRow);
             String batchId = row[0];
             String itemName = row[1];
@@ -888,15 +893,24 @@ public class InventoryRegistrationPanel extends JPanel {
             JPanel p = new JPanel(new GridBagLayout());
             GridBagConstraints c = new GridBagConstraints();
             c.insets = new Insets(6, 6, 6, 6);
-            c.gridx = 0; c.gridy = 0; c.anchor = GridBagConstraints.WEST;
+            c.gridx = 0;
+            c.gridy = 0;
+            c.anchor = GridBagConstraints.WEST;
             p.add(new JLabel("Quantity:"), c);
-            c.gridx = 1; c.fill = GridBagConstraints.HORIZONTAL; c.weightx = 1.0;
+            c.gridx = 1;
+            c.fill = GridBagConstraints.HORIZONTAL;
+            c.weightx = 1.0;
             qtyFld.setPreferredSize(new Dimension(200, 28));
             p.add(qtyFld, c);
 
-            c.gridx = 0; c.gridy = 1; c.weightx = 0; c.fill = GridBagConstraints.NONE;
+            c.gridx = 0;
+            c.gridy = 1;
+            c.weightx = 0;
+            c.fill = GridBagConstraints.NONE;
             p.add(new JLabel("Expiry (YYYY-MM-DD):"), c);
-            c.gridx = 1; c.fill = GridBagConstraints.HORIZONTAL; c.weightx = 1.0;
+            c.gridx = 1;
+            c.fill = GridBagConstraints.HORIZONTAL;
+            c.weightx = 1.0;
             p.add(expFld, c);
 
             JButton deleteBtn = new JButton("Delete Batch");
@@ -911,11 +925,12 @@ public class InventoryRegistrationPanel extends JPanel {
                 if (confirm == JOptionPane.YES_OPTION) {
                     onDelete(modelRow);
                     Window w = SwingUtilities.getWindowAncestor(p);
-                    if (w != null) w.dispose();
+                    if (w != null)
+                        w.dispose();
                 }
             });
 
-            Object[] options = new Object[] {"Save", deleteBtn, "Cancel"};
+            Object[] options = new Object[] { "Save", deleteBtn, "Cancel" };
             int res = JOptionPane.showOptionDialog(InventoryRegistrationPanel.this, p,
                     "Edit Batch " + batchId,
                     JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE,
@@ -942,7 +957,10 @@ public class InventoryRegistrationPanel extends JPanel {
                     }
 
                     rebuildTable();
-                    try { inventory.Inventory.getInstance().refreshItem(itemName); } catch (Exception ignored) {}
+                    try {
+                        inventory.Inventory.getInstance().refreshItem(itemName);
+                    } catch (Exception ignored) {
+                    }
                     triggerRefreshCallbacks();
                     setStatus("✓  Batch " + batchId + " updated.", BADGE_OK_FG);
                 } catch (Exception ex) {
@@ -981,15 +999,19 @@ public class InventoryRegistrationPanel extends JPanel {
         AbstractDocument doc = (AbstractDocument) field.getDocument();
         doc.setDocumentFilter(new DocumentFilter() {
             @Override
-            public void insertString(FilterBypass fb, int offset, String string, AttributeSet attr) throws BadLocationException {
+            public void insertString(FilterBypass fb, int offset, String string, AttributeSet attr)
+                    throws BadLocationException {
                 replace(fb, offset, 0, string, attr);
             }
 
             @Override
-            public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attrs) throws BadLocationException {
+            public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attrs)
+                    throws BadLocationException {
                 String current = fb.getDocument().getText(0, fb.getDocument().getLength());
-                String raw = new StringBuilder(current).replace(offset, offset + length, text == null ? "" : text).toString();
-                String digits = raw.replaceAll("[^0-9]", "").substring(0, Math.min(8, raw.replaceAll("[^0-9]", "").length()));
+                String raw = new StringBuilder(current).replace(offset, offset + length, text == null ? "" : text)
+                        .toString();
+                String digits = raw.replaceAll("[^0-9]", "").substring(0,
+                        Math.min(8, raw.replaceAll("[^0-9]", "").length()));
                 String formatted = formatExpiryDigits(digits);
                 fb.replace(0, fb.getDocument().getLength(), formatted, attrs);
             }
@@ -998,16 +1020,19 @@ public class InventoryRegistrationPanel extends JPanel {
             public void remove(FilterBypass fb, int offset, int length) throws BadLocationException {
                 String current = fb.getDocument().getText(0, fb.getDocument().getLength());
                 String raw = new StringBuilder(current).delete(offset, offset + length).toString();
-                String digits = raw.replaceAll("[^0-9]", "").substring(0, Math.min(8, raw.replaceAll("[^0-9]", "").length()));
+                String digits = raw.replaceAll("[^0-9]", "").substring(0,
+                        Math.min(8, raw.replaceAll("[^0-9]", "").length()));
                 String formatted = formatExpiryDigits(digits);
                 fb.replace(0, fb.getDocument().getLength(), formatted, null);
             }
 
             private String formatExpiryDigits(String digits) {
-                if (digits.isEmpty()) return "";
+                if (digits.isEmpty())
+                    return "";
                 StringBuilder sb = new StringBuilder();
                 for (int i = 0; i < digits.length() && i < 8; i++) {
-                    if (i == 4 || i == 6) sb.append('-');
+                    if (i == 4 || i == 6)
+                        sb.append('-');
                     sb.append(digits.charAt(i));
                 }
                 return sb.toString();

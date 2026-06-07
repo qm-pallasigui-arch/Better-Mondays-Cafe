@@ -6,13 +6,16 @@ import loginregister.UserDataManager.Role;
 
 /**
  * Firebase-ready abstraction for account and role management.
- * A future Firebase adapter can implement this interface without changing UI code.
+ * A future Firebase adapter can implement this interface without changing UI
+ * code.
  */
 public interface AccountRoleRepository {
 
     List<UserAccount> listUsers() throws Exception;
 
     void updateUserRole(String username, Role role) throws Exception;
+
+    void deleteUser(String username) throws Exception;
 
     void createUser(String username, String plainPassword, Role role,
             String fullName, int age, String birthdate,

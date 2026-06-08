@@ -161,6 +161,13 @@ public final class AppTheme {
                 button.setUI(new BasicButtonUI());
             } else if ("danger".equals(variant)) {
                 button.setBackground(DANGER);
+                button.setForeground(Color.WHITE);
+                button.setOpaque(true);
+                button.setContentAreaFilled(true);
+                button.setFont(BODY);
+                button.setFocusPainted(false);
+                button.setBorderPainted(false);
+                return;
             } else {
                 button.setBackground(ACCENT);
             }

@@ -20,4 +20,7 @@ public interface AccountRoleRepository {
     void createUser(String username, String plainPassword, Role role,
             String fullName, int age, String birthdate,
             String address, String mobile, String gender) throws Exception;
+
+    void updateUserDetails(String username, String fullName, int age, String birthdate,
+            String address, String mobile, String gender) throws Exception;
 }

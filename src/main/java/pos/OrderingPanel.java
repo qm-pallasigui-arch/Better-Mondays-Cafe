@@ -1489,7 +1489,7 @@ public class OrderingPanel extends JPanel {
         try {
             controller.OrderController oc = new controller.OrderController(
                     new persistence.sqlite.SQLiteSalesRepository());
-            oc.persistCompletedTransaction(txnRef, sales, totalInclusive, cash, change);
+            oc.persistCompletedTransaction(txnRef, sales, totalInclusive, cash, change, customerName);
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Save error: " + ex.getMessage(),
                     "Database", JOptionPane.WARNING_MESSAGE);

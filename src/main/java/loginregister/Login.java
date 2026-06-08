@@ -1,5 +1,6 @@
 package loginregister;
 
+import persistence.sqlite.SQLiteStaffShiftRepository;
 import pos.POSSystem;
 import ui.AppTheme;
 import util.FieldAssist;
@@ -175,7 +176,12 @@ public class Login extends javax.swing.JFrame {
         if (UserDataManager.verifyCredentials(username, password)) {
             // Get user's role
             UserDataManager.Role userRole = UserDataManager.getUserRole(username);
-            
+
+            // Auto-record shift start
+            try {
+                new SQLiteStaffShiftRepository().startShift(username);
+            } catch (Exception ignored) {}
+
             // Open POSSystem with user role
             new POSSystem(username, userRole).setVisible(true);
             this.dispose();

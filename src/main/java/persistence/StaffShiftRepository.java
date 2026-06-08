@@ -14,4 +14,12 @@ public interface StaffShiftRepository {
     List<StaffShift> findAllShifts() throws Exception;
 
     void updateShift(int id, String startedAt, String endedAt, String notes) throws Exception;
+
+    void markAsLate(String username) throws Exception;
+
+    void markAsAbsent(String username) throws Exception;
+
+    List<StaffShift> findTodayActiveShifts() throws Exception;
+
+    StaffShift findLatestShift(String username) throws Exception;
 }

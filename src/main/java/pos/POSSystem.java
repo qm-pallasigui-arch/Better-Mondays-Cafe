@@ -15,6 +15,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.stream.Collectors;
 import monitoring.SalesRecord;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.text.SimpleDateFormat;
 import java.awt.CardLayout;
@@ -36,6 +38,7 @@ import javax.swing.AbstractCellEditor;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.Icon;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
@@ -46,9 +49,20 @@ import javax.swing.JTextArea;
 import javax.swing.JComboBox;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import loginregister.Login;
 import javax.swing.table.TableCellEditor;
 import loginregister.UserDataManager;
+import loginregister.UserDataManager.Role;
+import javax.swing.JPasswordField;
+import javax.swing.JDialog;
+import java.awt.FontMetrics;
+import java.awt.Cursor;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.BasicStroke;
+import javax.swing.border.EmptyBorder;
 import persistence.Phase2Bootstrap;
 import ui.MenuMaintenancePanel;
 import ui.SearchModule;
@@ -76,6 +90,10 @@ public class POSSystem extends javax.swing.JFrame {
     private String currentUsername;
     private InventoryController inventoryController;
     private OrderController orderController;
+
+    private JLabel topNavUserIcon;
+    private JLabel topNavUserName;
+    private JLabel topNavUserRole;
 
     private static final List<String> ORDERING_CATEGORIES = List.of(
             "Espresso & Coffee",
@@ -803,7 +821,7 @@ public class POSSystem extends javax.swing.JFrame {
 
         String transactionRef = "TXN" + String.format("%06d", transactionCounter);
         try {
-            orderController.persistCompletedTransaction(transactionRef, salesList, subTotal, cash, change);
+            orderController.persistCompletedTransaction(transactionRef, salesList, subTotal, cash, change, "Walk-in");
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this,
                     "Unable to save sales to database: " + e.getMessage(),
@@ -818,6 +836,366 @@ public class POSSystem extends javax.swing.JFrame {
         monitoringPanel.refreshData();
     }
 
+    // ─── Top Navigation Bar (with user profile on right) ────────
+    private JPanel buildTopNavBar() {
+        JPanel bar = new JPanel(new BorderLayout(0, 0));
+        bar.setBackground(AppTheme.BG_SURFACE);
+        bar.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, AppTheme.BORDER),
+                new EmptyBorder(0, 24, 0, 20)));
+        bar.setPreferredSize(new Dimension(0, 56));
+
+        // Left — live clock
+        JLabel clockLabel = new JLabel();
+        clockLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        clockLabel.setForeground(AppTheme.FG_MUTED);
+        Timer clockTimer = new Timer(1000, e -> {
+            LocalDateTime now = LocalDateTime.now();
+            clockLabel.setText(now.format(DateTimeFormatter.ofPattern("EEEE, MM/dd/yyyy, hh:mm:ss a")));
+        });
+        clockTimer.setInitialDelay(0);
+        clockTimer.start();
+        JPanel clockPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        clockPanel.setOpaque(false);
+        clockPanel.add(clockLabel);
+        bar.add(clockPanel, BorderLayout.WEST);
+
+        // Right side — status indicators + user profile
+        JPanel profilePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        profilePanel.setOpaque(false);
+        profilePanel.setBorder(new EmptyBorder(0, 0, 0, 4));
+
+        // ── Online indicator ──
+        JPanel onlinePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        onlinePanel.setOpaque(false);
+        JLabel dot = new JLabel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(AppTheme.SUCCESS);
+                int d = 8;
+                g2.fillOval((getWidth() - d) / 2, (getHeight() - d) / 2, d, d);
+                g2.dispose();
+            }
+        };
+        dot.setPreferredSize(new Dimension(14, 14));
+        dot.setOpaque(false);
+        JLabel onlineText = new JLabel("Online");
+        onlineText.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        onlineText.setForeground(AppTheme.SUCCESS);
+        onlinePanel.add(dot);
+        onlinePanel.add(onlineText);
+
+        // ── Notification bell with badge ──
+        int notifCount = ui.MonitoringPanel.getPendingReportCount();
+        JPanel bellPanel = new JPanel(new GridBagLayout());
+        bellPanel.setOpaque(false);
+        JLabel bellIcon = new JLabel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int w = getWidth(), h = getHeight();
+                int cx = w / 2, by = h - 6;
+                g2.setColor(new Color(0x2563EB));
+                g2.setStroke(new BasicStroke(1.6f));
+                g2.drawArc(cx - 6, by - 12, 12, 10, 0, 180);
+                g2.drawLine(cx - 4, by, cx + 4, by);
+                g2.fillOval(cx - 1, by - 14, 3, 3);
+                g2.dispose();
+            }
+        };
+        bellIcon.setPreferredSize(new Dimension(22, 22));
+        bellIcon.setOpaque(false);
+        bellIcon.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        bellIcon.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                ui.MonitoringPanel.showNotificationsDialog(SwingUtilities.windowForComponent(bellPanel));
+            }
+        });
+        bellPanel.add(bellIcon);
+
+        if (notifCount > 0) {
+            JLabel badge = new JLabel(String.valueOf(notifCount), SwingConstants.CENTER);
+            badge.setFont(new Font("Segoe UI", Font.BOLD, 9));
+            badge.setForeground(Color.WHITE);
+            badge.setBackground(AppTheme.DANGER);
+            badge.setOpaque(true);
+            badge.setPreferredSize(new Dimension(16, 16));
+            badge.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
+            GridBagConstraints bc = new GridBagConstraints();
+            bc.gridx = 1;
+            bc.gridy = 0;
+            bc.anchor = GridBagConstraints.NORTHWEST;
+            bellPanel.add(badge, bc);
+        }
+
+        // ── User avatar ──
+        topNavUserIcon = new JLabel(String.valueOf(Character.toUpperCase(currentUsername.charAt(0)))) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(currentUserRole == Role.ADMIN ? AppTheme.ACCENT_DARK : AppTheme.SUCCESS);
+                int size = Math.min(getWidth(), getHeight());
+                g2.fillOval(0, 0, size - 1, size - 1);
+                g2.setColor(Color.WHITE);
+                g2.setFont(new Font("Segoe UI", Font.BOLD, 14));
+                FontMetrics fm = g2.getFontMetrics();
+                String text = getText();
+                g2.drawString(text, (getWidth() - fm.stringWidth(text)) / 2,
+                        (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
+                g2.dispose();
+            }
+        };
+        topNavUserIcon.setPreferredSize(new Dimension(36, 36));
+        topNavUserIcon.setMinimumSize(new Dimension(36, 36));
+        topNavUserIcon.setHorizontalAlignment(SwingConstants.CENTER);
+        topNavUserIcon.setOpaque(false);
+
+        JPanel avatarWrap = new JPanel(new GridBagLayout());
+        avatarWrap.setOpaque(false);
+        avatarWrap.setPreferredSize(new Dimension(40, 40));
+        avatarWrap.add(topNavUserIcon);
+
+        // ── Name + role pill ──
+        JPanel namePanel = new JPanel();
+        namePanel.setLayout(new BoxLayout(namePanel, BoxLayout.Y_AXIS));
+        namePanel.setOpaque(false);
+
+        topNavUserName = new JLabel(currentUsername);
+        topNavUserName.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        topNavUserName.setForeground(AppTheme.FG_PRIMARY);
+
+        boolean isAdmin = currentUserRole == Role.ADMIN;
+        topNavUserRole = new JLabel(isAdmin ? "Admin" : "Staff");
+        topNavUserRole.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        topNavUserRole.setForeground(isAdmin ? AppTheme.ACCENT_DARK : AppTheme.SUCCESS);
+        topNavUserRole.setBackground(isAdmin ? AppTheme.BG_BADGE_BLUE : AppTheme.BG_BADGE_GREEN);
+        topNavUserRole.setOpaque(true);
+        topNavUserRole.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createEmptyBorder(1, 6, 1, 6),
+                BorderFactory.createLineBorder(isAdmin ? AppTheme.ACCENT_DARK : AppTheme.SUCCESS, 1)));
+        topNavUserRole.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        namePanel.add(topNavUserName);
+        namePanel.add(Box.createVerticalStrut(2));
+        namePanel.add(topNavUserRole);
+
+        JButton settingsBtn = new JButton();
+        settingsBtn.putClientProperty("appTheme.variant", "transparent");
+        settingsBtn.setIcon(createOverflowIcon());
+        settingsBtn.setPreferredSize(new Dimension(24, 24));
+        settingsBtn.setForeground(AppTheme.FG_MUTED);
+        settingsBtn.setBackground(new Color(0, 0, 0, 0));
+        settingsBtn.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
+        settingsBtn.setFocusPainted(false);
+        settingsBtn.setContentAreaFilled(false);
+        settingsBtn.setOpaque(false);
+        settingsBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        settingsBtn.addActionListener(e -> showProfileSettingsDialog());
+
+        // Add to profilePanel (FlowLayout.RIGHT → first added = rightmost)
+        profilePanel.add(onlinePanel);
+        if (isAdmin) {
+            profilePanel.add(bellPanel);
+        }
+        profilePanel.add(Box.createHorizontalStrut(4));
+        profilePanel.add(avatarWrap);
+        profilePanel.add(Box.createHorizontalStrut(2));
+        profilePanel.add(namePanel);
+        profilePanel.add(Box.createHorizontalStrut(4));
+        profilePanel.add(settingsBtn);
+
+        bar.add(profilePanel, BorderLayout.EAST);
+        return bar;
+    }
+
+    private Icon createOverflowIcon() {
+        return new Icon() {
+            @Override
+            public int getIconWidth() { return 10; }
+
+            @Override
+            public int getIconHeight() { return 14; }
+
+            @Override
+            public void paintIcon(java.awt.Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(AppTheme.FG_MUTED);
+                g2.fillOval(x + 3, y + 1, 4, 4);
+                g2.fillOval(x + 3, y + 5, 4, 4);
+                g2.fillOval(x + 3, y + 9, 4, 4);
+                g2.dispose();
+            }
+        };
+    }
+
+    private void showProfileSettingsDialog() {
+        JDialog dialog = new JDialog(this, "User Settings", JDialog.ModalityType.APPLICATION_MODAL);
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+
+        JPanel content = new JPanel();
+        content.setLayout(new BorderLayout(0, 14));
+        content.setBorder(new EmptyBorder(16, 16, 16, 16));
+        content.setBackground(AppTheme.BG_SURFACE);
+
+        JPanel summary = new JPanel(new GridLayout(0, 1, 0, 4));
+        summary.setOpaque(false);
+        JLabel title = new JLabel("User Settings");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        JLabel current = new JLabel("Current username: " + currentUsername);
+        current.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        current.setForeground(AppTheme.FG_MUTED);
+        summary.add(title);
+        summary.add(current);
+
+        JPanel actions = new JPanel(new GridLayout(0, 1, 0, 10));
+        actions.setOpaque(false);
+
+        JButton checkUsername = new JButton("Check Username");
+        checkUsername.addActionListener(ae -> JOptionPane.showMessageDialog(
+                dialog, "Current username: " + currentUsername, "Username",
+                JOptionPane.INFORMATION_MESSAGE));
+
+        JButton editUsername = new JButton("Edit Username");
+        editUsername.addActionListener(ae -> showEditUsernameDialog());
+
+        JButton changePassword = new JButton("Change Password");
+        changePassword.addActionListener(ae -> showChangePasswordDialog());
+
+        JButton close = new JButton("Close");
+        close.addActionListener(ae -> dialog.dispose());
+
+        styleSettingsButton(checkUsername);
+        styleSettingsButton(editUsername);
+        styleSettingsButton(changePassword);
+        styleSettingsButton(close);
+
+        actions.add(checkUsername);
+        actions.add(editUsername);
+        actions.add(changePassword);
+        actions.add(close);
+
+        content.add(summary, BorderLayout.NORTH);
+        content.add(actions, BorderLayout.CENTER);
+        AppTheme.applyToComponent(content);
+
+        dialog.setContentPane(content);
+        dialog.pack();
+        dialog.setResizable(false);
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
+    }
+
+    private void styleSettingsButton(JButton button) {
+        if (button == null) return;
+        button.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        button.setPreferredSize(new Dimension(220, 36));
+        button.setMinimumSize(new Dimension(220, 36));
+        button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        button.setFocusPainted(false);
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    }
+
+    private void showEditUsernameDialog() {
+        JTextField usernameField = new JTextField(currentUsername, 18);
+        JPasswordField currentPasswordField = new JPasswordField(18);
+
+        JPanel panel = new JPanel(new GridLayout(0, 1, 6, 6));
+        panel.add(new JLabel("New username"));
+        panel.add(usernameField);
+        panel.add(new JLabel("Current password"));
+        panel.add(currentPasswordField);
+
+        int result = JOptionPane.showConfirmDialog(
+                this, panel, "Edit Username",
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if (result != JOptionPane.OK_OPTION) return;
+
+        String newUsername = usernameField.getText().trim();
+        String currentPassword = new String(currentPasswordField.getPassword()).trim();
+        if (newUsername.isEmpty() || currentPassword.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Username and password are required.",
+                    "Edit Username", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        if (newUsername.equals(currentUsername)) {
+            JOptionPane.showMessageDialog(this, "New username must be different.",
+                    "Edit Username", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        if (UserDataManager.updateUsername(currentUsername, newUsername, currentPassword)) {
+            currentUsername = newUsername;
+            topNavUserName.setText(newUsername);
+            topNavUserIcon.setText(String.valueOf(Character.toUpperCase(newUsername.charAt(0))));
+            setTitle("Better Mondays Coffeee Cafe Management System - " + newUsername);
+            JOptionPane.showMessageDialog(this, "Username updated.",
+                    "Edit Username", JOptionPane.INFORMATION_MESSAGE);
+        } else {
+            JOptionPane.showMessageDialog(this,
+                    "Unable to update username. Check your password or whether the username is already in use.",
+                    "Edit Username", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void showChangePasswordDialog() {
+        JPasswordField currentPasswordField = new JPasswordField(18);
+        JPasswordField newPasswordField = new JPasswordField(18);
+        JPasswordField confirmPasswordField = new JPasswordField(18);
+
+        JPanel panel = new JPanel(new GridLayout(0, 1, 6, 6));
+        panel.add(new JLabel("Current password"));
+        panel.add(currentPasswordField);
+        panel.add(new JLabel("New password"));
+        panel.add(newPasswordField);
+        panel.add(new JLabel("Confirm new password"));
+        panel.add(confirmPasswordField);
+
+        int result = JOptionPane.showConfirmDialog(
+                this, panel, "Change Password",
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if (result != JOptionPane.OK_OPTION) return;
+
+        String currentPassword = new String(currentPasswordField.getPassword()).trim();
+        String newPassword = new String(newPasswordField.getPassword()).trim();
+        String confirmPassword = new String(confirmPasswordField.getPassword()).trim();
+
+        if (currentPassword.isEmpty() || newPassword.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "All password fields are required.",
+                    "Change Password", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        if (!newPassword.equals(confirmPassword)) {
+            JOptionPane.showMessageDialog(this, "New passwords do not match.",
+                    "Change Password", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        if (!isStrongPassword(newPassword)) {
+            JOptionPane.showMessageDialog(this,
+                    "Password must be at least 8 characters and include a number and a special character.",
+                    "Change Password", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        if (UserDataManager.updatePassword(currentUsername, currentPassword, newPassword)) {
+            JOptionPane.showMessageDialog(this, "Password updated.",
+                    "Change Password", JOptionPane.INFORMATION_MESSAGE);
+        } else {
+            JOptionPane.showMessageDialog(this, "Unable to update password. Check your current password.",
+                    "Change Password", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private boolean isStrongPassword(String password) {
+        return password.length() >= 8 && password.matches(".*\\d.*") && password.matches(".*[!@#$%^&*(),.?\":{}|<>].*");
+    }
+
     // ─── initComponents (replaces GUI builder code) ─────────────
     private void initComponents() {
         jPanelPOS = new javax.swing.JPanel();
@@ -825,13 +1203,8 @@ public class POSSystem extends javax.swing.JFrame {
 
         sidebar = new SidebarPanel(currentUsername, currentUserRole, page -> {
             cardLayout.show(contentPanel, page);
-        }, this::logoutAndReturnToLogin, newUsername -> {
-            currentUsername = newUsername;
-            setTitle("Better Mondays Coffeee Cafe Management System - " + newUsername);
-            if (sidebar != null) {
-                sidebar.setUsername(newUsername);
-            }
         });
+        sidebar.setLogoutListener(this::logoutAndReturnToLogin);
         cardLayout = new CardLayout();
         contentPanel = new JPanel(cardLayout);
         contentPanel.setBackground(AppTheme.BG_PRIMARY);
@@ -974,6 +1347,8 @@ public class POSSystem extends javax.swing.JFrame {
         JPanel rightControls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
         rightControls.setOpaque(false);
 
+        boolean isAdmin = currentUserRole == Role.ADMIN;
+
         JButton addBtn = new JButton("+ Add Item");
         addBtn.setFont(BOLD_FONT);
         addBtn.setForeground(Color.WHITE);
@@ -982,6 +1357,7 @@ public class POSSystem extends javax.swing.JFrame {
         addBtn.setFocusPainted(false);
         addBtn.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
         addBtn.addActionListener(e -> InventoryAddActionPerformed(null));
+        addBtn.setVisible(isAdmin);
         rightControls.add(addBtn);
 
         controlsPanel.add(rightControls, BorderLayout.EAST);
@@ -997,43 +1373,56 @@ public class POSSystem extends javax.swing.JFrame {
         jScrollPane3.getViewport().setBackground(AppTheme.BG_SURFACE);
 
         inventoryTable = new javax.swing.JTable();
-        inventoryTable.setModel(new DefaultTableModel(
-                new Object[][] {},
-                new String[] { "Item Name", "Quantity", "Alert Level", "Batches", "Status", "Actions" }) {
-            boolean[] canEdit = new boolean[] { false, false, false, false, false, true };
-
-            public boolean isCellEditable(int rowIndex, int columnIndex) {
-                return canEdit[columnIndex];
-            }
-        });
+        if (isAdmin) {
+            inventoryTable.setModel(new DefaultTableModel(
+                    new Object[][] {},
+                    new String[] { "Item Name", "Quantity", "Alert Level", "Batches", "Status", "Actions" }) {
+                boolean[] canEdit = new boolean[] { false, false, false, false, false, true };
+                public boolean isCellEditable(int rowIndex, int columnIndex) {
+                    return canEdit[columnIndex];
+                }
+            });
+        } else {
+            inventoryTable.setModel(new DefaultTableModel(
+                    new Object[][] {},
+                    new String[] { "Item Name", "Quantity", "Alert Level", "Batches", "Status" }) {
+                public boolean isCellEditable(int rowIndex, int columnIndex) {
+                    return false;
+                }
+            });
+        }
         AppTheme.applyTableDefaults(inventoryTable);
         inventoryTable.setShowHorizontalLines(true);
         inventoryTable.setShowVerticalLines(false);
         inventoryTable.setRowMargin(4);
         inventoryTable.getTableHeader().setReorderingAllowed(false);
 
-        // Column widths: Name | Quantity | Alert Level | Last Updated | Status |
-        // Actions
+        // Column widths
         inventoryTable.getColumnModel().getColumn(0).setPreferredWidth(160);
         inventoryTable.getColumnModel().getColumn(1).setPreferredWidth(100);
         inventoryTable.getColumnModel().getColumn(2).setPreferredWidth(100);
         inventoryTable.getColumnModel().getColumn(3).setPreferredWidth(130);
         inventoryTable.getColumnModel().getColumn(4).setPreferredWidth(100);
-        inventoryTable.getColumnModel().getColumn(5).setPreferredWidth(80);
+        if (isAdmin) {
+            inventoryTable.getColumnModel().getColumn(5).setPreferredWidth(80);
+        }
 
         // Center align all columns
         DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
         centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
-        for (int i = 0; i < 6; i++) {
+        int colCount = isAdmin ? 6 : 5;
+        for (int i = 0; i < colCount; i++) {
             inventoryTable.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
         }
 
         // Batches column at index 3
         inventoryTable.getColumnModel().getColumn(3).setCellRenderer(new BatchSummaryRenderer());
 
-        // Actions column at index 5
-        inventoryTable.getColumnModel().getColumn(5).setCellRenderer(new ActionsCellRenderer());
-        inventoryTable.getColumnModel().getColumn(5).setCellEditor(new ActionsCellEditor());
+        if (isAdmin) {
+            // Actions column at index 5
+            inventoryTable.getColumnModel().getColumn(5).setCellRenderer(new ActionsCellRenderer());
+            inventoryTable.getColumnModel().getColumn(5).setCellEditor(new ActionsCellEditor());
+        }
 
         // Single-click: col 3 opens batch modal, col 5 opens actions menu
         inventoryTable.addMouseListener(new java.awt.event.MouseAdapter() {
@@ -1051,7 +1440,7 @@ public class POSSystem extends javax.swing.JFrame {
                         return;
                     new ui.InventoryBatchModal(POSSystem.this, rv.getName(),
                             inventoryController, POSSystem.this::loadInventoryTable).setVisible(true);
-                } else if (col == 5) {
+                } else if (col == 5 && isAdmin) {
                     inventoryTable.editCellAt(row, col);
                 }
             }
@@ -1103,13 +1492,13 @@ public class POSSystem extends javax.swing.JFrame {
         // ═══════════════════════════════════════════════════════════
         // MONITORING TAB (redesigned MonitoringPanel)
         // ═══════════════════════════════════════════════════════════
-        monitoringPanel = new MonitoringPanel();
+        monitoringPanel = new MonitoringPanel(isAdmin);
         monitoringPanel.setBackground(AppTheme.BG_PRIMARY);
         contentPanel.add(monitoringPanel, "Monitoring");
 
         // Other tabs
         try {
-            contentPanel.add(new MenuMaintenancePanel(), "Menu Maintenance");
+            contentPanel.add(new MenuMaintenancePanel(isAdmin), "Menu Maintenance");
         } catch (Exception e) {
             System.err.println("MenuMaintenancePanel init failed: " + e.getMessage());
         }
@@ -1121,7 +1510,7 @@ public class POSSystem extends javax.swing.JFrame {
                         if (monitoringPanel != null) {
                             monitoringPanel.refreshData();
                         }
-                    }), "Register Product");
+                    }, isAdmin, currentUsername), "Register Product");
         } catch (Exception e) {
             System.err.println("InventoryRegistrationPanel init failed: " + e.getMessage());
         }
@@ -1137,7 +1526,12 @@ public class POSSystem extends javax.swing.JFrame {
 
         getContentPane().setLayout(new BorderLayout());
         getContentPane().add(sidebar, BorderLayout.WEST);
-        getContentPane().add(contentPanel, BorderLayout.CENTER);
+
+        JPanel centerWrapper = new JPanel(new BorderLayout());
+        centerWrapper.setOpaque(false);
+        centerWrapper.add(buildTopNavBar(), BorderLayout.NORTH);
+        centerWrapper.add(contentPanel, BorderLayout.CENTER);
+        getContentPane().add(centerWrapper, BorderLayout.CENTER);
 
         pack();
         setLocationRelativeTo(null);
@@ -1395,7 +1789,7 @@ public class POSSystem extends javax.swing.JFrame {
         try {
             if (orderController == null)
                 orderController = new OrderController(new SQLiteSalesRepository());
-            orderController.persistCompletedTransaction(transactionRef, salesList, subTotal, cash, change);
+            orderController.persistCompletedTransaction(transactionRef, salesList, subTotal, cash, change, "Walk-in");
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Unable to save sales to database: " + e.getMessage(), "Database",
                     JOptionPane.WARNING_MESSAGE);

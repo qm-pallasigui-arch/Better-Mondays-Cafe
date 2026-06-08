@@ -63,6 +63,7 @@ public class MenuMaintenancePanel extends JPanel {
     private final JTable table;
     private final JComboBox<String> categoryFilter;
     private final JTextField searchField;
+    private final boolean isAdmin;
     private List<MenuItem> cachedItems = new ArrayList<>();
     private OnMenuItemSavedCallback onItemSavedCallback = null;
 
@@ -78,7 +79,12 @@ public class MenuMaintenancePanel extends JPanel {
 
     // ── Constructor ──────────────────────────────────────────────────────────
     public MenuMaintenancePanel() throws Exception {
+        this(true);
+    }
+
+    public MenuMaintenancePanel(boolean isAdmin) throws Exception {
         super(new BorderLayout());
+        this.isAdmin = isAdmin;
         setBackground(BG_PAGE);
         repo = new SQLiteMenuRepository();
 
@@ -150,31 +156,25 @@ public class MenuMaintenancePanel extends JPanel {
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         actions.setOpaque(false);
 
-        JButton addBtn = makeButton("+ Add", true, false);
-        JButton editBtn = makeButton("✎ Edit", false, false);
-        JButton deleteBtn = makeButton("⌫ Delete", false, true);
+        if (isAdmin) {
+            JButton addBtn = makeButton("+ Add", true, false);
+            JButton editBtn = makeButton("✎ Edit", false, false);
+            JButton deleteBtn = makeButton("⌫ Delete", false, true);
 
-        addBtn.addActionListener(e -> onAdd());
-        editBtn.addActionListener(e -> onEdit());
-        deleteBtn.addActionListener(e -> onDelete());
+            addBtn.addActionListener(e -> onAdd());
+            editBtn.addActionListener(e -> onEdit());
+            deleteBtn.addActionListener(e -> onDelete());
+
+            actions.add(addBtn);
+            actions.add(editBtn);
+            actions.add(deleteBtn);
+        }
         categoryFilter.addActionListener(e -> applyFilters());
         searchField.getDocument().addDocumentListener(new DocumentListener() {
-            public void insertUpdate(DocumentEvent e) {
-                applyFilters();
-            }
-
-            public void removeUpdate(DocumentEvent e) {
-                applyFilters();
-            }
-
-            public void changedUpdate(DocumentEvent e) {
-                applyFilters();
-            }
+            public void insertUpdate(DocumentEvent e) { applyFilters(); }
+            public void removeUpdate(DocumentEvent e) { applyFilters(); }
+            public void changedUpdate(DocumentEvent e) { applyFilters(); }
         });
-
-        actions.add(addBtn);
-        actions.add(editBtn);
-        actions.add(deleteBtn);
 
         bar.add(filters, BorderLayout.CENTER);
         bar.add(actions, BorderLayout.EAST);

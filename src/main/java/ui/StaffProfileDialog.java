@@ -3,11 +3,21 @@ package ui;
 import loginregister.UserAccount;
 import persistence.AccountRoleRepository;
 import persistence.ProfilePictureRepository;
+import persistence.StaffScheduleRepository;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.geom.RoundRectangle2D;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class StaffProfileDialog extends JDialog {
 
@@ -15,35 +25,41 @@ public class StaffProfileDialog extends JDialog {
     private final UserAccount account;
     private final AccountRoleRepository accountRoleRepository;
     private final ProfilePictureRepository profilePictureRepository;
+    private final StaffScheduleRepository scheduleRepo;
     private final String currentUsername;
-    private final Runnable onDeleted;
+    private final Runnable onChanged;
+    private boolean editing;
+    private JPanel centerPanel;
 
     public StaffProfileDialog(Window owner, UserAccount account,
             AccountRoleRepository accountRoleRepository,
             ProfilePictureRepository profilePictureRepository,
+            StaffScheduleRepository scheduleRepo,
             String currentUsername,
-            Runnable onDeleted) {
+            Runnable onChanged) {
         super(owner, "Staff Profile", ModalityType.APPLICATION_MODAL);
         this.account = account;
         this.accountRoleRepository = accountRoleRepository;
         this.profilePictureRepository = profilePictureRepository;
+        this.scheduleRepo = scheduleRepo;
         this.currentUsername = currentUsername;
-        this.onDeleted = onDeleted;
+        this.onChanged = onChanged;
+        this.editing = false;
         this.view = new StaffDialogView(account);
 
-        setResizable(false);
+        setResizable(true);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         setContentPane(fittedContent(view.root()));
         pack();
-        setSize(new Dimension(650, Math.min(getHeight(), 760)));
-        setMinimumSize(new Dimension(650, Math.min(getHeight(), 760)));
+        setSize(new Dimension(650, 600));
+        setMinimumSize(new Dimension(650, 400));
         revalidate();
         repaint();
         setLocationRelativeTo(owner);
     }
 
     public StaffProfileDialog(Window owner, UserAccount account) {
-        this(owner, account, null, null, "", null);
+        this(owner, account, null, null, null, "", null);
     }
 
     private JScrollPane fittedContent(JPanel root) {
@@ -59,6 +75,13 @@ public class StaffProfileDialog extends JDialog {
     private final class StaffDialogView extends StaffProfileForm {
         private final UserAccount account;
         private final byte[] pictureBytes;
+        private final List<JTextField> detailFields = new ArrayList<>();
+        private final Map<Integer, String> editSchedule = new HashMap<>();
+        private JTextField birthdateField;
+        private JComboBox<String> genderCombo;
+        private JPanel scheduleCard;
+        private JButton actionBtn;
+        private JPanel actionFooter;
 
         StaffDialogView(UserAccount account) {
             super("Personal Details");
@@ -67,16 +90,40 @@ public class StaffProfileDialog extends JDialog {
         }
 
         JPanel root() {
-            JPanel root = new JPanel(new BorderLayout(0, 16));
+            JPanel root = new JPanel(new GridBagLayout());
             root.setOpaque(true);
             root.setBackground(new Color(0xF3F6FA));
             root.setBorder(new EmptyBorder(22, 22, 22, 22));
 
-            root.add(profileHeader(), BorderLayout.NORTH);
-            root.add(detailsCard(), BorderLayout.CENTER);
-            root.add(canDeleteAccount()
-                    ? footer(deleteButton(), closeButton())
-                    : footer(closeButton()), BorderLayout.SOUTH);
+            GridBagConstraints gbc = new GridBagConstraints();
+            gbc.gridx = 0;
+            gbc.fill = GridBagConstraints.HORIZONTAL;
+            gbc.anchor = GridBagConstraints.NORTH;
+            gbc.weightx = 1;
+
+            gbc.gridy = 0;
+            gbc.weighty = 0;
+            root.add(profileHeader(), gbc);
+
+            gbc.gridy = 1;
+            gbc.weighty = 1;
+            gbc.fill = GridBagConstraints.BOTH;
+            gbc.insets = new Insets(16, 0, 0, 0);
+            centerPanel = new JPanel();
+            centerPanel.setOpaque(false);
+            centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
+            centerPanel.add(detailsCard());
+            scheduleCard = buildScheduleCard();
+            scheduleCard.setVisible(false);
+            centerPanel.add(scheduleCard);
+            root.add(centerPanel, gbc);
+
+            gbc.gridy = 2;
+            gbc.weighty = 0;
+            gbc.fill = GridBagConstraints.HORIZONTAL;
+            gbc.insets = new Insets(16, 0, 0, 0);
+            root.add(buildFooter(), gbc);
+
             return root;
         }
 
@@ -138,12 +185,13 @@ public class StaffProfileDialog extends JDialog {
             card.add(title, gbc);
 
             addDetail(card, "Full Name", account.getFullName(), 0, 1);
-            addDetail(card, "Date of Birth", account.getBirthdate(), 1, 1);
+            addDateField(card, "Date of Birth", account.getBirthdate(), 1, 1);
             addDetail(card, "Email / Contact", account.getMobile(), 0, 2);
-            addDetail(card, "Gender", account.getGender(), 1, 2);
+            addGenderField(card, "Gender", account.getGender(), 1, 2);
             addDetail(card, "Age", account.getAge() > 0 ? String.valueOf(account.getAge()) : "", 0, 3);
             addDetail(card, "Address", account.getAddress(), 1, 3);
             addDetail(card, "Account Created", account.getCreatedAt(), 0, 4);
+
             return card;
         }
 
@@ -187,21 +235,287 @@ public class StaffProfileDialog extends JDialog {
             gbc.weightx = 1;
             gbc.insets = new Insets(0, x == 0 ? 0 : 10, 14, x == 0 ? 10 : 0);
             parent.add(group, gbc);
+
+            detailFields.add(field);
         }
 
-        private JPanel footer(JButton... buttons) {
-            JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-            footer.setOpaque(false);
-            for (JButton button : buttons) {
-                footer.add(button);
+        private void addDateField(JPanel parent, String label, String value, int x, int y) {
+            JPanel group = new JPanel();
+            group.setOpaque(false);
+            group.setLayout(new BoxLayout(group, BoxLayout.Y_AXIS));
+
+            JLabel labelComponent = new JLabel(label);
+            labelComponent.setFont(new Font("Segoe UI", Font.BOLD, 11));
+            labelComponent.setForeground(new Color(0x475569));
+
+            JTextField field = new JTextField(safe(value));
+            field.setEditable(false);
+            field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+            field.setForeground(new Color(0x334155));
+            field.setBackground(new Color(0xF8FAFC));
+            field.setPreferredSize(new Dimension(0, 40));
+            field.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(new Color(0xE2E8F0)),
+                    new EmptyBorder(9, 12, 9, 12)));
+            field.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            field.addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    if (editing) {
+                        String before = field.getText();
+                        new DatePickerDialog(StaffProfileDialog.this, field).setVisible(true);
+                        String after = field.getText();
+                        if (!after.equals(before) && !after.isEmpty()) {
+                            try {
+                                LocalDate bd = LocalDate.parse(after, DateTimeFormatter.ISO_LOCAL_DATE);
+                                int age = java.time.Period.between(bd, LocalDate.now()).getYears();
+                                detailFields.get(2).setText(String.valueOf(age));
+                            } catch (Exception ignored) {}
+                        }
+                    }
+                }
+            });
+
+            group.add(labelComponent);
+            group.add(Box.createVerticalStrut(6));
+            group.add(field);
+
+            GridBagConstraints gbc = new GridBagConstraints();
+            gbc.gridx = x;
+            gbc.gridy = y;
+            gbc.fill = GridBagConstraints.HORIZONTAL;
+            gbc.weightx = 1;
+            gbc.insets = new Insets(0, x == 0 ? 0 : 10, 14, x == 0 ? 10 : 0);
+            parent.add(group, gbc);
+
+            birthdateField = field;
+        }
+
+        private void addGenderField(JPanel parent, String label, String value, int x, int y) {
+            JPanel group = new JPanel();
+            group.setOpaque(false);
+            group.setLayout(new BoxLayout(group, BoxLayout.Y_AXIS));
+
+            JLabel labelComponent = new JLabel(label);
+            labelComponent.setFont(new Font("Segoe UI", Font.BOLD, 11));
+            labelComponent.setForeground(new Color(0x475569));
+
+            String[] genders = { "Male", "Female" };
+            genderCombo = new JComboBox<>(genders);
+            genderCombo.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+            genderCombo.setBackground(Color.WHITE);
+            genderCombo.setBorder(BorderFactory.createLineBorder(new Color(0xE2E8F0)));
+            genderCombo.setPreferredSize(new Dimension(0, 40));
+            genderCombo.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            String val = safe(value);
+            if (val.equalsIgnoreCase("female")) {
+                genderCombo.setSelectedItem("Female");
+            } else {
+                genderCombo.setSelectedItem("Male");
             }
-            return footer;
+            genderCombo.setEnabled(false);
+
+            group.add(labelComponent);
+            group.add(Box.createVerticalStrut(6));
+            group.add(genderCombo);
+
+            GridBagConstraints gbc = new GridBagConstraints();
+            gbc.gridx = x;
+            gbc.gridy = y;
+            gbc.fill = GridBagConstraints.HORIZONTAL;
+            gbc.weightx = 1;
+            gbc.insets = new Insets(0, x == 0 ? 0 : 10, 14, x == 0 ? 10 : 0);
+            parent.add(group, gbc);
         }
 
-        private JButton closeButton() {
-            JButton close = secondaryButton("Close");
-            close.addActionListener(e -> dispose());
-            return close;
+        private JPanel buildScheduleCard() {
+            JPanel card = new JPanel(new BorderLayout());
+            card.setOpaque(true);
+            card.setBackground(Color.WHITE);
+            card.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(new Color(0xE2E8F0)),
+                    new EmptyBorder(16, 16, 16, 16)));
+
+            JLabel title = new JLabel("Weekly Schedule");
+            title.setFont(new Font("Segoe UI", Font.BOLD, 16));
+            title.setForeground(new Color(0x0F172A));
+            card.add(title, BorderLayout.NORTH);
+
+            JPanel grid = new JPanel(new GridLayout(7, 1, 0, 4));
+            grid.setOpaque(false);
+
+            String[] days = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
+            Map<Integer, String> saved = loadExistingSchedule();
+
+            for (int i = 0; i < 7; i++) {
+                int day = i + 1;
+                String shift = saved != null ? saved.getOrDefault(day, "") : "";
+                editSchedule.put(day, shift);
+
+                JPanel dayRow = new JPanel(new BorderLayout(8, 0));
+                dayRow.setOpaque(false);
+
+                JLabel dayLabel = new JLabel(days[i]);
+                dayLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+                dayLabel.setForeground(new Color(0x475569));
+                dayLabel.setPreferredSize(new Dimension(50, 28));
+
+                String[] opts = { "", "Rest Day", "Afternoon", "Night" };
+                JComboBox<String> combo = new JComboBox<>(opts);
+                combo.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+                combo.setBackground(Color.WHITE);
+                combo.setBorder(BorderFactory.createLineBorder(new Color(0xE2E8F0)));
+                if (!shift.isEmpty()) {
+                    String display = shift.equals("rest") ? "Rest Day"
+                            : shift.equals("afternoon") ? "Afternoon"
+                            : shift.equals("night") ? "Night" : "";
+                    combo.setSelectedItem(display);
+                }
+                combo.addActionListener(e -> {
+                    String selected = (String) combo.getSelectedItem();
+                    if (selected == null || selected.isEmpty()) {
+                        editSchedule.put(day, "");
+                    } else if (selected.equals("Rest Day")) {
+                        editSchedule.put(day, "rest");
+                    } else if (selected.equals("Afternoon")) {
+                        editSchedule.put(day, "afternoon");
+                    } else if (selected.equals("Night")) {
+                        editSchedule.put(day, "night");
+                    }
+                });
+
+                JPanel centerWrapper = new JPanel(new GridBagLayout());
+                centerWrapper.setOpaque(false);
+                centerWrapper.add(combo);
+
+                dayRow.add(dayLabel, BorderLayout.WEST);
+                dayRow.add(centerWrapper, BorderLayout.CENTER);
+
+                grid.add(dayRow);
+            }
+
+            card.add(grid, BorderLayout.CENTER);
+            return card;
+        }
+
+        private void setFieldsEditable(boolean editable) {
+            for (int i = 0; i < detailFields.size() - 1; i++) {
+                JTextField field = detailFields.get(i);
+                field.setEditable(editable);
+                field.setBackground(editable ? Color.WHITE : new Color(0xF8FAFC));
+                field.setForeground(editable ? new Color(0x0F172A) : new Color(0x334155));
+            }
+            if (genderCombo != null) {
+                genderCombo.setEnabled(editable);
+            }
+        }
+
+        private void toggleEditMode() {
+            editing = !editing;
+            setFieldsEditable(editing);
+            scheduleCard.setVisible(editing);
+            actionBtn.setText(editing ? "Save Changes" : "Edit Profile");
+            setResizable(true);
+            setSize(new Dimension(650, editing ? Math.min(760, 600) : 600));
+            setMinimumSize(new Dimension(650, 400));
+            revalidate();
+            repaint();
+            if (editing) {
+                SwingUtilities.invokeLater(() -> {
+                    JScrollPane sp = (JScrollPane) getContentPane();
+                    sp.getVerticalScrollBar().setValue(0);
+                });
+            }
+        }
+
+        private void saveChanges() {
+            if (!editing || accountRoleRepository == null) return;
+            try {
+                String fullName = detailFields.get(0).getText().trim();
+                String birthdate = birthdateField.getText().trim();
+                String mobile = detailFields.get(1).getText().trim();
+                String gender = genderCombo != null ? (String) genderCombo.getSelectedItem() : "";
+                String ageStr = detailFields.get(2).getText().trim();
+                String address = detailFields.get(3).getText().trim();
+                int age = 0;
+                if (!ageStr.isEmpty()) {
+                    try {
+                        age = Integer.parseInt(ageStr);
+                    } catch (NumberFormatException e) {
+                        JOptionPane.showMessageDialog(StaffProfileDialog.this,
+                                "Invalid age value.", "Error", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                }
+                String username = account.getUsername();
+
+                accountRoleRepository.updateUserDetails(username, fullName, age, birthdate,
+                        address, mobile, gender);
+
+                if (scheduleRepo != null) {
+                    Map<Integer, String> toSave = new HashMap<>();
+                    for (Map.Entry<Integer, String> e : editSchedule.entrySet()) {
+                        if (!e.getValue().isEmpty()) {
+                            toSave.put(e.getKey(), e.getValue());
+                        }
+                    }
+                    scheduleRepo.saveSchedule(username, toSave);
+                }
+
+                if (onChanged != null) {
+                    onChanged.run();
+                }
+                JOptionPane.showMessageDialog(StaffProfileDialog.this,
+                        "Profile updated successfully.", "Saved",
+                        JOptionPane.INFORMATION_MESSAGE);
+                dispose();
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(StaffProfileDialog.this,
+                        "Failed to save changes:\n" + ex.getMessage(),
+                        "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+
+        private Map<Integer, String> loadExistingSchedule() {
+            if (scheduleRepo == null) return null;
+            try {
+                return scheduleRepo.loadSchedule(account.getUsername());
+            } catch (Exception ignored) {
+                return null;
+            }
+        }
+
+        private JPanel buildFooter() {
+            actionFooter = new JPanel(new BorderLayout());
+            actionFooter.setOpaque(false);
+
+            JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+            left.setOpaque(false);
+            if (canDeleteAccount()) {
+                left.add(deleteButton());
+            }
+
+            JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+            right.setOpaque(false);
+
+            JButton closeBtn = secondaryButton("Cancel");
+            closeBtn.addActionListener(e -> dispose());
+            right.add(closeBtn);
+
+            actionBtn = primaryButton("Edit Profile");
+            actionBtn.setEnabled(accountRoleRepository != null);
+            actionBtn.addActionListener(e -> {
+                if (editing) {
+                    saveChanges();
+                } else {
+                    toggleEditMode();
+                }
+            });
+            right.add(actionBtn);
+
+            actionFooter.add(left, BorderLayout.WEST);
+            actionFooter.add(right, BorderLayout.EAST);
+            return actionFooter;
         }
 
         private JButton deleteButton() {
@@ -222,6 +536,224 @@ public class StaffProfileDialog extends JDialog {
         private String firstInitial() {
             String source = displayName();
             return source.isEmpty() ? "?" : String.valueOf(Character.toUpperCase(source.charAt(0)));
+        }
+    }
+
+    private class DatePickerDialog extends JDialog {
+        private static final Color BLUE = new Color(0x2563EB);
+        private static final Color BLUE_HOVER = new Color(0x1D4ED8);
+        private static final Color GRAY_MUTED = new Color(0x9CA3AF);
+        private static final Color GRAY_BG = new Color(0xF3F4F6);
+        private static final Color GRID_BORDER = new Color(0xE5E7EB);
+
+        private final JTextField targetField;
+        private YearMonth currentMonth;
+        private LocalDate pickedDate;
+        private LocalDate hoveredDate;
+        private final JLabel monthLabel = new JLabel("", SwingConstants.CENTER);
+        private final JPanel gridPanel;
+        private final JLabel[] dayLabels = new JLabel[42];
+
+        DatePickerDialog(JDialog parent, JTextField field) {
+            super(parent, "Select Date", ModalityType.APPLICATION_MODAL);
+            this.targetField = field;
+            String existing = field.getText().trim();
+            LocalDate initial = null;
+            if (!existing.isEmpty()) {
+                try {
+                    initial = LocalDate.parse(existing, DateTimeFormatter.ISO_LOCAL_DATE);
+                } catch (Exception e1) {
+                    try {
+                        initial = LocalDate.parse(existing, DateTimeFormatter.ofPattern("MMM dd, yyyy"));
+                    } catch (Exception e2) {}
+                }
+            }
+            this.currentMonth = initial != null ? YearMonth.from(initial) : YearMonth.now();
+            this.pickedDate = initial;
+
+            setResizable(false);
+            setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+
+            JPanel root = new JPanel(new BorderLayout(0, 0));
+            root.setBackground(Color.WHITE);
+            root.setBorder(BorderFactory.createEmptyBorder(16, 16, 12, 16));
+
+            root.add(buildHeader(), BorderLayout.NORTH);
+            gridPanel = new JPanel(new GridLayout(0, 7, 0, 0));
+            gridPanel.setBackground(Color.WHITE);
+            root.add(gridPanel, BorderLayout.CENTER);
+            root.add(buildFooter(), BorderLayout.SOUTH);
+
+            setContentPane(root);
+            renderGrid();
+            pack();
+            setLocationRelativeTo(parent);
+        }
+
+        private JPanel buildHeader() {
+            JPanel header = new JPanel(new BorderLayout(8, 0));
+            header.setBackground(Color.WHITE);
+            header.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
+
+            JPanel nav = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 0));
+            nav.setOpaque(false);
+
+            nav.add(navButton("<<", e -> { currentMonth = currentMonth.minusYears(1); renderGrid(); }));
+            nav.add(navButton("<", e -> { currentMonth = currentMonth.minusMonths(1); renderGrid(); }));
+            monthLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+            monthLabel.setForeground(new Color(0x0F172A));
+            monthLabel.setPreferredSize(new Dimension(160, 30));
+            nav.add(monthLabel);
+            nav.add(navButton(">", e -> { currentMonth = currentMonth.plusMonths(1); renderGrid(); }));
+            nav.add(navButton(">>", e -> { currentMonth = currentMonth.plusYears(1); renderGrid(); }));
+
+            header.add(nav, BorderLayout.CENTER);
+            return header;
+        }
+
+        private JButton navButton(String text, java.awt.event.ActionListener listener) {
+            JButton btn = new JButton(text);
+            btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            btn.setForeground(new Color(0x475569));
+            btn.setBackground(Color.WHITE);
+            btn.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
+            btn.setFocusPainted(false);
+            btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            btn.addActionListener(listener);
+            btn.addMouseListener(new MouseAdapter() {
+                @Override public void mouseEntered(MouseEvent e) { btn.setForeground(BLUE); }
+                @Override public void mouseExited(MouseEvent e) { btn.setForeground(new Color(0x475569)); }
+            });
+            return btn;
+        }
+
+        private JPanel buildFooter() {
+            JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+            footer.setBackground(Color.WHITE);
+            footer.setBorder(BorderFactory.createEmptyBorder(12, 0, 0, 0));
+
+            JButton cancel = new JButton("Cancel");
+            cancel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            cancel.setForeground(new Color(0x0F172A));
+            cancel.setBackground(Color.WHITE);
+            cancel.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(GRID_BORDER),
+                    new EmptyBorder(7, 18, 7, 18)));
+            cancel.setFocusPainted(false);
+            cancel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            cancel.addActionListener(e -> dispose());
+
+            JButton apply = new JButton("Apply");
+            apply.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            apply.setForeground(Color.WHITE);
+            apply.setBackground(new Color(0x0F172A));
+            apply.setBorder(BorderFactory.createEmptyBorder(8, 22, 8, 22));
+            apply.setFocusPainted(false);
+            apply.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            apply.addActionListener(e -> {
+                if (pickedDate != null) {
+                    targetField.setText(pickedDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
+                }
+                dispose();
+            });
+            apply.addMouseListener(new MouseAdapter() {
+                @Override public void mouseEntered(MouseEvent e) { apply.setBackground(new Color(0x1E293B)); }
+                @Override public void mouseExited(MouseEvent e) { apply.setBackground(new Color(0x0F172A)); }
+            });
+
+            footer.add(cancel);
+            footer.add(apply);
+            return footer;
+        }
+
+        private void renderGrid() {
+            gridPanel.removeAll();
+            monthLabel.setText(currentMonth.getMonth().getDisplayName(
+                    java.time.format.TextStyle.SHORT, java.util.Locale.ENGLISH)
+                    + " " + currentMonth.getYear());
+
+            String[] dayNames = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
+            for (String d : dayNames) {
+                JLabel lbl = new JLabel(d, SwingConstants.CENTER);
+                lbl.setFont(new Font("Segoe UI", Font.BOLD, 10));
+                lbl.setForeground(GRAY_MUTED);
+                lbl.setPreferredSize(new Dimension(36, 28));
+                gridPanel.add(lbl);
+            }
+
+            LocalDate firstOfMonth = currentMonth.atDay(1);
+            int startDow = firstOfMonth.getDayOfWeek().getValue() - 1;
+            int daysInMonth = currentMonth.lengthOfMonth();
+            LocalDate today = LocalDate.now();
+
+            for (int i = 0; i < 42; i++) {
+                final int cellIndex = i;
+                JLabel lbl = new JLabel("", SwingConstants.CENTER);
+                lbl.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+                lbl.setPreferredSize(new Dimension(36, 28));
+                lbl.setOpaque(true);
+                lbl.setBackground(Color.WHITE);
+                lbl.setForeground(new Color(0x0F172A));
+
+                int dayNum;
+                boolean isCurrentMonth;
+                if (i < startDow) {
+                    int prevDays = YearMonth.from(currentMonth.minusMonths(1)).lengthOfMonth();
+                    dayNum = prevDays - startDow + i + 1;
+                    isCurrentMonth = false;
+                } else if (i >= startDow + daysInMonth) {
+                    dayNum = i - startDow - daysInMonth + 1;
+                    isCurrentMonth = false;
+                } else {
+                    dayNum = i - startDow + 1;
+                    isCurrentMonth = true;
+                }
+
+                LocalDate cellDate = isCurrentMonth
+                        ? currentMonth.atDay(dayNum)
+                        : (i < startDow
+                                ? currentMonth.minusMonths(1).atDay(dayNum)
+                                : currentMonth.plusMonths(1).atDay(dayNum));
+
+                lbl.setText(String.valueOf(dayNum));
+                lbl.setForeground(isCurrentMonth ? new Color(0x0F172A) : GRAY_MUTED);
+
+                if (pickedDate != null && pickedDate.equals(cellDate)) {
+                    lbl.setBackground(BLUE);
+                    lbl.setForeground(Color.WHITE);
+                    lbl.setFont(new Font("Segoe UI", Font.BOLD, 12));
+                } else if (today.equals(cellDate)) {
+                    lbl.setBackground(GRAY_BG);
+                }
+
+                lbl.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                lbl.addMouseListener(new MouseAdapter() {
+                    @Override public void mouseClicked(MouseEvent e) {
+                        pickedDate = cellDate;
+                        renderGrid();
+                    }
+                    @Override public void mouseEntered(MouseEvent e) {
+                        if (pickedDate == null || !pickedDate.equals(cellDate)) {
+                            lbl.setBackground(new Color(0xE5E7EB));
+                        }
+                    }
+                    @Override public void mouseExited(MouseEvent e) {
+                        if (pickedDate != null && pickedDate.equals(cellDate)) {
+                            lbl.setBackground(BLUE);
+                        } else if (today.equals(cellDate)) {
+                            lbl.setBackground(GRAY_BG);
+                        } else {
+                            lbl.setBackground(Color.WHITE);
+                        }
+                    }
+                });
+
+                gridPanel.add(lbl);
+                dayLabels[i] = lbl;
+            }
+
+            gridPanel.revalidate();
+            gridPanel.repaint();
         }
     }
 
@@ -260,8 +792,8 @@ public class StaffProfileDialog extends JDialog {
                 profilePictureRepository.deletePicture(target);
             }
             accountRoleRepository.deleteUser(target);
-            if (onDeleted != null) {
-                onDeleted.run();
+            if (onChanged != null) {
+                onChanged.run();
             }
             JOptionPane.showMessageDialog(this,
                     "Staff account \"" + target + "\" deleted.",
@@ -278,15 +810,15 @@ public class StaffProfileDialog extends JDialog {
 
     static class StaffProfileForm {
         private static final Color BG_PAGE = new Color(0xF3F6FA);
-        private static final Color BG_CARD = Color.WHITE;
-        private static final Color BG_INPUT = new Color(0xF8FAFC);
-        private static final Color BG_INPUT_READONLY = new Color(0xF1F5F9);
-        private static final Color ACCENT = new Color(0x2563EB);
-        private static final Color ACCENT_HOVER = new Color(0x1D4ED8);
-        private static final Color ACCENT_SOFT = new Color(0xDBEAFE);
-        private static final Color BORDER = new Color(0xE2E8F0);
-        private static final Color TEXT_PRIMARY = new Color(0x0F172A);
-        private static final Color TEXT_SECONDARY = new Color(0x475569);
+        protected static final Color BG_CARD = Color.WHITE;
+        protected static final Color BG_INPUT = new Color(0xF8FAFC);
+        protected static final Color BG_INPUT_READONLY = new Color(0xF1F5F9);
+        protected static final Color ACCENT = new Color(0x2563EB);
+        protected static final Color ACCENT_HOVER = new Color(0x1D4ED8);
+        protected static final Color ACCENT_SOFT = new Color(0xDBEAFE);
+        protected static final Color BORDER = new Color(0xE2E8F0);
+        protected static final Color TEXT_PRIMARY = new Color(0x0F172A);
+        protected static final Color TEXT_SECONDARY = new Color(0x475569);
         private static final Color TEXT_MUTED = new Color(0x94A3B8);
         private static final Color DANGER = new Color(0xEF4444);
         private static final Color DANGER_HOVER = new Color(0xDC2626);
@@ -299,7 +831,7 @@ public class StaffProfileDialog extends JDialog {
         private static final Font SUBTITLE_FONT = new Font("Segoe UI", Font.PLAIN, 13);
         private static final Font NAME_FONT = new Font("Segoe UI", Font.BOLD, 20);
         private static final Font LABEL_FONT = new Font("Segoe UI", Font.BOLD, 11);
-        private static final Font VALUE_FONT = new Font("Segoe UI", Font.PLAIN, 13);
+        protected static final Font VALUE_FONT = new Font("Segoe UI", Font.PLAIN, 13);
         private static final Font BUTTON_FONT = new Font("Segoe UI", Font.BOLD, 13);
         private static final Font AVATAR_FONT = new Font("Segoe UI", Font.BOLD, 34);
         private static final Font SECTION_FONT = new Font("Segoe UI", Font.BOLD, 15);

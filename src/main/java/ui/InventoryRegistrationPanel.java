@@ -106,15 +106,18 @@ public class InventoryRegistrationPanel extends JPanel {
     private final JLabel statusLabel = new JLabel(" ");
     private final JLabel batchCountLabel = new JLabel(" ");
 
+    private final boolean isAdmin;
+    private final String currentUsername;
+
     private final DefaultTableModel tableModel = new DefaultTableModel(
-            new String[] { "Batch ID", "Item", "SKU", "Quantity", "Expiry", "Status", "" }, 0) {
+            new String[] { "Batch ID", "Item", "SKU", "Quantity", "Expiry", "Status", "Added By", "" }, 0) {
         @Override
         public boolean isCellEditable(int r, int c) {
-            return c == 6; // delete column uses a button editor
+            return !isAdmin ? false : c == 7;
         }
     };
 
-    // In-memory cache: String[]{ id, itemName, sku, qty, expiry }
+    // In-memory cache: String[]{ id, itemName, sku, qty, expiry, addedBy }
     private final List<String[]> batchCache = new ArrayList<>();
 
     // IDs that have been deleted — persisted across restarts so the DB rows
@@ -127,16 +130,25 @@ public class InventoryRegistrationPanel extends JPanel {
 
     // ── Constructor ────────────────────────────────────────────────────────────
     public InventoryRegistrationPanel(InventoryRepository inventoryRepository) {
-        this(inventoryRepository, null, null);
+        this(inventoryRepository, null, null, true, "");
     }
 
     public InventoryRegistrationPanel(InventoryRepository inventoryRepository,
             Runnable inventoryRefreshCallback,
             Runnable monitoringRefreshCallback) {
+        this(inventoryRepository, inventoryRefreshCallback, monitoringRefreshCallback, true, "");
+    }
+
+    public InventoryRegistrationPanel(InventoryRepository inventoryRepository,
+            Runnable inventoryRefreshCallback,
+            Runnable monitoringRefreshCallback,
+            boolean isAdmin, String currentUsername) {
         super(new BorderLayout());
         this.inventoryRepository = inventoryRepository;
         this.inventoryRefreshCallback = inventoryRefreshCallback;
         this.monitoringRefreshCallback = monitoringRefreshCallback;
+        this.isAdmin = isAdmin;
+        this.currentUsername = currentUsername;
         setBackground(BG_PAGE);
         setBorder(new EmptyBorder(24, 28, 24, 28));
         loadDeletedIds(); // must run before loadAllBatches()
@@ -265,8 +277,10 @@ public class InventoryRegistrationPanel extends JPanel {
         ((DefaultTableCellRenderer) header.getDefaultRenderer())
                 .setHorizontalAlignment(SwingConstants.LEFT);
 
-        // Column widths — last column is narrow (delete button)
-        int[] widths = { 95, 190, 140, 70, 110, 110, 72 };
+        // Column widths — last column is narrow (edit button)
+        int[] widths = isAdmin
+                ? new int[] { 95, 160, 120, 70, 100, 100, 120, 72 }
+                : new int[] { 95, 160, 120, 70, 100, 100, 120 };
         for (int i = 0; i < widths.length; i++)
             table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
 
@@ -275,12 +289,15 @@ public class InventoryRegistrationPanel extends JPanel {
         for (int i = 1; i <= 4; i++)
             table.getColumnModel().getColumn(i).setCellRenderer(std);
         table.getColumnModel().getColumn(5).setCellRenderer(new StatusBadgeRenderer());
+        table.getColumnModel().getColumn(6).setCellRenderer(std);
 
-        // Edit column — renderer + editor (opens edit dialog that contains Delete)
-        EditButtonRenderer editRenderer = new EditButtonRenderer();
-        EditButtonEditor editEditor = new EditButtonEditor(table);
-        table.getColumnModel().getColumn(6).setCellRenderer(editRenderer);
-        table.getColumnModel().getColumn(6).setCellEditor(editEditor);
+        if (isAdmin) {
+            // Edit column — renderer + editor (opens edit dialog that contains Delete)
+            EditButtonRenderer editRenderer = new EditButtonRenderer();
+            EditButtonEditor editEditor = new EditButtonEditor(table);
+            table.getColumnModel().getColumn(7).setCellRenderer(editRenderer);
+            table.getColumnModel().getColumn(7).setCellEditor(editEditor);
+        }
 
         JScrollPane scroll = new JScrollPane(table);
         scroll.setBorder(AppTheme.inputBorderRegular());
@@ -347,7 +364,7 @@ public class InventoryRegistrationPanel extends JPanel {
                 ? String.format("INV-%06d", batch.getId())
                 : generateBatchId();
         String expiryStr = (normExpiry == null || normExpiry.isBlank()) ? "" : normExpiry;
-        batchCache.add(new String[] { id, name, finalSku, String.valueOf(qty), expiryStr });
+        batchCache.add(new String[] { id, name, finalSku, String.valueOf(qty), expiryStr, currentUsername });
         writeJsonFallback();
 
         // Append the new row directly — do NOT call loadAllBatches() here.
@@ -473,9 +490,16 @@ public class InventoryRegistrationPanel extends JPanel {
     private void rebuildTable() {
         tableModel.setRowCount(0);
         for (String[] row : batchCache) {
-            tableModel.addRow(new Object[] {
-                    row[0], row[1], row[2], row[3], row[4], computeStatus(row[4]), "Delete"
-            });
+            String addedBy = row.length > 5 ? row[5] : "";
+            if (isAdmin) {
+                tableModel.addRow(new Object[] {
+                        row[0], row[1], row[2], row[3], row[4], computeStatus(row[4]), addedBy, "Edit"
+                });
+            } else {
+                tableModel.addRow(new Object[] {
+                        row[0], row[1], row[2], row[3], row[4], computeStatus(row[4]), addedBy
+                });
+            }
         }
         int n = batchCache.size();
         batchCountLabel.setText(n + " batch" + (n != 1 ? "es" : "") + " stored");
@@ -503,12 +527,14 @@ public class InventoryRegistrationPanel extends JPanel {
             StringBuilder sb = new StringBuilder("[\n");
             for (int i = 0; i < batchCache.size(); i++) {
                 String[] r = batchCache.get(i);
+                String addedBy = r.length > 5 ? r[5] : "";
                 sb.append("  {")
                         .append("\"id\":").append(js(r[0])).append(",")
                         .append("\"item\":").append(js(r[1])).append(",")
                         .append("\"sku\":").append(js(r[2])).append(",")
                         .append("\"qty\":").append(js(r[3])).append(",")
-                        .append("\"expiry\":").append(js(r[4]))
+                        .append("\"expiry\":").append(js(r[4])).append(",")
+                        .append("\"addedBy\":").append(js(addedBy))
                         .append("}");
                 if (i < batchCache.size() - 1)
                     sb.append(",");
@@ -538,11 +564,13 @@ public class InventoryRegistrationPanel extends JPanel {
                 String sku = jv(obj, "sku");
                 String qty = jv(obj, "qty");
                 String expiry = jv(obj, "expiry");
+                String addedBy = jv(obj, "addedBy");
                 if (id != null && item != null)
                     result.add(new String[] { id, item,
                             sku != null ? sku : "",
                             qty != null ? qty : "0",
-                            expiry != null ? expiry : "" });
+                            expiry != null ? expiry : "",
+                            addedBy != null ? addedBy : "" });
                 pos = end + 1;
             }
         } catch (IOException ignored) {

@@ -900,39 +900,6 @@ public class MonitoringPanel extends JPanel {
             content.setOpaque(false);
             content.add(topArea, BorderLayout.CENTER);
 
-            // Action button for specific cards
-            JButton actionBtn = null;
-            if (isAdmin && idx == 2) {
-                actionBtn = new JButton("\u2714 Dispose");
-                actionBtn.setFont(new Font("Segoe UI", Font.BOLD, 10));
-                actionBtn.setForeground(Color.WHITE);
-                actionBtn.setBackground(AppTheme.DANGER);
-                actionBtn.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 10));
-                actionBtn.setFocusPainted(false);
-                actionBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-                actionBtn.addActionListener(e -> onDisposeExpired());
-            } else if (isAdmin) {
-                if (idx == 1 || idx == 2 || idx == 3) {
-                    actionBtn = new JButton("Acknowledge");
-                    actionBtn.setFont(new Font("Segoe UI", Font.BOLD, 10));
-                    actionBtn.setForeground(AppTheme.SUCCESS);
-                    actionBtn.setBackground(new Color(0xD1FAE5));
-                    actionBtn.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 10));
-                    actionBtn.setFocusPainted(false);
-                    actionBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-                    final int type = idx;
-                    actionBtn.addActionListener(e -> onAcknowledge(type));
-                }
-            }
-
-            if (actionBtn != null) {
-                JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
-                btnRow.setOpaque(false);
-                btnRow.add(actionBtn);
-                content.add(btnRow, BorderLayout.SOUTH);
-                cardActionBtns[idx] = actionBtn;
-            }
-
             card.add(content, BorderLayout.CENTER);
             row.add(card);
         }

@@ -216,8 +216,8 @@ public class SidebarPanel extends JPanel {
     private void buildNavContent() {
         addNavItem("Ordering", "Ordering", this::paintCoffeeIcon);
         addNavItem("Search", "Search", this::paintSearchIcon);
+        addNavItem("Inventory", "Inventory", this::paintBoxIcon);
         if (isAdmin) {
-            addNavItem("Inventory", "Inventory", this::paintBoxIcon);
             addNavItem("Monitoring", "Monitoring", this::paintChartIcon);
             addNavItem("Menu Maintenance", "Menu Maintenance", this::paintListIcon);
             addNavItem("Register Product", "Register Product", this::paintTagIcon);

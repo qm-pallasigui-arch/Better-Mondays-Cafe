@@ -20,6 +20,7 @@ import java.text.SimpleDateFormat;
 import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.BorderLayout;
+import java.awt.Cursor;
 import java.awt.Component;
 import java.awt.GridLayout;
 import java.awt.FlowLayout;
@@ -68,6 +69,8 @@ import persistence.sqlite.SQLiteProfilePictureRepository;
 import controller.InventoryController;
 import controller.InventoryRowView;
 import controller.OrderController;
+import notifications.Notification;
+import notifications.NotificationService;
 import inventory.InventoryItem;
 import inventory.analytics.InventoryPolicyService;
 
@@ -83,6 +86,9 @@ public class POSSystem extends javax.swing.JFrame {
     private String currentUsername;
     private InventoryController inventoryController;
     private OrderController orderController;
+    private JButton inventoryAlertsBellBtn;
+    private List<Notification> latestInventoryAlerts = List.of();
+    private final NotificationService inventoryNotificationService = new NotificationService();
 
     private static final List<String> ORDERING_CATEGORIES = List.of(
             "Espresso & Coffee",
@@ -899,6 +905,16 @@ public class POSSystem extends javax.swing.JFrame {
         titleStack.add(dateSubtitle, BorderLayout.SOUTH);
         headerPanel.add(titleStack, BorderLayout.WEST);
 
+        inventoryAlertsBellBtn = new JButton("🔔");
+        inventoryAlertsBellBtn.setFont(new Font("Segoe UI", Font.PLAIN, 18));
+        inventoryAlertsBellBtn.setForeground(AppTheme.FG_PRIMARY);
+        inventoryAlertsBellBtn.setBackground(AppTheme.BG_SURFACE);
+        inventoryAlertsBellBtn.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
+        inventoryAlertsBellBtn.setFocusPainted(false);
+        inventoryAlertsBellBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        inventoryAlertsBellBtn.addActionListener(e -> showInventoryAlertsPopup(inventoryAlertsBellBtn));
+        headerPanel.add(inventoryAlertsBellBtn, BorderLayout.EAST);
+
         jPanelInventory.add(headerPanel, BorderLayout.NORTH);
 
         // ─── Main Table Card ────────────────────────────────
@@ -1237,6 +1253,100 @@ public class POSSystem extends javax.swing.JFrame {
         inventoryRowsCache.clear();
         inventoryRowsCache.addAll(inventoryController.buildInventoryRows());
         applyInventoryFilters();
+        refreshInventoryAlertsBadge();
+    }
+
+    // ─── Rule-Based Notifications (Inventory page) ───────────────────────────
+    private void refreshInventoryAlertsBadge() {
+        if (inventoryAlertsBellBtn == null) return;
+
+        latestInventoryAlerts = inventoryNotificationService.evaluate(inventoryRowsCache);
+
+        boolean hasCritical = latestInventoryAlerts.stream()
+                .anyMatch(n -> n.getSeverity() == Notification.Severity.CRITICAL);
+        boolean hasAny = !latestInventoryAlerts.isEmpty();
+        if (hasCritical) {
+            inventoryAlertsBellBtn.setText("🔔 " + latestInventoryAlerts.size());
+            inventoryAlertsBellBtn.setForeground(new Color(0xDC2626));
+        } else if (hasAny) {
+            inventoryAlertsBellBtn.setText("🔔 " + latestInventoryAlerts.size());
+            inventoryAlertsBellBtn.setForeground(new Color(0xD97706));
+        } else {
+            inventoryAlertsBellBtn.setText("🔔");
+            inventoryAlertsBellBtn.setForeground(AppTheme.FG_PRIMARY);
+        }
+    }
+
+    private void showInventoryAlertsPopup(java.awt.Component anchor) {
+        Font boldFont = new Font("Segoe UI", Font.BOLD, 14);
+        Font bodyFont = new Font("Segoe UI", Font.PLAIN, 13);
+        Font smallBoldFont = new Font("Segoe UI", Font.BOLD, 10);
+
+        JPanel content = new JPanel(new BorderLayout(0, 8));
+        content.setBackground(AppTheme.BG_SURFACE);
+        content.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
+        content.setPreferredSize(new java.awt.Dimension(340, 280));
+
+        JLabel title = new JLabel("Inventory Alerts");
+        title.setFont(boldFont);
+        title.setForeground(AppTheme.FG_PRIMARY);
+        content.add(title, BorderLayout.NORTH);
+
+        JPanel list = new JPanel();
+        list.setOpaque(false);
+        list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS));
+
+        if (latestInventoryAlerts.isEmpty()) {
+            JLabel empty = new JLabel("No alerts right now — inventory looks healthy.");
+            empty.setFont(bodyFont);
+            empty.setForeground(AppTheme.FG_MUTED);
+            empty.setBorder(BorderFactory.createEmptyBorder(8, 4, 8, 4));
+            list.add(empty);
+        } else {
+            for (Notification notification : latestInventoryAlerts) {
+                Color bg;
+                Color fg;
+                String badge;
+                switch (notification.getSeverity()) {
+                    case CRITICAL -> { bg = new Color(0xFEE2E2); fg = new Color(0xDC2626); badge = "CRITICAL"; }
+                    case WARNING -> { bg = new Color(0xFEF3C7); fg = new Color(0xD97706); badge = "WARNING"; }
+                    default -> { bg = new Color(0xE0F2FE); fg = new Color(0x0284C7); badge = "INFO"; }
+                }
+
+                JPanel row = new JPanel(new BorderLayout(10, 0));
+                row.setOpaque(true);
+                row.setBackground(bg);
+                row.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
+                row.setMaximumSize(new java.awt.Dimension(Integer.MAX_VALUE, 40));
+                row.setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);
+
+                JLabel badgeLbl = new JLabel(badge);
+                badgeLbl.setFont(smallBoldFont);
+                badgeLbl.setForeground(fg);
+                badgeLbl.setPreferredSize(new java.awt.Dimension(64, 20));
+                row.add(badgeLbl, BorderLayout.WEST);
+
+                JLabel messageLbl = new JLabel(notification.getMessage());
+                messageLbl.setFont(bodyFont);
+                messageLbl.setForeground(AppTheme.FG_PRIMARY);
+                row.add(messageLbl, BorderLayout.CENTER);
+
+                list.add(row);
+                list.add(Box.createVerticalStrut(6));
+            }
+        }
+
+        JScrollPane scroll = new JScrollPane(list);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.setOpaque(false);
+        scroll.getViewport().setOpaque(false);
+        scroll.getVerticalScrollBar().setUnitIncrement(14);
+        content.add(scroll, BorderLayout.CENTER);
+
+        JPopupMenu popup = new JPopupMenu();
+        popup.setBorder(BorderFactory.createLineBorder(AppTheme.BG_SURFACE.darker(), 1));
+        popup.add(content);
+        popup.show(anchor, anchor.getWidth() - content.getPreferredSize().width, anchor.getHeight() + 6);
     }
 
     private void applyInventoryFilters() {

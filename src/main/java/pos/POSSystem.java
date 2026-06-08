@@ -68,6 +68,8 @@ import persistence.sqlite.SQLiteProfilePictureRepository;
 import controller.InventoryController;
 import controller.InventoryRowView;
 import controller.OrderController;
+import inventory.InventoryItem;
+import inventory.analytics.InventoryPolicyService;
 
 public class POSSystem extends javax.swing.JFrame {
 
@@ -1012,8 +1014,8 @@ public class POSSystem extends javax.swing.JFrame {
         };
         inventoryTable.setModel(new DefaultTableModel(
                 new Object[][] {},
-                new String[] { "Item Name", "Quantity", "Alert Level", "Batches", "Status", "Actions" }) {
-            boolean[] canEdit = new boolean[] { false, false, false, false, false, true };
+                new String[] { "Item Name", "Quantity", "Alert Level", "ABC", "Reorder Guide", "Batches", "Status", "Actions" }) {
+            boolean[] canEdit = new boolean[] { false, false, false, false, false, false, false, true };
 
             public boolean isCellEditable(int rowIndex, int columnIndex) {
                 return canEdit[columnIndex];
@@ -1026,30 +1028,39 @@ public class POSSystem extends javax.swing.JFrame {
         inventoryTable.setSelectionForeground(AppTheme.FG_PRIMARY);
         inventoryTable.getTableHeader().setReorderingAllowed(false);
 
-        // Column widths: Name | Quantity | Alert Level | Last Updated | Status |
-        // Actions
+        // Column widths: Name | Quantity | Alert Level | ABC | Reorder Guide |
+        // Batches | Status | Actions
         inventoryTable.getColumnModel().getColumn(0).setPreferredWidth(160);
         inventoryTable.getColumnModel().getColumn(1).setPreferredWidth(100);
         inventoryTable.getColumnModel().getColumn(2).setPreferredWidth(100);
-        inventoryTable.getColumnModel().getColumn(3).setPreferredWidth(130);
-        inventoryTable.getColumnModel().getColumn(4).setPreferredWidth(100);
-        inventoryTable.getColumnModel().getColumn(5).setPreferredWidth(80);
+        inventoryTable.getColumnModel().getColumn(3).setPreferredWidth(70);
+        inventoryTable.getColumnModel().getColumn(4).setPreferredWidth(170);
+        inventoryTable.getColumnModel().getColumn(5).setPreferredWidth(130);
+        inventoryTable.getColumnModel().getColumn(6).setPreferredWidth(100);
+        inventoryTable.getColumnModel().getColumn(7).setPreferredWidth(80);
 
         // Center align all columns
         DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
         centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < 8; i++) {
             inventoryTable.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
         }
 
-        // Batches column at index 3
-        inventoryTable.getColumnModel().getColumn(3).setCellRenderer(new BatchSummaryRenderer());
+        // ABC column at index 3 — colored badge by tier
+        inventoryTable.getColumnModel().getColumn(3).setCellRenderer(new AbcTierRenderer());
 
-        // Actions column at index 5
-        inventoryTable.getColumnModel().getColumn(5).setCellRenderer(new ActionsCellRenderer());
-        inventoryTable.getColumnModel().getColumn(5).setCellEditor(new ActionsCellEditor());
+        // Reorder Guide column at index 4 — EOQ/ROP at a glance, ROP highlighted
+        // in red once stock has reached or fallen below it (time to reorder).
+        inventoryTable.getColumnModel().getColumn(4).setCellRenderer(new ReorderGuideRenderer());
 
-        // Single-click: col 3 opens batch modal, col 5 opens actions menu
+        // Batches column at index 5
+        inventoryTable.getColumnModel().getColumn(5).setCellRenderer(new BatchSummaryRenderer());
+
+        // Actions column at index 7
+        inventoryTable.getColumnModel().getColumn(7).setCellRenderer(new ActionsCellRenderer());
+        inventoryTable.getColumnModel().getColumn(7).setCellEditor(new ActionsCellEditor());
+
+        // Single-click: col 5 opens batch modal, col 7 opens actions menu
         inventoryTable.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseClicked(java.awt.event.MouseEvent e) {
@@ -1057,8 +1068,8 @@ public class POSSystem extends javax.swing.JFrame {
                 int row = inventoryTable.rowAtPoint(e.getPoint());
                 if (row < 0)
                     return;
-                if (col == 3) {
-                    Object cellVal = inventoryTable.getModel().getValueAt(row, 3);
+                if (col == 5) {
+                    Object cellVal = inventoryTable.getModel().getValueAt(row, 5);
                     if (!(cellVal instanceof controller.InventoryRowView rv))
                         return;
                     if (inventoryController == null)
@@ -1070,14 +1081,14 @@ public class POSSystem extends javax.swing.JFrame {
                                     inventoryRegistrationPanel.refreshFromRepository();
                                 }
                             }).setVisible(true);
-                } else if (col == 5) {
+                } else if (col == 7) {
                     inventoryTable.editCellAt(row, col);
                 }
             }
         });
 
-        // Status column: colored badge renderer at index 4
-        inventoryTable.getColumnModel().getColumn(4).setCellRenderer(new StatusBadgeRenderer());
+        // Status column: colored badge renderer at index 6
+        inventoryTable.getColumnModel().getColumn(6).setCellRenderer(new StatusBadgeRenderer());
 
         inventoryTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
@@ -1240,13 +1251,28 @@ public class POSSystem extends javax.swing.JFrame {
                 ? "All"
                 : inventoryCategoryFilter.getSelectedItem().toString();
 
+        // ABC tiers rank items by usage value relative to the whole inventory,
+        // so they're computed once across all rows up front, not per-row.
+        InventoryPolicyService policyService = new InventoryPolicyService();
+        Map<String, InventoryItem> itemsByName = new java.util.LinkedHashMap<>();
+        for (InventoryRowView r : inventoryRowsCache) {
+            itemsByName.put(r.getName(), new InventoryItem(r.getName(), r.getQuantity(), r.getUnit(), r.getAlertLevel()));
+        }
+        Map<String, String> abcTiers = policyService.classifyAbc(itemsByName);
+
         for (InventoryRowView row : inventoryRowsCache) {
             if (!matchesInventoryFilters(row, query, selectedCategory)) {
                 continue;
             }
             String qtyDisplay = row.getQuantity() + " " + row.getUnit();
             String alertDisplay = row.getAlertLevel() + " " + row.getUnit();
-            model.addRow(new Object[] { row.getName(), qtyDisplay, alertDisplay, row, row.getStatus(), "..." });
+            InventoryItem item = itemsByName.get(row.getName());
+            String tier = abcTiers.getOrDefault(row.getName(), "C");
+            ReorderGuideInfo reorderGuide = new ReorderGuideInfo(
+                    policyService.computeRecommendedEoq(item),
+                    policyService.computeReorderPoint(item),
+                    row.getQuantity(), row.getUnit());
+            model.addRow(new Object[] { row.getName(), qtyDisplay, alertDisplay, tier, reorderGuide, row, row.getStatus(), "..." });
         }
 
         if (model.getRowCount() > 0) {
@@ -1484,22 +1510,69 @@ public class POSSystem extends javax.swing.JFrame {
         return "TXN" + String.format("%06d", transactionCounter);
     }
 
-    private void filterInventoryTable(String query) {
-        if (inventoryTable == null)
-            return;
-        DefaultTableModel model = (DefaultTableModel) inventoryTable.getModel();
-        model.setRowCount(0);
-        if (inventoryController == null) {
-            inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
+    /** Carries the EOQ/ROP figures for a row so ReorderGuideRenderer can color ROP once stock reaches it. */
+    private static final class ReorderGuideInfo {
+        final double eoq;
+        final double rop;
+        final double quantity;
+        final String unit;
+
+        ReorderGuideInfo(double eoq, double rop, double quantity, String unit) {
+            this.eoq = eoq;
+            this.rop = rop;
+            this.quantity = quantity;
+            this.unit = unit;
         }
-        List<InventoryRowView> rows = inventoryController.buildInventoryRows();
-        for (InventoryRowView row : rows) {
-            if (query == null || query.trim().isEmpty()
-                    || row.getName().toLowerCase().contains(query.toLowerCase())) {
-                String qtyDisplay = row.getQuantity() + " " + row.getUnit();
-                String alertDisplay = row.getAlertLevel() + " " + row.getUnit();
-                model.addRow(new Object[] { row.getName(), qtyDisplay, alertDisplay, row, row.getStatus(), "..." });
+    }
+
+    private static class AbcTierRenderer extends DefaultTableCellRenderer {
+        @Override
+        public java.awt.Component getTableCellRendererComponent(JTable table, Object value,
+                boolean isSelected, boolean hasFocus, int row, int column) {
+            java.awt.Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            if (c instanceof JLabel label) {
+                String tier = value == null ? "C" : value.toString();
+                label.setText(tier);
+                label.setHorizontalAlignment(SwingConstants.CENTER);
+                label.setFont(label.getFont().deriveFont(Font.BOLD));
+                if (!isSelected) {
+                    switch (tier) {
+                        case "A" -> label.setForeground(new Color(0x16A34A));
+                        case "B" -> label.setForeground(new Color(0xD97706));
+                        default -> label.setForeground(new Color(0x6B7280));
+                    }
+                }
             }
+            return c;
+        }
+    }
+
+    private static class ReorderGuideRenderer extends DefaultTableCellRenderer {
+        @Override
+        public java.awt.Component getTableCellRendererComponent(JTable table, Object value,
+                boolean isSelected, boolean hasFocus, int row, int column) {
+            java.awt.Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            if (c instanceof JLabel label) {
+                label.setHorizontalAlignment(SwingConstants.CENTER);
+                if (value instanceof ReorderGuideInfo info) {
+                    long eoqRounded = Math.round(info.eoq);
+                    long ropRounded = Math.round(info.rop);
+                    label.setText("EOQ~" + eoqRounded + "  ·  ROP~" + ropRounded);
+                    if (!isSelected) {
+                        // Red flags the actionable case: stock has reached its
+                        // reorder point and a new order should be placed now.
+                        label.setForeground(info.quantity <= info.rop
+                                ? new Color(0xDC2626)
+                                : AppTheme.FG_MUTED);
+                    }
+                } else {
+                    label.setText("—");
+                    if (!isSelected) {
+                        label.setForeground(AppTheme.FG_MUTED);
+                    }
+                }
+            }
+            return c;
         }
     }
 
@@ -1804,10 +1877,25 @@ public class POSSystem extends javax.swing.JFrame {
 
         String itemName = String.valueOf(inventoryTable.getValueAt(selectedRow, 0));
         List<InventoryRowView> rows = inventoryController.buildInventoryRows();
+
+        // ABC tiers rank items by usage value relative to the whole inventory,
+        // so they must be computed across all rows, not just the selected one.
+        InventoryPolicyService policyService = new InventoryPolicyService();
+        Map<String, InventoryItem> itemsByName = new java.util.LinkedHashMap<>();
+        for (InventoryRowView r : rows) {
+            itemsByName.put(r.getName(), new InventoryItem(r.getName(), r.getQuantity(), r.getUnit(), r.getAlertLevel()));
+        }
+        Map<String, String> abcTiers = policyService.classifyAbc(itemsByName);
+
         for (InventoryRowView row : rows) {
             if (!row.getName().equals(itemName)) {
                 continue;
             }
+
+            InventoryItem item = itemsByName.get(row.getName());
+            double eoq = policyService.computeRecommendedEoq(item);
+            double rop = policyService.computeReorderPoint(item);
+            String tier = abcTiers.getOrDefault(row.getName(), "C");
 
             StringBuilder details = new StringBuilder();
             details.append("Name: ").append(row.getName()).append('\n');
@@ -1820,6 +1908,20 @@ public class POSSystem extends javax.swing.JFrame {
             details.append("Categories: ")
                     .append(row.getCategories() == null || row.getCategories().isBlank() ? "N/A" : row.getCategories())
                     .append('\n');
+            details.append('\n');
+            details.append("--- Replenishment Insights ---\n");
+            details.append("ABC Tier: ").append(tier)
+                    .append(" (").append(tier.equals("A") ? "high priority — drives ~80% of usage"
+                            : tier.equals("B") ? "medium priority — next ~15%"
+                            : "low priority — remaining ~5%")
+                    .append(")\n");
+            details.append("Recommended Order Qty (EOQ): ~").append(Math.round(eoq)).append(' ').append(row.getUnit()).append('\n');
+            details.append("Reorder Point (ROP): ~").append(Math.round(rop)).append(' ').append(row.getUnit());
+            if (row.getQuantity() <= rop) {
+                details.append("  ← reorder now, stock has reached its reorder point");
+            }
+            details.append('\n');
+            details.append("Deduction order: FEFO (earliest-expiring batches used first)\n");
             inventoryDetailArea.setText(details.toString());
             inventoryDetailArea.setCaretPosition(0);
             return;

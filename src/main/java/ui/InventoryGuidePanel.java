@@ -25,6 +25,12 @@ EOQ (Economic Order Quantity)
 - EOQ indicates suggested replenishment quantity to reduce ordering + holding cost.
 - Status format EOQ~N means the recommended order size is approximately N units.
 
+ROP (Reorder Point)
+- ROP is the stock level at which a new order should be placed, based on
+  average daily demand, lead time, and a safety-stock buffer.
+- Status format ROP~N means a reorder should be placed once quantity falls to N.
+- ROP is shown in red once the current quantity has reached or fallen below it.
+
 FEFO (First-Expire-First-Out)
 - Inventory deductions use earliest expiry batches first.
 - EXPIRED: at least one batch is already expired.

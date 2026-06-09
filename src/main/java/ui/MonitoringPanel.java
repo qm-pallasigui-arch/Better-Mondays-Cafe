@@ -4,13 +4,19 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Cursor;
+import java.awt.Dialog.ModalityType;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.FlowLayout;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.awt.GridLayout;
+import java.awt.Insets;
 import java.awt.RenderingHints;
+import java.awt.Window;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.sql.Connection;
@@ -21,8 +27,10 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.AbstractCellEditor;
@@ -37,6 +45,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
+import javax.swing.JSeparator;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
@@ -85,8 +94,10 @@ public class MonitoringPanel extends JPanel {
     };
 
     // ─── State ───────────────────────────────────────────────────────────────
+    private final boolean isAdmin;
     private JLabel[] cardCountLabels = new JLabel[4];
     private JLabel[] cardSubtextLabels = new JLabel[4];
+    private JButton[] cardActionBtns = new JButton[4];
     private JTable salesTable;
     private DefaultTableModel salesTableModel;
     private BarChartPanel barChart;
@@ -129,6 +140,11 @@ public class MonitoringPanel extends JPanel {
 
     // ─── Constructor ─────────────────────────────────────────────────────────
     public MonitoringPanel() {
+        this(true);
+    }
+
+    public MonitoringPanel(boolean isAdmin) {
+        this.isAdmin = isAdmin;
         setLayout(new BorderLayout(0, 16));
         setBackground(AppTheme.BG_PRIMARY);
         setBorder(BorderFactory.createEmptyBorder(20, 28, 20, 28));
@@ -916,8 +932,8 @@ public class MonitoringPanel extends JPanel {
             final int idx = i;
 
             CardPanel card = new CardPanel(16, AppTheme.BG_SURFACE);
-            card.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
-            card.setLayout(new BorderLayout(14, 0));
+            card.setBorder(BorderFactory.createEmptyBorder(16, 16, 12, 16));
+            card.setLayout(new BorderLayout(0, 0));
             card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             card.addMouseListener(new MouseAdapter() {
                 @Override
@@ -1001,8 +1017,16 @@ public class MonitoringPanel extends JPanel {
             textStack.add(titleLbl, BorderLayout.CENTER);
             textStack.add(subtextLbl, BorderLayout.SOUTH);
 
-            card.add(iconBox, BorderLayout.WEST);
-            card.add(textStack, BorderLayout.CENTER);
+            JPanel topArea = new JPanel(new BorderLayout(14, 0));
+            topArea.setOpaque(false);
+            topArea.add(iconBox, BorderLayout.WEST);
+            topArea.add(textStack, BorderLayout.CENTER);
+
+            JPanel content = new JPanel(new BorderLayout(0, 8));
+            content.setOpaque(false);
+            content.add(topArea, BorderLayout.CENTER);
+
+            card.add(content, BorderLayout.CENTER);
             row.add(card);
         }
         return row;
@@ -1059,19 +1083,83 @@ public class MonitoringPanel extends JPanel {
         cardSubtextLabels[3].setForeground(outOfStock > 0 ? new Color(0x4B5563) : AppTheme.SUCCESS);
     }
 
+    private void onDisposeExpired() {
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Dispose all expired inventory batches?\nThis will archive them permanently.",
+                "Dispose Expired", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (confirm != JOptionPane.YES_OPTION) return;
+        try (Connection conn = persistence.AppDatabase.openConnection()) {
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE inventory_batches SET archived = 1, quantity = 0 "
+                    + "WHERE expiry_date < date('now') AND quantity > 0")) {
+                int n = ps.executeUpdate();
+                JOptionPane.showMessageDialog(this,
+                        n + " expired batch(es) disposed.", "Disposed",
+                        JOptionPane.INFORMATION_MESSAGE);
+            }
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Failed to dispose expired items:\n" + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
+        refreshData();
+    }
+
+    private void onAcknowledge(int type) {
+        String label = CARD_TITLES[type];
+        List<String[]> relevant = new ArrayList<>();
+        try (Connection conn = persistence.AppDatabase.openConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT id, item_name, value FROM staff_reports WHERE type = ? AND status = 'pending'")) {
+            ps.setInt(1, type);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                relevant.add(new String[]{rs.getString(1), rs.getString(2), rs.getString(3)});
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        if (relevant.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                    "No pending notifications for \"" + label + "\".",
+                    "Acknowledge", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        StringBuilder msg = new StringBuilder("Acknowledge the following reports?\n\n");
+        for (String[] n : relevant) {
+            msg.append("• ").append(n[2]).append(" (").append(n[1]).append(")\n");
+        }
+        int confirm = JOptionPane.showConfirmDialog(this,
+                msg.toString(), "Acknowledge " + label,
+                JOptionPane.YES_NO_OPTION, JOptionPane.INFORMATION_MESSAGE);
+        if (confirm == JOptionPane.YES_OPTION) {
+            try (Connection conn = persistence.AppDatabase.openConnection();
+                 PreparedStatement ps = conn.prepareStatement(
+                         "UPDATE staff_reports SET status = 'acknowledged', acknowledged_at = datetime('now','localtime') WHERE type = ? AND status = 'pending'")) {
+                ps.setInt(1, type);
+                ps.executeUpdate();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+            JOptionPane.showMessageDialog(this,
+                    "Acknowledged " + relevant.size() + " report(s).",
+                    "Done", JOptionPane.INFORMATION_MESSAGE);
+        }
+    }
+
     private void showSummaryModal(int idx) {
         String title = CARD_TITLES[idx];
         List<String[]> rows = new ArrayList<>();
         try (Connection conn = AppDatabase.openConnection()) {
             String sql = switch (idx) {
-                case 0 -> "SELECT name, quantity, unit FROM inventory_items ORDER BY name";
-                case 1 -> "SELECT name, quantity, unit, alert_level FROM inventory_items "
+                case 0 -> "SELECT name, quantity, unit, storage_location FROM inventory_items ORDER BY name";
+                case 1 -> "SELECT name, quantity, unit, alert_level, storage_location FROM inventory_items "
                         + "WHERE quantity > 0 AND quantity <= alert_level ORDER BY name";
-                case 2 -> "SELECT ii.name, ib.sku, ib.quantity, ib.expiry_date "
+                case 2 -> "SELECT ii.name, ib.sku, ib.quantity, ib.expiry_date, ii.storage_location "
                         + "FROM inventory_batches ib "
                         + "JOIN inventory_items ii ON ii.id = ib.inventory_item_id "
                         + "WHERE ib.expiry_date < date('now') AND ib.quantity > 0 ORDER BY ib.expiry_date";
-                case 3 -> "SELECT name, unit FROM inventory_items WHERE quantity <= 0 ORDER BY name";
+                case 3 -> "SELECT name, unit, storage_location FROM inventory_items WHERE quantity <= 0 ORDER BY name";
                 default -> "";
             };
             try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
@@ -1090,23 +1178,29 @@ public class MonitoringPanel extends JPanel {
         content.setBackground(AppTheme.BG_SURFACE);
         content.setBorder(BorderFactory.createEmptyBorder(12, 16, 12, 16));
 
+        // ── Header with title, category filter, and + button ──
+        JPanel headerPanel = new JPanel(new BorderLayout(8, 0));
+        headerPanel.setOpaque(false);
+
         JLabel headerLbl = new JLabel(title + " (" + rows.size() + ")");
         headerLbl.setFont(BOLD_FONT);
         headerLbl.setForeground(AppTheme.FG_PRIMARY);
-        content.add(headerLbl, BorderLayout.NORTH);
+        headerPanel.add(headerLbl, BorderLayout.WEST);
 
+        JPanel rightGroup = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        rightGroup.setOpaque(false);
+
+        // ── Table ──
         String[] columns = switch (idx) {
-            case 0 -> new String[] { "Item Name", "Qty", "Unit" };
-            case 1 -> new String[] { "Item Name", "Qty", "Unit", "Alert Level" };
-            case 2 -> new String[] { "Item", "Batch SKU", "Qty", "Expiry" };
-            case 3 -> new String[] { "Item Name", "Unit" };
+            case 0 -> new String[] { "Item Name", "Qty", "Unit", "Storage" };
+            case 1 -> new String[] { "Item Name", "Qty", "Unit", "Alert Level", "Storage" };
+            case 2 -> new String[] { "Item", "Batch SKU", "Qty", "Expiry", "Storage" };
+            case 3 -> new String[] { "Item Name", "Unit", "Storage" };
             default -> new String[] { "" };
         };
 
         DefaultTableModel model = new DefaultTableModel(columns, 0) {
-            public boolean isCellEditable(int r, int c) {
-                return false;
-            }
+            public boolean isCellEditable(int r, int c) { return false; }
         };
         for (String[] row : rows)
             model.addRow(row);
@@ -1119,8 +1213,459 @@ public class MonitoringPanel extends JPanel {
         scrollPane.setBorder(BorderFactory.createLineBorder(AppTheme.BORDER));
         content.add(scrollPane, BorderLayout.CENTER);
 
+        // ── Category filter (storage_location) ──
+        int locCol = switch (idx) {
+            case 0 -> 3; case 1 -> 4; case 2 -> 4; case 3 -> 2;
+            default -> -1;
+        };
+        List<String[]> allRows = new ArrayList<>(rows);
+
+        if (locCol >= 0) {
+            Set<String> locSet = new LinkedHashSet<>();
+            for (String[] r : rows) {
+                String loc = r.length > locCol ? r[locCol].trim() : "";
+                if (!loc.isEmpty()) locSet.add(loc);
+            }
+            if (!locSet.isEmpty()) {
+                JComboBox<String> catFilter = new JComboBox<>();
+                catFilter.addItem("All Categories");
+                for (String loc : locSet) catFilter.addItem(loc);
+                catFilter.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+                catFilter.setPreferredSize(new Dimension(150, 24));
+
+                JComboBox<String> finalCatFilter = catFilter;
+                catFilter.addActionListener(e -> {
+                    String sel = (String) finalCatFilter.getSelectedItem();
+                    model.setRowCount(0);
+                    for (String[] r : allRows) {
+                        if (sel == null || sel.equals("All Categories") || (r.length > locCol && sel.equals(r[locCol].trim()))) {
+                            model.addRow(r);
+                        }
+                    }
+                    headerLbl.setText(title + " (" + model.getRowCount() + ")");
+                });
+
+                rightGroup.add(catFilter);
+            }
+        }
+
+        if (!isAdmin && idx >= 1 && idx <= 3) {
+            JButton reportBtn = new JButton("+");
+            reportBtn.setFont(new Font("Segoe UI", Font.BOLD, 16));
+            reportBtn.setForeground(Color.WHITE);
+            reportBtn.setBackground(AppTheme.ACCENT);
+            reportBtn.setBorder(BorderFactory.createEmptyBorder(2, 10, 2, 10));
+            reportBtn.setFocusPainted(false);
+            reportBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            final int fIdx = idx;
+            reportBtn.addActionListener(e -> {
+                Window w = SwingUtilities.windowForComponent(headerPanel);
+                if (w instanceof JDialog) ((JDialog) w).dispose();
+                showStaffReportForm(fIdx);
+            });
+            rightGroup.add(reportBtn);
+        }
+
+        headerPanel.add(rightGroup, BorderLayout.EAST);
+        content.add(headerPanel, BorderLayout.NORTH);
+
+        // ── Pending Staff Reports section (Admin only) ──
+        if (isAdmin && idx >= 1 && idx <= 3) {
+            List<String[]> pending = new ArrayList<>();
+            try (Connection conn = AppDatabase.openConnection();
+                 PreparedStatement ps = conn.prepareStatement(
+                         "SELECT id, item_name, value, created_at FROM staff_reports "
+                         + "WHERE type = ? AND status = 'pending' ORDER BY created_at")) {
+                ps.setInt(1, idx);
+                ResultSet rs = ps.executeQuery();
+                while (rs.next()) {
+                    pending.add(new String[]{
+                        String.valueOf(rs.getInt(1)),
+                        rs.getString(2),
+                        rs.getString(3),
+                        rs.getString(4)
+                    });
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            if (!pending.isEmpty()) {
+                JPanel reportsPanel = new JPanel(new BorderLayout(0, 4));
+                reportsPanel.setOpaque(false);
+                reportsPanel.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
+
+                JLabel reportsTitle = new JLabel("Pending Staff Reports (" + pending.size() + ")");
+                reportsTitle.setFont(BOLD_FONT);
+                reportsTitle.setForeground(AppTheme.DANGER);
+                reportsPanel.add(reportsTitle, BorderLayout.NORTH);
+
+                JPanel listPanel = new JPanel();
+                listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
+                listPanel.setOpaque(false);
+                for (String[] r : pending) {
+                    int reportId = Integer.parseInt(r[0]);
+                    String itemName = r[1];
+                    String reportValue = r[2];
+                    boolean canAck = false;
+                    String subtext = "";
+
+                    if (idx == 1 || idx == 3) {
+                        try (Connection conn = AppDatabase.openConnection();
+                             PreparedStatement ps = conn.prepareStatement(
+                                     "SELECT quantity, alert_level FROM inventory_items WHERE name = ?")) {
+                            ps.setString(1, itemName);
+                            ResultSet rs = ps.executeQuery();
+                            if (rs.next()) {
+                                double qty = rs.getDouble(1);
+                                double alert = rs.getDouble(2);
+                                if (idx == 1) {
+                                    canAck = qty >= alert;
+                                    if (!canAck) subtext = "Need to refill (qty: " + qty + " < alert: " + alert + ")";
+                                } else {
+                                    canAck = qty > 0;
+                                    if (!canAck) subtext = "Need to restock (currently out)";
+                                }
+                            }
+                        } catch (Exception ex) {
+                            ex.printStackTrace();
+                        }
+                    } else if (idx == 2) {
+                        canAck = false;
+                        subtext = "Dispose expired batch first";
+                    }
+
+                    JPanel rowPanel = new JPanel(new BorderLayout(6, 0));
+                    rowPanel.setBackground(AppTheme.BG_SURFACE);
+                    rowPanel.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createMatteBorder(0, 0, 1, 0, AppTheme.BORDER),
+                        BorderFactory.createEmptyBorder(6, 8, 6, 8)
+                    ));
+
+                    JPanel textCol = new JPanel(new BorderLayout(0, 2));
+                    textCol.setOpaque(false);
+                    JLabel nameLbl = new JLabel(itemName);
+                    nameLbl.setFont(BODY_FONT);
+                    textCol.add(nameLbl, BorderLayout.NORTH);
+                    JLabel detailLbl = new JLabel(subtext.isEmpty() ? "Reported: " + r[3] : subtext);
+                    detailLbl.setFont(SMALL_FONT);
+                    detailLbl.setForeground(AppTheme.FG_MUTED);
+                    textCol.add(detailLbl, BorderLayout.SOUTH);
+                    rowPanel.add(textCol, BorderLayout.CENTER);
+
+                    if (idx == 2) {
+                        JButton disposeBtn = new JButton("Dispose");
+                        disposeBtn.setFont(new Font("Segoe UI", Font.BOLD, 11));
+                        disposeBtn.setForeground(Color.WHITE);
+                        disposeBtn.setBackground(AppTheme.DANGER);
+                        disposeBtn.setBorder(BorderFactory.createEmptyBorder(3, 12, 3, 12));
+                        disposeBtn.setFocusPainted(false);
+                        disposeBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                        int rid = reportId;
+                        disposeBtn.addActionListener(e -> {
+                            onDisposeSingle(itemName, rid);
+                            Window w = SwingUtilities.windowForComponent(content);
+                            if (w instanceof JDialog) ((JDialog) w).dispose();
+                        });
+                        rowPanel.add(disposeBtn, BorderLayout.EAST);
+                    } else {
+                        JButton ackBtn = new JButton("Acknowledge");
+                        ackBtn.setFont(new Font("Segoe UI", Font.BOLD, 11));
+                        ackBtn.setForeground(AppTheme.SUCCESS);
+                        ackBtn.setBackground(new Color(0xD1FAE5));
+                        ackBtn.setBorder(BorderFactory.createEmptyBorder(3, 12, 3, 12));
+                        ackBtn.setFocusPainted(false);
+                        ackBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                        ackBtn.setEnabled(canAck);
+                        int rid = reportId;
+                        ackBtn.addActionListener(e -> {
+                            onAcknowledgeSingle(rid, itemName);
+                            Window w = SwingUtilities.windowForComponent(content);
+                            if (w instanceof JDialog) ((JDialog) w).dispose();
+                        });
+                        rowPanel.add(ackBtn, BorderLayout.EAST);
+                    }
+
+                    listPanel.add(rowPanel);
+                }
+
+                JScrollPane reportScroll = new JScrollPane(listPanel);
+                reportScroll.setPreferredSize(new Dimension(500, Math.min(200, pending.size() * 40 + 10)));
+                reportScroll.setBorder(BorderFactory.createLineBorder(AppTheme.BORDER));
+                reportsPanel.add(reportScroll, BorderLayout.CENTER);
+
+                content.add(reportsPanel, BorderLayout.SOUTH);
+            }
+        }
+
         JOptionPane.showMessageDialog(SwingUtilities.windowForComponent(this),
                 content, title, JOptionPane.PLAIN_MESSAGE);
+    }
+
+    private void onDisposeSingle(String itemName, int reportId) {
+        String sql = "UPDATE inventory_batches SET archived = 1, quantity = 0 "
+                + "WHERE inventory_item_id = (SELECT id FROM inventory_items WHERE name = ?) "
+                + "AND expiry_date < date('now') AND quantity > 0";
+        try (Connection conn = persistence.AppDatabase.openConnection()) {
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, itemName);
+                int n = ps.executeUpdate();
+                if (n > 0) {
+                    try (PreparedStatement up = conn.prepareStatement(
+                            "UPDATE staff_reports SET status = 'acknowledged', acknowledged_at = datetime('now','localtime') WHERE id = ?")) {
+                        up.setInt(1, reportId);
+                        up.executeUpdate();
+                    }
+                    JOptionPane.showMessageDialog(this,
+                            n + " expired batch(es) disposed for " + itemName + ".",
+                            "Disposed", JOptionPane.INFORMATION_MESSAGE);
+                    refreshData();
+                } else {
+                    JOptionPane.showMessageDialog(this,
+                            "No expired batches found for " + itemName + ".",
+                            "Info", JOptionPane.INFORMATION_MESSAGE);
+                }
+            }
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Failed to dispose:\n" + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void onAcknowledgeSingle(int reportId, String itemName) {
+        try (Connection conn = persistence.AppDatabase.openConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "UPDATE staff_reports SET status = 'acknowledged', acknowledged_at = datetime('now','localtime') WHERE id = ?")) {
+            ps.setInt(1, reportId);
+            ps.executeUpdate();
+            JOptionPane.showMessageDialog(this,
+                    "Acknowledged report for " + itemName + ".",
+                    "Done", JOptionPane.INFORMATION_MESSAGE);
+            refreshData();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Failed to acknowledge:\n" + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void showStaffReportForm(int type) {
+        String label = CARD_TITLES[type];
+        Map<String, String[]> itemMap = new LinkedHashMap<>();
+
+        // Load ALL inventory items — users can select any ingredient
+        String sql = "SELECT name, quantity, alert_level, unit FROM inventory_items ORDER BY name";
+        try (Connection conn = persistence.AppDatabase.openConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                String name = rs.getString(1);
+                String qty = String.valueOf(rs.getDouble(2));
+                String alert = String.valueOf(rs.getDouble(3));
+                String unit = rs.getString(4);
+                itemMap.put(name, new String[]{name, qty, alert, unit});
+            }
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Failed to load items:\n" + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        if (itemMap.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                    "No inventory items found.",
+                    "Report", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        String[] names = itemMap.keySet().toArray(new String[0]);
+
+        JDialog dialog = new JDialog(SwingUtilities.windowForComponent(this), "Report " + label, ModalityType.APPLICATION_MODAL);
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+
+        JPanel form = new JPanel(new GridBagLayout());
+        form.setBackground(AppTheme.BG_SURFACE);
+        form.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.insets = new Insets(4, 4, 4, 4);
+
+        // ── Row 0: Item Name selection ──
+        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 0;
+        JLabel nameLbl = new JLabel("Item Name:");
+        nameLbl.setFont(BOLD_FONT);
+        form.add(nameLbl, gbc);
+
+        gbc.gridx = 1; gbc.gridy = 0; gbc.weightx = 1;
+        JComboBox<String> itemCombo = new JComboBox<>(names);
+        itemCombo.setFont(BODY_FONT);
+        itemCombo.setPreferredSize(new Dimension(250, 28));
+        form.add(itemCombo, gbc);
+        gbc.weightx = 0;
+
+        // ── Row 1 (Low Stock / Out of Stock): current qty + alert level info ──
+        JLabel infoLbl = new JLabel(" ");
+        infoLbl.setFont(BODY_FONT);
+        infoLbl.setForeground(AppTheme.FG_MUTED);
+
+        if (type != 2) {
+            gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 2;
+            gbc.fill = GridBagConstraints.HORIZONTAL;
+            form.add(infoLbl, gbc);
+
+            Runnable updateInfo = () -> {
+                String sel = (String) itemCombo.getSelectedItem();
+                if (sel != null && itemMap.containsKey(sel)) {
+                    String[] d = itemMap.get(sel);
+                    infoLbl.setText("Current Qty: " + d[1] + " " + d[3] + "  |  Alert Level: " + d[2] + " " + d[3]);
+                }
+            };
+            itemCombo.addActionListener(e -> updateInfo.run());
+            updateInfo.run();
+        }
+
+        // ── Quantity / Batch ID field ──
+        int qtyRow = type == 2 ? 1 : 2;
+        gbc.gridx = 0; gbc.gridy = qtyRow; gbc.gridwidth = 1; gbc.fill = GridBagConstraints.HORIZONTAL;
+        JLabel qtyLbl = new JLabel(type == 2 ? "Batch ID:" : "Quantity Needed:");
+        qtyLbl.setFont(BOLD_FONT);
+        form.add(qtyLbl, gbc);
+
+        gbc.gridx = 1; gbc.gridy = qtyRow; gbc.weightx = 1;
+        JPanel qtyRowPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        qtyRowPanel.setOpaque(false);
+        JTextField qtyField = new JTextField(12);
+        qtyField.setFont(BODY_FONT);
+        qtyRowPanel.add(qtyField);
+
+        JLabel unitDisplay = new JLabel("");
+        unitDisplay.setFont(BOLD_FONT);
+        unitDisplay.setForeground(AppTheme.FG_MUTED);
+        if (type != 2) {
+            qtyRowPanel.add(unitDisplay);
+            Runnable updateUnit = () -> {
+                String sel = (String) itemCombo.getSelectedItem();
+                if (sel != null && itemMap.containsKey(sel))
+                    unitDisplay.setText(itemMap.get(sel)[3]);
+            };
+            itemCombo.addActionListener(e -> updateUnit.run());
+            updateUnit.run();
+        }
+        form.add(qtyRowPanel, gbc);
+        gbc.weightx = 0;
+
+        // ── Send button ──
+        int btnRow = (type == 2 ? 2 : 3);
+        gbc.gridx = 0; gbc.gridy = btnRow; gbc.gridwidth = 2;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.anchor = GridBagConstraints.CENTER;
+        JButton sendBtn = new JButton("Send Report");
+        sendBtn.setFont(BOLD_FONT);
+        sendBtn.setForeground(Color.WHITE);
+        sendBtn.setBackground(AppTheme.ACCENT);
+        sendBtn.setBorder(BorderFactory.createEmptyBorder(8, 24, 8, 24));
+        sendBtn.setFocusPainted(false);
+        sendBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        sendBtn.addActionListener(e -> {
+            String selectedItem = (String) itemCombo.getSelectedItem();
+            if (selectedItem == null) return;
+            String val = qtyField.getText().trim();
+            if (val.isEmpty()) {
+                JOptionPane.showMessageDialog(dialog,
+                        "Please enter a " + (type == 2 ? "batch ID" : "quantity") + ".",
+                        "Input Needed", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            // Save to DB
+            try (Connection conn = persistence.AppDatabase.openConnection();
+                 PreparedStatement ps = conn.prepareStatement(
+                         "INSERT INTO staff_reports (type, item_name, value) VALUES (?, ?, ?)")) {
+                ps.setInt(1, type);
+                ps.setString(2, selectedItem);
+                ps.setString(3, val);
+                ps.executeUpdate();
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(dialog,
+                        "Failed to save report:\n" + ex.getMessage(),
+                        "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            dialog.dispose();
+            JOptionPane.showMessageDialog(this,
+                    "Report sent to admin.", "Reported",
+                    JOptionPane.INFORMATION_MESSAGE);
+        });
+        form.add(sendBtn, gbc);
+
+        dialog.add(form);
+        dialog.pack();
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
+    }
+
+    public static int getPendingReportCount() {
+        try (Connection conn = persistence.AppDatabase.openConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT COUNT(*) FROM staff_reports WHERE status = 'pending'");
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) return rs.getInt(1);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public static void showNotificationsDialog(java.awt.Window parent) {
+        List<String[]> reports = new ArrayList<>();
+        try (Connection conn = persistence.AppDatabase.openConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT sr.type, sr.item_name, sr.value, sr.created_at, ii.quantity, ii.alert_level "
+                     + "FROM staff_reports sr "
+                     + "LEFT JOIN inventory_items ii ON ii.name = sr.item_name "
+                     + "WHERE sr.status = 'pending' ORDER BY sr.created_at");
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                reports.add(new String[]{
+                    String.valueOf(rs.getInt(1)),
+                    rs.getString(2),
+                    rs.getString(3),
+                    rs.getString(4),
+                    String.valueOf(rs.getDouble(5)),
+                    String.valueOf(rs.getDouble(6))
+                });
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        if (reports.isEmpty()) {
+            JOptionPane.showMessageDialog(parent, "No pending notifications.",
+                    "Notifications", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBackground(AppTheme.BG_SURFACE);
+        panel.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
+
+        String[] typeNames = {"", "Low Stock", "Expired", "Out of Stock"};
+        for (String[] r : reports) {
+            int t = Integer.parseInt(r[0]);
+            String label = t >= 1 && t <= 3 ? typeNames[t] : "Report";
+            JPanel row = new JPanel(new BorderLayout(6, 0));
+            row.setOpaque(false);
+            row.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 0));
+            JLabel text = new JLabel("<html><b>" + r[1] + "</b> \u2014 " + label + " (" + r[3] + ")</html>");
+            text.setFont(BODY_FONT);
+            row.add(text, BorderLayout.CENTER);
+            panel.add(row);
+            panel.add(new JSeparator());
+        }
+
+        JOptionPane.showMessageDialog(parent, panel, "Pending Notifications (" + reports.size() + ")",
+                JOptionPane.INFORMATION_MESSAGE);
     }
 
     // ─── Recent Sales Table ───────────────────────────────────────────────────
@@ -1206,12 +1751,8 @@ public class MonitoringPanel extends JPanel {
     private String buildTimeFilter(String filter) {
         if ("Yesterday".equals(filter))
             return "WHERE DATE(created_at) = DATE('now', '-1 day') ";
-        if ("This Week".equals(filter)) {
-            Calendar cal = Calendar.getInstance();
-            cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
-            String monday = new SimpleDateFormat("yyyy-MM-dd").format(cal.getTime());
-            return "WHERE created_at >= '" + monday + "' ";
-        }
+        if ("This Week".equals(filter))
+            return "WHERE DATE(created_at) >= DATE('now', '-' || CAST(strftime('%w', 'now') AS INTEGER) || ' days') ";
         return "WHERE DATE(created_at) = DATE('now') ";
     }
 
@@ -1223,7 +1764,7 @@ public class MonitoringPanel extends JPanel {
         try (Connection conn = AppDatabase.openConnection();
                 PreparedStatement ps = conn.prepareStatement(
                         "SELECT st.id, st.transaction_ref, "
-                                + "'' AS customer_name, "
+                                + "COALESCE(st.customer_name,'Walk-in') AS customer_name, "
                                 + "COALESCE(st.subtotal,0)       AS subtotal, "
                                 + "COALESCE(st.tax,0)            AS tax, "
                                 + "COALESCE(st.total,0)          AS total, "

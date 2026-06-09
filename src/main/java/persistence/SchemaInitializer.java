@@ -120,6 +120,7 @@ public final class SchemaInitializer {
                         statement.execute("CREATE TABLE IF NOT EXISTS sales_transactions ("
                                         + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
                                         + "transaction_ref TEXT NOT NULL UNIQUE, "
+                                        + "customer_name TEXT NOT NULL DEFAULT 'Walk-in', "
                                         + "subtotal REAL NOT NULL, "
                                         + "tax REAL NOT NULL, "
                                         + "total REAL NOT NULL, "
@@ -127,6 +128,10 @@ public final class SchemaInitializer {
                                         + "change_amount REAL NOT NULL, "
                                         + "created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
                                         + ")");
+                        // Migration: add customer_name to existing databases
+                        try {
+                            statement.execute("ALTER TABLE sales_transactions ADD COLUMN customer_name TEXT NOT NULL DEFAULT 'Walk-in'");
+                        } catch (SQLException ignored) {}
                         // Order status table stores status for transactions (PENDING, COMPLETED,
                         // CANCELLED, etc.)
                         statement.execute("CREATE TABLE IF NOT EXISTS sales_order_status ("
@@ -150,7 +155,19 @@ public final class SchemaInitializer {
                                         + "username TEXT NOT NULL, "
                                         + "started_at TEXT NOT NULL DEFAULT (datetime('now','localtime')), "
                                         + "ended_at TEXT, "
-                                        + "notes TEXT"
+                                        + "notes TEXT, "
+                                        + "status TEXT NOT NULL DEFAULT 'active'"
+                                        + ")");
+                        try {
+                            statement.execute("ALTER TABLE staff_shifts ADD COLUMN status TEXT NOT NULL DEFAULT 'active'");
+                        } catch (java.sql.SQLException ignored) {}
+                        // Weekly staff schedules
+                        statement.execute("CREATE TABLE IF NOT EXISTS staff_schedules ("
+                                        + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                                        + "username TEXT NOT NULL, "
+                                        + "day_of_week INTEGER NOT NULL, "
+                                        + "shift_type TEXT NOT NULL DEFAULT 'off', "
+                                        + "UNIQUE(username, day_of_week)"
                                         + ")");
                         // Password reset requests submitted from the login screen
                         statement.execute("CREATE TABLE IF NOT EXISTS password_reset_requests ("
@@ -159,6 +176,27 @@ public final class SchemaInitializer {
                                         + "status TEXT NOT NULL DEFAULT 'PENDING', "
                                         + "requested_at TEXT NOT NULL DEFAULT (datetime('now','localtime')), "
                                         + "resolved_at TEXT"
+                                        + ")");
+                        // Leave requests submitted by Staff
+                        statement.execute("CREATE TABLE IF NOT EXISTS staff_leave_requests ("
+                                        + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                                        + "username TEXT NOT NULL, "
+                                        + "start_date TEXT NOT NULL, "
+                                        + "end_date TEXT NOT NULL, "
+                                        + "reason TEXT, "
+                                        + "status TEXT NOT NULL DEFAULT 'pending', "
+                                        + "created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))"
+                                        + ")");
+                        // Staff reports for Admin notification
+                        statement.execute("CREATE TABLE IF NOT EXISTS staff_reports ("
+                                        + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                                        + "type INTEGER NOT NULL, "
+                                        + "item_name TEXT NOT NULL, "
+                                        + "value TEXT NOT NULL DEFAULT '', "
+                                        + "status TEXT NOT NULL DEFAULT 'pending', "
+                                        + "created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')), "
+                                        + "acknowledged_at TEXT, "
+                                        + "acknowledged_by TEXT"
                                         + ")");
                 }
         }

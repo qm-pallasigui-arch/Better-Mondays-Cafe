@@ -115,13 +115,9 @@ public class UserDataManager {
         }
     }
 
-    public static boolean resetPassword(String username, String newPassword) {
-        try {
-            USER_REPOSITORY.resetPassword(username, newPassword);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
+    public static boolean resetPassword(String username, String newPassword) throws Exception {
+        USER_REPOSITORY.resetPassword(username, newPassword);
+        return true;
     }
 
     public static void createUser(String username, String plainPassword, Role role,

@@ -1,5 +1,6 @@
 package loginregister;
 
+import persistence.sqlite.SQLiteStaffShiftRepository;
 import pos.POSSystem;
 import ui.AppTheme;
 import util.FieldAssist;

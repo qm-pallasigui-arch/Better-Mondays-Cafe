@@ -216,6 +216,26 @@ public class SQLiteUserRepository implements UserRepository, AccountRoleReposito
         }
     }
 
+    @Override
+    public void updateUserDetails(String username, String fullName, int age, String birthdate,
+            String address, String mobile, String gender) throws Exception {
+        try (Connection connection = AppDatabase.openConnection();
+                PreparedStatement stmt = connection.prepareStatement(
+                        "UPDATE users SET full_name = ?, age = ?, birthdate = ?, address = ?, mobile = ?, gender = ? WHERE username = ?")) {
+            stmt.setString(1, fullName);
+            stmt.setInt(2, age);
+            stmt.setString(3, birthdate);
+            stmt.setString(4, address);
+            stmt.setString(5, mobile);
+            stmt.setString(6, gender);
+            stmt.setString(7, username);
+            int affected = stmt.executeUpdate();
+            if (affected == 0) {
+                throw new IllegalArgumentException("User not found: " + username);
+            }
+        }
+    }
+
     public void resetPassword(String username, String newPassword) throws Exception {
         try (Connection connection = AppDatabase.openConnection();
                 PreparedStatement update = connection.prepareStatement(

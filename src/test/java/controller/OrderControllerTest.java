@@ -17,7 +17,7 @@ class OrderControllerTest {
         List<SalesRecord> records = new ArrayList<>();
         records.add(new SalesRecord("Latte", 2, 100.0, 200.0));
 
-        controller.persistCompletedTransaction("TXN001", records, 200.0, 500.0, 300.0);
+        controller.persistCompletedTransaction("TXN001", records, 200.0, 500.0, 300.0, "Walk-in");
 
         assertTrue(repo.saved);
         assertEquals("TXN001", repo.savedRef);
@@ -35,7 +35,7 @@ class OrderControllerTest {
         }
 
         @Override
-        public void saveAll(String transactionRef, List<SalesRecord> records, double subtotal, double tax, double total, double cash, double changeAmount) {
+        public void saveAll(String transactionRef, List<SalesRecord> records, double subtotal, double tax, double total, double cash, double changeAmount, String customerName) {
             this.saved = true;
             this.savedRef = transactionRef;
         }

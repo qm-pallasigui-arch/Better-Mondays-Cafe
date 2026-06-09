@@ -41,7 +41,7 @@ public class MenuItemDialog extends JDialog {
 
     private static final String[] CATEGORIES = { "Coffee", "Non-Coffee", "Fruit Tea", "Herbal Tea", "Food" };
     private static final String[] PACKAGING_DEFAULTS = { "Cup", "Cup Holder", "Lid", "Straw" };
-    private static final Path IMAGES_DIR = Paths.get("data", "images");
+    private static final Path RESOURCE_IMAGES_DIR = Paths.get("src", "main", "resources", "images");
 
     // Fixed dialog size
     private static final int DLG_W = 780;
@@ -576,7 +576,9 @@ public class MenuItemDialog extends JDialog {
                                 .getTransferData(DataFlavor.javaFileListFlavor);
                         if (!files.isEmpty())
                             loadImage(files.get(0));
+                        e.dropComplete(true);
                     } catch (Exception ignored) {
+                        e.dropComplete(false);
                     }
                 }
 
@@ -604,15 +606,16 @@ public class MenuItemDialog extends JDialog {
 
         void loadImage(File file) {
             try {
-                BufferedImage img = ImageIO.read(file);
+                BufferedImage img = readImage(file);
                 if (img == null)
-                    return;
-                Files.createDirectories(IMAGES_DIR);
+                    throw new IOException("Unsupported image format");
+                Path saveDir = getImageSaveDirectory();
+                Files.createDirectories(saveDir);
                 String ext = ext(file.getName());
                 String safe = nameField.getText().trim().replaceAll("[^a-zA-Z0-9_\\-]", "_");
                 if (safe.isEmpty())
                     safe = "item_" + System.currentTimeMillis();
-                Path dest = IMAGES_DIR.resolve(safe + "." + ext);
+                Path dest = saveDir.resolve(safe + "." + ext);
                 Files.copy(file.toPath(), dest, StandardCopyOption.REPLACE_EXISTING);
                 selectedImagePath = dest.toAbsolutePath().toString();
                 preview = img;
@@ -622,6 +625,60 @@ public class MenuItemDialog extends JDialog {
                 JOptionPane.showMessageDialog(MenuItemDialog.this,
                         "Could not load image: " + ex.getMessage(), "Image Error", JOptionPane.ERROR_MESSAGE);
             }
+        }
+
+        private Path getImageSaveDirectory() {
+            String category = Objects.toString(catBox.getSelectedItem(), "Coffee").trim();
+            String folder = mapCategoryToResourceFolder(category, nameField.getText().trim());
+            return RESOURCE_IMAGES_DIR.resolve(folder);
+        }
+
+        private String mapCategoryToResourceFolder(String category, String itemName) {
+            if (category.equalsIgnoreCase("Coffee")) {
+                return "Espresso & Coffee";
+            }
+            if (category.equalsIgnoreCase("Non-Coffee") || category.equalsIgnoreCase("Fruit Tea")
+                    || category.equalsIgnoreCase("Herbal Tea")) {
+                return category;
+            }
+            if (category.equalsIgnoreCase("Food")) {
+                String normalized = itemName == null ? "" : itemName.toLowerCase();
+                if (normalized.contains("pandesal") || normalized.contains("pande"))
+                    return "Pandesal Pairs";
+                if (normalized.contains("sandwich") || normalized.contains("ham") || normalized.contains("cheese")
+                        || normalized.contains("club"))
+                    return "Sandwiches";
+                return "Pastries";
+            }
+            return category;
+        }
+
+        private BufferedImage readImage(File file) throws IOException {
+            BufferedImage img = ImageIO.read(file);
+            if (img != null)
+                return img;
+
+            Image iconImage = Toolkit.getDefaultToolkit().createImage(file.getAbsolutePath());
+            MediaTracker tracker = new MediaTracker(this);
+            tracker.addImage(iconImage, 0);
+            try {
+                tracker.waitForID(0);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            if (tracker.isErrorAny())
+                return null;
+
+            int w = iconImage.getWidth(null);
+            int h = iconImage.getHeight(null);
+            if (w <= 0 || h <= 0)
+                return null;
+
+            BufferedImage buffered = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g2 = buffered.createGraphics();
+            g2.drawImage(iconImage, 0, 0, null);
+            g2.dispose();
+            return buffered;
         }
 
         private String ext(String n) {

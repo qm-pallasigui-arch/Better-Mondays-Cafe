@@ -16,6 +16,8 @@ import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.RenderingHints;
 import java.awt.Image;
+import java.awt.MediaTracker;
+import java.awt.Toolkit;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
@@ -46,6 +48,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import java.io.File;
 import inventory.Inventory;
 import inventory.InventoryBatch;
 import monitoring.SalesRecord;
@@ -267,7 +270,9 @@ public class OrderingPanel extends JPanel {
             this.itemCount = count;
         }
 
-        /** Minutes since this order was placed — used as the "sequence/aging" factor. */
+        /**
+         * Minutes since this order was placed — used as the "sequence/aging" factor.
+         */
         double waitMinutes() {
             return (System.currentTimeMillis() - placedAtMillis) / 60000.0;
         }
@@ -279,7 +284,8 @@ public class OrderingPanel extends JPanel {
     /**
      * Priority score combining sequence (how long an order has waited — older
      * orders are boosted so they aren't starved) and urgency (larger orders
-     * need more lead time, so they're nudged ahead too). Higher score = serve sooner.
+     * need more lead time, so they're nudged ahead too). Higher score = serve
+     * sooner.
      */
     private static double orderPriorityScore(CompletedOrder co) {
         return co.waitMinutes() + (co.itemCount * 0.5);
@@ -333,6 +339,13 @@ public class OrderingPanel extends JPanel {
             }));
         } catch (Exception ignored) {
         }
+
+        // Listen for menu changes so new/edited item images appear immediately
+        Menu.getInstance().addChangeListener(() -> SwingUtilities.invokeLater(() -> {
+            imageCache.clear();
+            rebuildProductGrid();
+            refreshOrderDisplay();
+        }));
 
         // Re-rank the active queue periodically so wait-time-based priority
         // (the "aging" factor) keeps moving orders forward even when nothing
@@ -1903,7 +1916,36 @@ public class OrderingPanel extends JPanel {
         if (cached != null)
             return cached;
 
-        String baseName = IMAGE_MAP.getOrDefault(prodName, prodName);
+        // Normalize large iced variants to their base image name: "Iced Large X" →
+        // "Iced X"
+        String lookupName = prodName.replaceFirst("(?i)^(iced)\\s+large\\s+", "$1 ")
+                .replaceFirst("(?i)\\s*\\(large\\)$", "").trim();
+        String baseName = IMAGE_MAP.getOrDefault(lookupName, lookupName);
+
+        // Prefer images saved on the menu item itself before falling back to bundled
+        // assets.
+        String lookupBaseName = lookupName;
+        if (lookupBaseName.toLowerCase().startsWith("hot ")) {
+            lookupBaseName = lookupBaseName.substring(4).trim();
+        } else if (lookupBaseName.toLowerCase().startsWith("iced ")) {
+            lookupBaseName = lookupBaseName.substring(5).trim();
+        }
+        lookupBaseName = NAME_MAP.getOrDefault(lookupBaseName, lookupBaseName);
+        MenuItem menuItem = Menu.getInstance().getMenuItem(lookupBaseName);
+        if (menuItem != null && menuItem.getImagePath() != null && !menuItem.getImagePath().isBlank()) {
+            try {
+                File imageFile = new File(menuItem.getImagePath());
+                if (imageFile.exists()) {
+                    ImageIcon icon = readImageIcon(imageFile);
+                    if (icon != null) {
+                        imageCache.put(key, icon);
+                        return icon;
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
         List<String> attempts = new ArrayList<>();
         String lc = baseName.toLowerCase();
         if (lc.startsWith("hot ") || lc.startsWith("iced ")) {
@@ -1941,6 +1983,34 @@ public class OrderingPanel extends JPanel {
         }
         imageCache.put(key, null);
         return null;
+    }
+
+    private ImageIcon readImageIcon(File imageFile) {
+        BufferedImage bufferedImage = null;
+        try {
+            bufferedImage = ImageIO.read(imageFile);
+        } catch (Exception ignored) {
+        }
+
+        if (bufferedImage == null) {
+            Image image = Toolkit.getDefaultToolkit().createImage(imageFile.getAbsolutePath());
+            MediaTracker tracker = new MediaTracker(this);
+            tracker.addImage(image, 0);
+            try {
+                tracker.waitForID(0);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            if (!tracker.isErrorAny() && image.getWidth(null) > 0 && image.getHeight(null) > 0) {
+                bufferedImage = new BufferedImage(image.getWidth(null), image.getHeight(null),
+                        BufferedImage.TYPE_INT_ARGB);
+                Graphics2D g = bufferedImage.createGraphics();
+                g.drawImage(image, 0, 0, null);
+                g.dispose();
+            }
+        }
+
+        return bufferedImage != null ? new ImageIcon(bufferedImage) : null;
     }
 
     private ImageIcon scaleToFit(ImageIcon icon, int targetWidth, int targetHeight) {
@@ -2169,6 +2239,18 @@ public class OrderingPanel extends JPanel {
             for (String n : e.getValue()) {
                 if (n.equals(itemName))
                     return e.getKey();
+            }
+        }
+        // Fallback for large iced variants: "Iced Large X" → "Iced X", "X (Large)" →
+        // "X"
+        String normalized = itemName.replaceFirst("(?i)^(iced)\\s+large\\s+", "$1 ")
+                .replaceFirst("(?i)\\s*\\(large\\)$", "").trim();
+        if (!normalized.equals(itemName)) {
+            for (Map.Entry<String, List<String>> e : CATEGORY_ITEMS.entrySet()) {
+                for (String n : e.getValue()) {
+                    if (n.equals(normalized))
+                        return e.getKey();
+                }
             }
         }
         return "";

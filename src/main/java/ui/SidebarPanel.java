@@ -236,9 +236,11 @@ public class SidebarPanel extends JPanel {
         addNavItem("Ordering", "Ordering", this::paintCoffeeIcon);
         addNavItem("Search", "Search", this::paintSearchIcon);
         addNavItem("Inventory", "Inventory", this::paintBoxIcon);
-        addNavItem("Monitoring", "Monitoring", this::paintChartIcon);
-        addNavItem("Menu Maintenance", "Menu Maintenance", this::paintListIcon);
-        addNavItem("Register Product", "Register Product", this::paintTagIcon);
+        if (isAdmin) {
+            addNavItem("Monitoring", "Monitoring", this::paintChartIcon);
+            addNavItem("Menu Maintenance", "Menu Maintenance", this::paintListIcon);
+            addNavItem("Register Product", "Register Product", this::paintTagIcon);
+        }
         addNavItem("Staff", "Staff", this::paintPeopleIcon);
         addNavItem("Inventory Guide", "Inventory Guide", this::paintBookIcon);
         addNavItem("About", "About", this::paintInfoIcon);

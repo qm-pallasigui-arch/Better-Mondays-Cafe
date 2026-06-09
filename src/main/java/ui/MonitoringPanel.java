@@ -43,6 +43,7 @@ import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JTable;
@@ -53,7 +54,12 @@ import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellEditor;
+import controller.InventoryController;
+import inventory.Inventory;
+import notifications.Notification;
+import notifications.NotificationService;
 import persistence.AppDatabase;
+import persistence.sqlite.SQLiteInventoryRepository;
 
 public class MonitoringPanel extends JPanel {
 
@@ -99,6 +105,9 @@ public class MonitoringPanel extends JPanel {
     private javax.swing.Timer autoRefreshTimer;
     private JComboBox<String> barCategoryCombo;
     private String barCategory = "All Categories";
+    private JButton notificationsBellBtn;
+    private List<Notification> latestNotifications = List.of();
+    private final NotificationService notificationService = new NotificationService();
 
     private static final String[] BAR_CATEGORIES = {
             "All Categories", "Espresso & Coffee", "Specialty Drinks", "Tea Latte",
@@ -162,6 +171,7 @@ public class MonitoringPanel extends JPanel {
     public void refreshData() {
         loadSummaryCards();
         loadSalesTable();
+        loadNotifications();
         barChart.refreshData();
         lineChart.refreshData();
     }
@@ -172,6 +182,7 @@ public class MonitoringPanel extends JPanel {
 
         JPanel contentBody = new JPanel(new BorderLayout(0, 20));
         contentBody.setOpaque(false);
+
         contentBody.add(buildSummaryRow(), BorderLayout.NORTH);
         contentBody.add(buildSalesCard(), BorderLayout.CENTER);
 
@@ -211,9 +222,65 @@ public class MonitoringPanel extends JPanel {
         reportBtn.setFocusPainted(false);
         reportBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         reportBtn.addActionListener(e -> showReportChooserModal());
-        header.add(reportBtn, BorderLayout.EAST);
+
+        notificationsBellBtn = new JButton("\uD83D\uDD14");
+        notificationsBellBtn.setFont(new Font("Segoe UI", Font.PLAIN, 18));
+        notificationsBellBtn.setForeground(AppTheme.FG_PRIMARY);
+        notificationsBellBtn.setBackground(AppTheme.BG_SURFACE);
+        notificationsBellBtn.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
+        notificationsBellBtn.setFocusPainted(false);
+        notificationsBellBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        notificationsBellBtn.addActionListener(e -> showNotificationsPopup(notificationsBellBtn));
+
+        JPanel actions = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 10, 0));
+        actions.setOpaque(false);
+        actions.add(notificationsBellBtn);
+        actions.add(reportBtn);
+        header.add(actions, BorderLayout.EAST);
 
         return header;
+    }
+
+    // \u2500\u2500\u2500 Notifications Popup \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    private void showNotificationsPopup(Component anchor) {
+        JPanel content = new JPanel(new BorderLayout(0, 8));
+        content.setBackground(AppTheme.BG_SURFACE);
+        content.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
+        content.setPreferredSize(new Dimension(340, 280));
+
+        JLabel title = new JLabel("Inventory Alerts");
+        title.setFont(BOLD_FONT);
+        title.setForeground(AppTheme.FG_PRIMARY);
+        content.add(title, BorderLayout.NORTH);
+
+        JPanel list = new JPanel();
+        list.setOpaque(false);
+        list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS));
+
+        if (latestNotifications.isEmpty()) {
+            JLabel empty = new JLabel("No alerts right now \u2014 inventory looks healthy.");
+            empty.setFont(BODY_FONT);
+            empty.setForeground(AppTheme.FG_MUTED);
+            empty.setBorder(BorderFactory.createEmptyBorder(8, 4, 8, 4));
+            list.add(empty);
+        } else {
+            for (Notification notification : latestNotifications) {
+                list.add(buildNotificationRow(notification));
+                list.add(Box.createVerticalStrut(6));
+            }
+        }
+
+        JScrollPane scroll = new JScrollPane(list);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.setOpaque(false);
+        scroll.getViewport().setOpaque(false);
+        scroll.getVerticalScrollBar().setUnitIncrement(14);
+        content.add(scroll, BorderLayout.CENTER);
+
+        JPopupMenu popup = new JPopupMenu();
+        popup.setBorder(BorderFactory.createLineBorder(AppTheme.BG_SURFACE.darker(), 1));
+        popup.add(content);
+        popup.show(anchor, anchor.getWidth() - content.getPreferredSize().width, anchor.getHeight() + 6);
     }
 
     // ─── Report Chooser Modal ─────────────────────────────────────────────────
@@ -798,6 +865,65 @@ public class MonitoringPanel extends JPanel {
     }
 
     // ─── Summary Cards ────────────────────────────────────────────────────────
+    // ─── Rule-Based Notifications ────────────────────────────────────────────
+    private void loadNotifications() {
+        if (notificationsBellBtn == null) return;
+
+        List<Notification> notifications;
+        try {
+            InventoryController controller = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
+            notifications = notificationService.evaluate(controller.buildInventoryRows());
+        } catch (Exception ex) {
+            notifications = List.of();
+        }
+
+        latestNotifications = notifications;
+
+        boolean hasCritical = notifications.stream().anyMatch(n -> n.getSeverity() == Notification.Severity.CRITICAL);
+        boolean hasAny = !notifications.isEmpty();
+        if (hasCritical) {
+            notificationsBellBtn.setText("🔔 " + notifications.size());
+            notificationsBellBtn.setForeground(new Color(0xDC2626));
+        } else if (hasAny) {
+            notificationsBellBtn.setText("🔔 " + notifications.size());
+            notificationsBellBtn.setForeground(new Color(0xD97706));
+        } else {
+            notificationsBellBtn.setText("🔔");
+            notificationsBellBtn.setForeground(AppTheme.FG_PRIMARY);
+        }
+    }
+
+    private JPanel buildNotificationRow(Notification notification) {
+        Color bg;
+        Color fg;
+        String badge;
+        switch (notification.getSeverity()) {
+            case CRITICAL -> { bg = new Color(0xFEE2E2); fg = new Color(0xDC2626); badge = "CRITICAL"; }
+            case WARNING -> { bg = new Color(0xFEF3C7); fg = new Color(0xD97706); badge = "WARNING"; }
+            default -> { bg = new Color(0xE0F2FE); fg = new Color(0x0284C7); badge = "INFO"; }
+        }
+
+        JPanel row = new JPanel(new BorderLayout(10, 0));
+        row.setOpaque(true);
+        row.setBackground(bg);
+        row.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel badgeLbl = new JLabel(badge);
+        badgeLbl.setFont(SMALL_FONT.deriveFont(Font.BOLD));
+        badgeLbl.setForeground(fg);
+        badgeLbl.setPreferredSize(new Dimension(64, 20));
+        row.add(badgeLbl, BorderLayout.WEST);
+
+        JLabel messageLbl = new JLabel(notification.getMessage());
+        messageLbl.setFont(BODY_FONT);
+        messageLbl.setForeground(AppTheme.FG_PRIMARY);
+        row.add(messageLbl, BorderLayout.CENTER);
+
+        return row;
+    }
+
     private JPanel buildSummaryRow() {
         JPanel row = new JPanel(new GridLayout(1, 4, 16, 0));
         row.setOpaque(false);

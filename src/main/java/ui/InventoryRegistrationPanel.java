@@ -421,13 +421,19 @@ public class InventoryRegistrationPanel extends JPanel {
         if (confirm != JOptionPane.YES_OPTION)
             return;
 
-        // Try repository removal (optional — only if your repo exposes deleteBatch)
+        // Remove the row from the database itself (the same hard-delete the
+        // Inventory module's batch dialog uses) so both views stay in sync.
         try {
-            if (inventoryRepository instanceof persistence.DeletableBatchRepository) {
-                ((persistence.DeletableBatchRepository) inventoryRepository).deleteBatch(batchId);
+            long numericId = parseNumericBatchId(batchId);
+            if (numericId > 0) {
+                inventoryRepository.deleteBatch(numericId);
             }
         } catch (Exception ignored) {
             // Non-fatal — remove from cache regardless
+        }
+        try {
+            inventory.Inventory.getInstance().refreshItem(itemName);
+        } catch (Exception ignored) {
         }
 
         batchCache.remove(row);
@@ -437,6 +443,15 @@ public class InventoryRegistrationPanel extends JPanel {
         rebuildTable();
         triggerRefreshCallbacks();
         setStatus("✓  Batch " + batchId + " deleted.", BADGE_ERR_FG);
+    }
+
+    /**
+     * Reloads the batch list from the repository. Call this after batches are
+     * deleted, archived, or deducted elsewhere (e.g. the Inventory module's
+     * batch dialog) so this table reflects those changes too.
+     */
+    public void refreshFromRepository() {
+        loadAllBatches();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -633,6 +648,25 @@ public class InventoryRegistrationPanel extends JPanel {
         String date = java.time.LocalDate.now().toString().replace("-", "");
         long seq = System.nanoTime() % 100000;
         return String.format("INV-%s-%05d", date, Math.abs(seq));
+    }
+
+    /**
+     * Recovers the numeric database ID from a formatted batch ID such as
+     * "INV-000123" (produced as {@code String.format("INV-%06d", id)}).
+     * Returns -1 for fallback IDs (e.g. "INV-20240518-00042") that were never
+     * assigned a real database ID.
+     */
+    private static long parseNumericBatchId(String formattedId) {
+        if (formattedId == null)
+            return -1;
+        String digits = formattedId.startsWith("INV-") ? formattedId.substring(4) : formattedId;
+        if (!digits.matches("\\d+"))
+            return -1;
+        try {
+            return Long.parseLong(digits);
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 
     private String autoSku(String name) {
@@ -974,10 +1008,13 @@ public class InventoryRegistrationPanel extends JPanel {
                     row[4] = normExp.isBlank() ? "" : normExp;
                     writeJsonFallback();
 
-                    // Try to update DB by deleting old batch id then re-adding
+                    // Update the DB by deleting the old batch row then re-adding —
+                    // mirrors the hard-delete used by the Inventory module so both
+                    // views see the same data.
                     try {
-                        if (inventoryRepository instanceof persistence.DeletableBatchRepository) {
-                            ((persistence.DeletableBatchRepository) inventoryRepository).deleteBatch(batchId);
+                        long numericId = parseNumericBatchId(batchId);
+                        if (numericId > 0) {
+                            inventoryRepository.deleteBatch(numericId);
                         }
                         InventoryBatch nb = new InventoryBatch(row[2], q, row[4].isBlank() ? null : row[4]);
                         inventoryRepository.addBatch(itemName, nb);

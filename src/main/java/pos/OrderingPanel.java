@@ -75,6 +75,8 @@ public class OrderingPanel extends JPanel {
     // Status colors
     private static final Color ST_WAITING_BG = AppTheme.BG_BADGE_YELLOW;
     private static final Color ST_WAITING_FG = AppTheme.WARNING;
+    private static final Color ST_PREPARING_BG = new Color(0xEDE9FE);
+    private static final Color ST_PREPARING_FG = new Color(0x7C3AED);
     private static final Color ST_READY_BG = AppTheme.BG_BADGE_GREEN;
     private static final Color ST_READY_FG = AppTheme.SUCCESS;
     private static final Color ST_DONE_BG = AppTheme.BG_BADGE_BLUE;
@@ -237,12 +239,17 @@ public class OrderingPanel extends JPanel {
     }
 
     // ─── Completed Order Record ───
+    // Despite the name (kept to avoid touching every call site), this also
+    // represents orders still in progress — "status" tracks where each one
+    // sits in the Waiting → Preparing → Ready to Serve → Completed lifecycle.
     private static class CompletedOrder {
         int orderId;
         String customerName;
         String timestamp;
         String status;
         List<OrderEntry> items;
+        final long placedAtMillis;
+        final int itemCount;
 
         CompletedOrder(int orderId, String customerName, String timestamp, String status, List<OrderEntry> items) {
             this.orderId = orderId;
@@ -250,7 +257,40 @@ public class OrderingPanel extends JPanel {
             this.timestamp = timestamp;
             this.status = status;
             this.items = items;
+            this.placedAtMillis = System.currentTimeMillis();
+            int count = 0;
+            if (items != null) {
+                for (OrderEntry e : items) {
+                    count += e.quantity;
+                }
+            }
+            this.itemCount = count;
         }
+
+        /** Minutes since this order was placed — used as the "sequence/aging" factor. */
+        double waitMinutes() {
+            return (System.currentTimeMillis() - placedAtMillis) / 60000.0;
+        }
+    }
+
+    // Order in the lifecycle that staff advance orders through.
+    private static final List<String> ORDER_STAGES = List.of("Waiting", "Preparing", "Ready to Serve", "Completed");
+
+    /**
+     * Priority score combining sequence (how long an order has waited — older
+     * orders are boosted so they aren't starved) and urgency (larger orders
+     * need more lead time, so they're nudged ahead too). Higher score = serve sooner.
+     */
+    private static double orderPriorityScore(CompletedOrder co) {
+        return co.waitMinutes() + (co.itemCount * 0.5);
+    }
+
+    private static String nextOrderStage(String currentStatus) {
+        int idx = ORDER_STAGES.indexOf(currentStatus);
+        if (idx < 0 || idx >= ORDER_STAGES.size() - 1) {
+            return currentStatus;
+        }
+        return ORDER_STAGES.get(idx + 1);
     }
 
     // ─── Repositories ───
@@ -293,6 +333,11 @@ public class OrderingPanel extends JPanel {
             }));
         } catch (Exception ignored) {
         }
+
+        // Re-rank the active queue periodically so wait-time-based priority
+        // (the "aging" factor) keeps moving orders forward even when nothing
+        // else triggers a refresh.
+        new javax.swing.Timer(30_000, e -> refreshOrderListCards()).start();
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -442,33 +487,58 @@ public class OrderingPanel extends JPanel {
 
     private void refreshOrderListCards() {
         orderListCards.removeAll();
-        if (completedOrders.isEmpty()) {
-            JLabel empty = new JLabel("No completed orders");
+
+        // Active queue = anything not yet served. Sorted by priority (sequence
+        // + urgency) so staff always see what to serve next at the front.
+        List<CompletedOrder> active = new ArrayList<>();
+        for (CompletedOrder co : completedOrders) {
+            if (!"Completed".equals(co.status)) {
+                active.add(co);
+            }
+        }
+        active.sort((a, b) -> Double.compare(orderPriorityScore(b), orderPriorityScore(a)));
+
+        if (active.isEmpty()) {
+            JLabel empty = new JLabel("No active orders");
             empty.setFont(FONT_SMALL);
             empty.setForeground(FG_MUTED);
             orderListCards.add(empty);
         } else {
-            for (CompletedOrder co : completedOrders) {
-                orderListCards.add(createOrderCard(co));
+            for (int i = 0; i < active.size(); i++) {
+                orderListCards.add(createOrderCard(active.get(i), i == 0));
             }
         }
-        orderListHeaderCount.setText(completedOrders.size() + " active");
+        orderListHeaderCount.setText(active.size() + " active");
         orderListCards.revalidate();
         orderListCards.repaint();
     }
 
-    private JPanel createOrderCard(CompletedOrder co) {
+    private JPanel createOrderCard(CompletedOrder co, boolean serveNext) {
         JPanel card = new JPanel(new BorderLayout(0, 2));
         card.setBackground(BG_SURFACE);
         card.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(BORDER, 1, true),
                 new EmptyBorder(10, 10, 10, 10)));
-        card.setPreferredSize(new Dimension(140, 60));
+        card.setPreferredSize(new Dimension(150, 64));
+        if (serveNext) {
+            card.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(ACCENT, 2, true),
+                    new EmptyBorder(9, 9, 9, 9)));
+        }
 
+        JPanel header = new JPanel(new BorderLayout());
+        header.setOpaque(false);
         JLabel name = new JLabel(co.customerName);
         name.setFont(FONT_SMALL);
         name.setForeground(FG_PRIMARY);
-        card.add(name, BorderLayout.NORTH);
+        header.add(name, BorderLayout.WEST);
+        if (serveNext) {
+            JLabel nextTag = new JLabel("▲ Serve Next");
+            nextTag.setFont(FONT_XSMALL);
+            nextTag.setForeground(ACCENT);
+            header.add(nextTag, BorderLayout.EAST);
+        }
+        card.add(header, BorderLayout.NORTH);
 
         JPanel meta = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
         meta.setOpaque(false);
@@ -476,6 +546,13 @@ public class OrderingPanel extends JPanel {
         orderId.setFont(FONT_XSMALL);
         orderId.setForeground(TEXT_MUTED);
         meta.add(orderId);
+
+        // Waiting time + item count — the inputs to the priority score, shown
+        // so staff can see *why* an order ranks where it does.
+        JLabel waitLbl = new JLabel(Math.max(0, Math.round(co.waitMinutes())) + "m · " + co.itemCount + " items");
+        waitLbl.setFont(FONT_XSMALL);
+        waitLbl.setForeground(TEXT_MUTED);
+        meta.add(waitLbl);
 
         // Status badge
         JLabel badge = new JLabel(co.status);
@@ -485,6 +562,10 @@ public class OrderingPanel extends JPanel {
             case "Waiting" -> {
                 badge.setBackground(ST_WAITING_BG);
                 badge.setForeground(ST_WAITING_FG);
+            }
+            case "Preparing" -> {
+                badge.setBackground(ST_PREPARING_BG);
+                badge.setForeground(ST_PREPARING_FG);
             }
             case "Ready to Serve" -> {
                 badge.setBackground(ST_READY_BG);
@@ -1495,10 +1576,11 @@ public class OrderingPanel extends JPanel {
                     "Database", JOptionPane.WARNING_MESSAGE);
         }
 
-        // Add to completed orders list
+        // Add to the order queue — newly placed orders start at "Waiting" and
+        // are advanced through the lifecycle by staff (see advanceOrderStage).
         String ts = new SimpleDateFormat("MM/dd HH:mm").format(new Date());
         completedOrders.add(0,
-                new CompletedOrder(orderCount + 1, customerName, ts, "Completed", new ArrayList<>(orderEntries)));
+                new CompletedOrder(orderCount + 1, customerName, ts, "Waiting", new ArrayList<>(orderEntries)));
         refreshOrderListCards();
 
         showReceipt(customerName, txnRef, subtotal, vat, totalInclusive, cash, change);
@@ -1665,6 +1747,29 @@ public class OrderingPanel extends JPanel {
         sp.getViewport().setBackground(BG_PRIMARY);
         body.add(sp, BorderLayout.CENTER);
 
+        JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+        btnRow.setOpaque(false);
+
+        // Advance Stage button — moves the order to the next step in the
+        // Waiting → Preparing → Ready to Serve → Completed lifecycle.
+        String next = nextOrderStage(co.status);
+        if (!next.equals(co.status)) {
+            JButton advance = new JButton("Mark as " + next);
+            advance.setFont(FONT_BODY);
+            advance.setForeground(Color.WHITE);
+            advance.setBackground(AppTheme.SUCCESS);
+            advance.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(AppTheme.SUCCESS, 1, true),
+                    new EmptyBorder(8, 16, 8, 16)));
+            advance.setFocusPainted(false);
+            advance.addActionListener(ev -> {
+                co.status = next;
+                refreshOrderListCards();
+                d.dispose();
+            });
+            btnRow.add(advance);
+        }
+
         // Close button
         JButton close = new JButton("Close");
         close.setFont(FONT_BODY);
@@ -1675,8 +1780,6 @@ public class OrderingPanel extends JPanel {
                 new EmptyBorder(8, 20, 8, 20)));
         close.setFocusPainted(false);
         close.addActionListener(ev -> d.dispose());
-        JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        btnRow.setOpaque(false);
         btnRow.add(close);
         body.add(btnRow, BorderLayout.SOUTH);
 
@@ -1745,6 +1848,10 @@ public class OrderingPanel extends JPanel {
                     case "Waiting" -> {
                         badge.setBackground(ST_WAITING_BG);
                         badge.setForeground(ST_WAITING_FG);
+                    }
+                    case "Preparing" -> {
+                        badge.setBackground(ST_PREPARING_BG);
+                        badge.setForeground(ST_PREPARING_FG);
                     }
                     default -> {
                         badge.setBackground(ST_CANCEL_BG);
@@ -1879,13 +1986,23 @@ public class OrderingPanel extends JPanel {
             if (stock == null || stock.getQuantity() < required)
                 return false;
 
-            // expiry check: sum only non-archived, non-expired batch quantities
+            // Expiry check: sum only non-archived, non-expired batch quantities.
+            // Ingredients with no batch records aren't batch-tracked — the
+            // item-level quantity (already checked above) is the source of
+            // truth for them, so skip this check rather than treating "no
+            // batches" as "zero fresh stock" (which would wrongly read as expired).
             try {
                 List<InventoryBatch> batches = batchRepo.findBatchesForItem(ing.getKey());
-                double fresh = 0;
+                List<InventoryBatch> active = new ArrayList<>();
                 for (InventoryBatch b : batches) {
-                    if (b.isArchived())
-                        continue;
+                    if (!b.isArchived())
+                        active.add(b);
+                }
+                if (active.isEmpty())
+                    continue;
+
+                double fresh = 0;
+                for (InventoryBatch b : active) {
                     String exp = b.getExpiryDate();
                     if (exp != null && !exp.isBlank()) {
                         try {
@@ -1923,10 +2040,18 @@ public class OrderingPanel extends JPanel {
                 continue; // missing, not expired
             try {
                 List<InventoryBatch> batches = batchRepo.findBatchesForItem(ing.getKey());
-                double fresh = 0;
+                List<InventoryBatch> active = new ArrayList<>();
                 for (InventoryBatch b : batches) {
-                    if (b.isArchived())
-                        continue;
+                    if (!b.isArchived())
+                        active.add(b);
+                }
+                // No batch records means this ingredient isn't batch-tracked —
+                // there's nothing to have expired, so don't report it as such.
+                if (active.isEmpty())
+                    continue;
+
+                double fresh = 0;
+                for (InventoryBatch b : active) {
                     String exp = b.getExpiryDate();
                     if (exp != null && !exp.isBlank()) {
                         try {

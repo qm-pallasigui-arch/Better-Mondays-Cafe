@@ -14,9 +14,9 @@ import java.util.List;
 
 public class InventoryBatchModal extends JDialog {
 
-    private static final Color OK_FG       = new Color(40,  167, 69);
+    private static final Color OK_FG = new Color(40, 167, 69);
     private static final Color EXPIRING_FG = new Color(200, 160, 40);
-    private static final Color EXPIRED_FG  = new Color(200, 50,  50);
+    private static final Color EXPIRED_FG = new Color(200, 50, 50);
     private static final Color ARCHIVED_FG = new Color(180, 180, 180);
 
     // Zebra-striping colors — kept consistent with the Register Product batch table
@@ -24,7 +24,7 @@ public class InventoryBatchModal extends JDialog {
     private static final Color ROW_ALT = new Color(0xF3F4F6);
     private static final Color SELECTION_BG = new Color(0x1A3A5C);
 
-    private static final String[] COLS = {"Batch ID", "SKU", "Quantity", "Expiry", "Status", "Actions"};
+    private static final String[] COLS = { "Batch ID", "SKU", "Quantity", "Expiry", "Status", "Actions" };
 
     private final String itemName;
     private final InventoryController controller;
@@ -34,7 +34,7 @@ public class InventoryBatchModal extends JDialog {
     private List<InventoryBatch> currentBatches = new java.util.ArrayList<>();
 
     public InventoryBatchModal(Window owner, String itemName,
-                               InventoryController controller, Runnable onInventoryRefresh) {
+            InventoryController controller, Runnable onInventoryRefresh) {
         super(owner, "Batches — " + itemName, ModalityType.APPLICATION_MODAL);
         this.itemName = itemName;
         this.controller = controller;
@@ -56,7 +56,10 @@ public class InventoryBatchModal extends JDialog {
 
         // ── Table ────────────────────────────────────────────────────
         tableModel = new DefaultTableModel(COLS, 0) {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
+            @Override
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
         };
         table = new JTable(tableModel) {
             @Override
@@ -75,7 +78,7 @@ public class InventoryBatchModal extends JDialog {
         table.getTableHeader().setReorderingAllowed(false);
         table.setRowHeight(32);
 
-        int[] widths = {105, 130, 70, 105, 90, 80};
+        int[] widths = { 105, 130, 70, 105, 90, 80 };
         for (int i = 0; i < widths.length; i++)
             table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
 
@@ -88,10 +91,12 @@ public class InventoryBatchModal extends JDialog {
         table.getColumnModel().getColumn(5).setCellRenderer(new ActionsDotRenderer());
 
         table.addMouseListener(new MouseAdapter() {
-            @Override public void mousePressed(MouseEvent e) {
+            @Override
+            public void mousePressed(MouseEvent e) {
                 int col = table.columnAtPoint(e.getPoint());
                 int row = table.rowAtPoint(e.getPoint());
-                if (col == 5 && row >= 0) showActionsMenu(e, row);
+                if (col == 5 && row >= 0)
+                    showActionsMenu(e, row);
             }
         });
 
@@ -112,8 +117,8 @@ public class InventoryBatchModal extends JDialog {
         closeBtn.setBackground(AppTheme.BG_SURFACE);
         closeBtn.setForeground(AppTheme.FG_PRIMARY);
         closeBtn.setBorder(BorderFactory.createCompoundBorder(
-            new RoundedLineBorder(AppTheme.BORDER, AppTheme.BORDER_THICKNESS, AppTheme.BORDER_RADIUS),
-            BorderFactory.createEmptyBorder(7, 18, 7, 18)));
+                new RoundedLineBorder(AppTheme.BORDER, AppTheme.BORDER_THICKNESS, AppTheme.BORDER_RADIUS),
+                BorderFactory.createEmptyBorder(7, 18, 7, 18)));
         closeBtn.setFocusPainted(false);
         closeBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         closeBtn.addActionListener(e -> dispose());
@@ -131,23 +136,25 @@ public class InventoryBatchModal extends JDialog {
         currentBatches = controller.getBatchesForItem(itemName);
         List<InventoryBatch> batches = currentBatches;
         if (batches.isEmpty()) {
-            tableModel.addRow(new Object[]{"", "", "", "", "—", "No batches"});
+            tableModel.addRow(new Object[] { "", "", "", "", "—", "No batches" });
             return;
         }
         for (InventoryBatch b : batches) {
             String batchId = b.getId() > 0 ? String.format("INV-%06d", b.getId()) : "—";
-            String sku     = b.getSku() != null ? b.getSku() : "—";
-            String qty     = String.valueOf(b.getQuantity());
-            String expiry  = (b.getExpiryDate() != null && !b.getExpiryDate().isBlank())
-                             ? b.getExpiryDate() : "—";
-            String status  = b.isArchived() ? "ARCHIVED" : computeStatus(b.getExpiryDate());
-            tableModel.addRow(new Object[]{batchId, sku, qty, expiry, status, "•••"});
+            String sku = b.getSku() != null ? b.getSku() : "—";
+            String qty = String.valueOf(b.getQuantity());
+            String expiry = (b.getExpiryDate() != null && !b.getExpiryDate().isBlank())
+                    ? b.getExpiryDate()
+                    : "—";
+            String status = b.isArchived() ? "ARCHIVED" : computeStatus(b.getExpiryDate());
+            tableModel.addRow(new Object[] { batchId, sku, qty, expiry, status, "•••" });
         }
     }
 
     // ── Actions popup ─────────────────────────────────────────────────
     private void showActionsMenu(MouseEvent e, int row) {
-        if (row >= currentBatches.size()) return;
+        if (row >= currentBatches.size())
+            return;
         InventoryBatch batch = currentBatches.get(row);
         boolean archived = batch.isArchived();
 
@@ -179,13 +186,16 @@ public class InventoryBatchModal extends JDialog {
                         + "Available: <b>%s</b></html>",
                         batch.getId(), batch.getQuantity()),
                 "Use Batch", JOptionPane.PLAIN_MESSAGE);
-        if (input == null) return;
+        if (input == null)
+            return;
         double amount;
         try {
             amount = Double.parseDouble(input.trim());
-            if (amount <= 0) throw new NumberFormatException();
+            if (amount <= 0)
+                throw new NumberFormatException();
         } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "Enter a positive number.", "Invalid Input", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Enter a positive number.", "Invalid Input",
+                    JOptionPane.WARNING_MESSAGE);
             return;
         }
         if (amount > batch.getQuantity()) {
@@ -209,7 +219,8 @@ public class InventoryBatchModal extends JDialog {
                         + "It will be removed from active inventory but kept for records.</html>",
                         batch.getId()),
                 "Archive Batch", JOptionPane.YES_NO_OPTION);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (confirm != JOptionPane.YES_OPTION)
+            return;
         try {
             controller.archiveBatch(batch.getId(), itemName);
             onInventoryRefresh.run();
@@ -224,7 +235,8 @@ public class InventoryBatchModal extends JDialog {
                 String.format("<html>Permanently delete batch <b>INV-%06d</b>?<br>"
                         + "This cannot be undone.</html>", batch.getId()),
                 "Delete Batch", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (confirm != JOptionPane.YES_OPTION)
+            return;
         try {
             controller.deleteBatch(batch.getId(), itemName);
             onInventoryRefresh.run();
@@ -236,13 +248,17 @@ public class InventoryBatchModal extends JDialog {
 
     // ── Helpers ───────────────────────────────────────────────────────
     private static String computeStatus(String expiryDate) {
-        if (expiryDate == null || expiryDate.isBlank()) return "OK";
+        if (expiryDate == null || expiryDate.isBlank())
+            return "OK";
         try {
             LocalDate exp = LocalDate.parse(expiryDate);
             LocalDate today = LocalDate.now();
-            if (!exp.isAfter(today))                 return "EXPIRED";
-            if (!exp.isAfter(today.plusDays(7)))     return "EXPIRING";
-        } catch (Exception ignored) {}
+            if (!exp.isAfter(today))
+                return "EXPIRED";
+            if (!exp.isAfter(today.plusDays(7)))
+                return "EXPIRING";
+        } catch (Exception ignored) {
+        }
         return "OK";
     }
 
@@ -257,13 +273,14 @@ public class InventoryBatchModal extends JDialog {
                 String text = value == null ? "" : value.toString();
                 Color fg;
                 switch (text) {
-                    case "OK"       -> fg = OK_FG;
+                    case "OK" -> fg = OK_FG;
                     case "EXPIRING" -> fg = EXPIRING_FG;
-                    case "EXPIRED"  -> fg = EXPIRED_FG;
+                    case "EXPIRED" -> fg = EXPIRED_FG;
                     case "ARCHIVED" -> fg = ARCHIVED_FG;
-                    default         -> fg = AppTheme.FG_MUTED;
+                    default -> fg = AppTheme.FG_MUTED;
                 }
-                if (!sel) label.setForeground(fg);
+                if (!sel)
+                    label.setForeground(fg);
             }
             return c;
         }

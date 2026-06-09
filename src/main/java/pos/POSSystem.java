@@ -35,7 +35,6 @@ import java.awt.RenderingHints;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import javax.swing.AbstractCellEditor;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -53,13 +52,11 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import loginregister.Login;
-import javax.swing.table.TableCellEditor;
 import loginregister.UserDataManager;
 import loginregister.UserDataManager.Role;
 import javax.swing.JPasswordField;
 import javax.swing.JDialog;
 import java.awt.FontMetrics;
-import java.awt.Cursor;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.BasicStroke;
@@ -75,6 +72,7 @@ import ui.InventoryGuidePanel;
 import ui.AppTheme;
 import ui.CardPanel;
 import ui.SidebarPanel;
+import ui.InventoryPanel;
 import persistence.sqlite.SQLiteInventoryRepository;
 import persistence.sqlite.SQLiteStaffShiftRepository;
 import persistence.sqlite.SQLiteSalesRepository;
@@ -83,26 +81,17 @@ import persistence.sqlite.SQLiteProfilePictureRepository;
 import controller.InventoryController;
 import controller.InventoryRowView;
 import controller.OrderController;
-import notifications.Notification;
-import notifications.NotificationService;
 import inventory.InventoryItem;
-import inventory.analytics.InventoryPolicyService;
 
 public class POSSystem extends javax.swing.JFrame {
 
-    // Zebra-striping colors — kept consistent with the Register Product batch table
-    private static final Color INVENTORY_ROW_ALT = new Color(0xF3F4F6);
-    private static final Color INVENTORY_SELECTION_BG = new Color(0x1A3A5C);
-
     private MonitoringPanel monitoringPanel;
     private InventoryRegistrationPanel inventoryRegistrationPanel;
+    private InventoryPanel inventoryPanel;
     private UserDataManager.Role currentUserRole;
     private String currentUsername;
     private InventoryController inventoryController;
     private OrderController orderController;
-    private JButton inventoryAlertsBellBtn;
-    private List<Notification> latestInventoryAlerts = List.of();
-    private final NotificationService inventoryNotificationService = new NotificationService();
 
     private JLabel topNavUserIcon;
     private JLabel topNavUserName;
@@ -214,11 +203,6 @@ public class POSSystem extends javax.swing.JFrame {
     private JTextField searchField;
     private JPanel orderPanel;
     private JPanel receiptPanel;
-    private JTextArea inventoryDetailArea;
-    private JTextField inventorySearchField;
-    private JComboBox<String> inventoryCategoryFilter;
-    private final List<InventoryRowView> inventoryRowsCache = new ArrayList<>();
-    private static final String INVENTORY_SEARCH_PLACEHOLDER = "Search ingredients";
 
     public POSSystem(String username, UserDataManager.Role role) {
         this.currentUserRole = role;
@@ -240,8 +224,6 @@ public class POSSystem extends javax.swing.JFrame {
         setExtendedState(javax.swing.JFrame.MAXIMIZED_BOTH);
         setLocationRelativeTo(null);
 
-        loadInventoryTable();
-
         inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
         orderController = new OrderController(new SQLiteSalesRepository());
 
@@ -249,12 +231,8 @@ public class POSSystem extends javax.swing.JFrame {
 
         AppTheme.applyToFrame(this);
 
-        // Re-apply ordering category pill styles after the global theme
-        // because `AppTheme.applyToFrame` overrides JButton backgrounds.
         if (orderingPanel != null)
             orderingPanel.refreshCategoryPills();
-
-        // OrderingPanel handles its own initial category state
     }
 
     @Deprecated
@@ -272,12 +250,10 @@ public class POSSystem extends javax.swing.JFrame {
             return;
         }
 
-        // ── Auto-end shift on logout ───────────────────────────────────────
         try {
             persistence.StaffShiftRepository shiftRepo = new persistence.sqlite.SQLiteStaffShiftRepository();
             shiftRepo.endShift(currentUsername, "Auto-ended on logout");
         } catch (Exception e) {
-            // Non-fatal: log but don't block logout
             java.util.logging.Logger.getLogger(POSSystem.class.getName())
                     .log(java.util.logging.Level.WARNING,
                             "Could not auto-end shift for " + currentUsername, e);
@@ -285,7 +261,6 @@ public class POSSystem extends javax.swing.JFrame {
                     "Logged out, but shift could not be ended automatically.\n" + e.getMessage(),
                     "Shift Warning", JOptionPane.WARNING_MESSAGE);
         }
-        // ──────────────────────────────────────────────────────────────────
 
         java.awt.EventQueue.invokeLater(() -> new Login().setVisible(true));
         dispose();
@@ -446,37 +421,26 @@ public class POSSystem extends javax.swing.JFrame {
             return null;
         }
 
-        if (SPECIALTY_DRINKS.contains(itemName)) {
+        if (SPECIALTY_DRINKS.contains(itemName))
             return "Specialty Drinks";
-        }
-        if (TEA_LATTE_ITEMS.contains(itemName)) {
+        if (TEA_LATTE_ITEMS.contains(itemName))
             return "Tea Latte";
-        }
-        if (NON_COFFEE_ITEMS.contains(itemName)) {
+        if (NON_COFFEE_ITEMS.contains(itemName))
             return "Non-Coffee";
-        }
-        if (FRUIT_TEA_ITEMS.contains(itemName)) {
+        if (FRUIT_TEA_ITEMS.contains(itemName))
             return "Fruit Tea";
-        }
-        if (HERBAL_TEA_ITEMS.contains(itemName)) {
+        if (HERBAL_TEA_ITEMS.contains(itemName))
             return "Herbal Tea";
-        }
-        if (SANDWICH_ITEMS.contains(itemName)) {
+        if (SANDWICH_ITEMS.contains(itemName))
             return "Sandwiches";
-        }
-        if (PANDESAL_PAIR_ITEMS.contains(itemName)) {
+        if (PANDESAL_PAIR_ITEMS.contains(itemName))
             return "Pandesal Pairs";
-        }
-        if (PASTRY_ITEMS.contains(itemName)) {
+        if (PASTRY_ITEMS.contains(itemName))
             return "Pastries";
-        }
-        if (HOUSE_FAVORITES_PRICES.containsKey(itemName)) {
+        if (HOUSE_FAVORITES_PRICES.containsKey(itemName))
             return "House Favorites";
-        }
-
-        if ("Coffee".equals(item.getCategory())) {
+        if ("Coffee".equals(item.getCategory()))
             return "Espresso & Coffee";
-        }
 
         return null;
     }
@@ -841,15 +805,17 @@ public class POSSystem extends javax.swing.JFrame {
                     "Database", JOptionPane.WARNING_MESSAGE);
         }
 
-        monitoringPanel.refreshData();
+        if (monitoringPanel != null)
+            monitoringPanel.refreshData();
+        if (inventoryPanel != null)
+            inventoryPanel.refresh();
+
         orderCount++;
         orderEntries.clear();
         refreshOrderDisplay();
-        loadInventoryTable();
-        monitoringPanel.refreshData();
     }
 
-    // ─── Top Navigation Bar (with user profile on right) ────────
+    // ─── Top Navigation Bar ──────────────────────────────────────
     private JPanel buildTopNavBar() {
         JPanel bar = new JPanel(new BorderLayout(0, 0));
         bar.setBackground(AppTheme.BG_SURFACE);
@@ -878,7 +844,7 @@ public class POSSystem extends javax.swing.JFrame {
         profilePanel.setOpaque(false);
         profilePanel.setBorder(new EmptyBorder(0, 0, 0, 4));
 
-        // ── Online indicator ──
+        // Online indicator
         JPanel onlinePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
         onlinePanel.setOpaque(false);
         JLabel dot = new JLabel() {
@@ -900,7 +866,7 @@ public class POSSystem extends javax.swing.JFrame {
         onlinePanel.add(dot);
         onlinePanel.add(onlineText);
 
-        // ── Notification bell with badge ──
+        // Notification bell
         int notifCount = ui.MonitoringPanel.getPendingReportCount();
         JPanel bellPanel = new JPanel(new GridBagLayout());
         bellPanel.setOpaque(false);
@@ -945,7 +911,7 @@ public class POSSystem extends javax.swing.JFrame {
             bellPanel.add(badge, bc);
         }
 
-        // ── User avatar ──
+        // User avatar
         topNavUserIcon = new JLabel(String.valueOf(Character.toUpperCase(currentUsername.charAt(0)))) {
             @Override
             protected void paintComponent(Graphics g) {
@@ -973,7 +939,7 @@ public class POSSystem extends javax.swing.JFrame {
         avatarWrap.setPreferredSize(new Dimension(40, 40));
         avatarWrap.add(topNavUserIcon);
 
-        // ── Name + role pill ──
+        // Name + role pill
         JPanel namePanel = new JPanel();
         namePanel.setLayout(new BoxLayout(namePanel, BoxLayout.Y_AXIS));
         namePanel.setOpaque(false);
@@ -1010,7 +976,6 @@ public class POSSystem extends javax.swing.JFrame {
         settingsBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         settingsBtn.addActionListener(e -> showProfileSettingsDialog());
 
-        // Add to profilePanel (FlowLayout.RIGHT → first added = rightmost)
         profilePanel.add(onlinePanel);
         if (isAdmin) {
             profilePanel.add(bellPanel);
@@ -1029,10 +994,14 @@ public class POSSystem extends javax.swing.JFrame {
     private Icon createOverflowIcon() {
         return new Icon() {
             @Override
-            public int getIconWidth() { return 10; }
+            public int getIconWidth() {
+                return 10;
+            }
 
             @Override
-            public int getIconHeight() { return 14; }
+            public int getIconHeight() {
+                return 14;
+            }
 
             @Override
             public void paintIcon(java.awt.Component c, Graphics g, int x, int y) {
@@ -1070,17 +1039,15 @@ public class POSSystem extends javax.swing.JFrame {
         actions.setOpaque(false);
 
         JButton checkUsername = new JButton("Check Username");
+        JButton editUsername = new JButton("Edit Username");
+        JButton changePassword = new JButton("Change Password");
+        JButton close = new JButton("Close");
+
         checkUsername.addActionListener(ae -> JOptionPane.showMessageDialog(
                 dialog, "Current username: " + currentUsername, "Username",
                 JOptionPane.INFORMATION_MESSAGE));
-
-        JButton editUsername = new JButton("Edit Username");
         editUsername.addActionListener(ae -> showEditUsernameDialog());
-
-        JButton changePassword = new JButton("Change Password");
         changePassword.addActionListener(ae -> showChangePasswordDialog());
-
-        JButton close = new JButton("Close");
         close.addActionListener(ae -> dialog.dispose());
 
         styleSettingsButton(checkUsername);
@@ -1105,7 +1072,8 @@ public class POSSystem extends javax.swing.JFrame {
     }
 
     private void styleSettingsButton(JButton button) {
-        if (button == null) return;
+        if (button == null)
+            return;
         button.setFont(new Font("Segoe UI", Font.BOLD, 12));
         button.setPreferredSize(new Dimension(220, 36));
         button.setMinimumSize(new Dimension(220, 36));
@@ -1127,7 +1095,8 @@ public class POSSystem extends javax.swing.JFrame {
         int result = JOptionPane.showConfirmDialog(
                 this, panel, "Edit Username",
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-        if (result != JOptionPane.OK_OPTION) return;
+        if (result != JOptionPane.OK_OPTION)
+            return;
 
         String newUsername = usernameField.getText().trim();
         String currentPassword = new String(currentPasswordField.getPassword()).trim();
@@ -1173,7 +1142,8 @@ public class POSSystem extends javax.swing.JFrame {
         int result = JOptionPane.showConfirmDialog(
                 this, panel, "Change Password",
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-        if (result != JOptionPane.OK_OPTION) return;
+        if (result != JOptionPane.OK_OPTION)
+            return;
 
         String currentPassword = new String(currentPasswordField.getPassword()).trim();
         String newPassword = new String(newPasswordField.getPassword()).trim();
@@ -1206,10 +1176,12 @@ public class POSSystem extends javax.swing.JFrame {
     }
 
     private boolean isStrongPassword(String password) {
-        return password.length() >= 8 && password.matches(".*\\d.*") && password.matches(".*[!@#$%^&*(),.?\":{}|<>].*");
+        return password.length() >= 8
+                && password.matches(".*\\d.*")
+                && password.matches(".*[!@#$%^&*(),.?\":{}|<>].*");
     }
 
-    // ─── initComponents (replaces GUI builder code) ─────────────
+    // ─── initComponents ─────────────────────────────────────────
     private void initComponents() {
         jPanelPOS = new javax.swing.JPanel();
         jLabel1 = new javax.swing.JLabel();
@@ -1218,15 +1190,17 @@ public class POSSystem extends javax.swing.JFrame {
             cardLayout.show(contentPanel, page);
         });
         sidebar.setLogoutListener(this::logoutAndReturnToLogin);
+
         cardLayout = new CardLayout();
         contentPanel = new JPanel(cardLayout);
         contentPanel.setBackground(AppTheme.BG_PRIMARY);
 
-        // ═══════════════════════════════════════════════════════════
-        // ORDERING TAB (redesigned OrderingPanel)
-        // ═══════════════════════════════════════════════════════════
+        boolean isAdmin = currentUserRole == Role.ADMIN;
+
+        // ── Ordering tab ────────────────────────────────────────
         orderingPanel = new OrderingPanel(() -> {
-            loadInventoryTable();
+            if (inventoryPanel != null)
+                inventoryPanel.refresh();
             if (monitoringPanel != null)
                 monitoringPanel.refreshData();
         });
@@ -1241,295 +1215,20 @@ public class POSSystem extends javax.swing.JFrame {
             }
         }));
 
-        // ═══════════════════════════════════════════════════════════
-        // INVENTORY TAB - Card-on-Canvas Design
-        // ═══════════════════════════════════════════════════════════
-        Font TITLE_FONT = new Font("Segoe UI", Font.BOLD, 28);
-        Font SUB_FONT = new Font("Segoe UI", Font.PLAIN, 13);
-        Font BODY_FONT = new Font("Segoe UI", Font.PLAIN, 13);
-        Font BOLD_FONT = new Font("Segoe UI", Font.BOLD, 14);
-        Font CARD_NUM_FONT = new Font("Segoe UI", Font.BOLD, 24);
-        Font CARD_LABEL_FONT = new Font("Segoe UI", Font.PLAIN, 12);
-
-        jPanelInventory = new JPanel();
-        jPanelInventory.setBackground(AppTheme.BG_PRIMARY);
-        jPanelInventory.setLayout(new BorderLayout(0, 16));
-        jPanelInventory.setBorder(BorderFactory.createEmptyBorder(20, 28, 20, 28));
-
-        // ─── Top Header ─────────────────────────────────────
-        JPanel headerPanel = new JPanel(new BorderLayout());
-        headerPanel.setOpaque(false);
-
-        JLabel pageTitle = new JLabel("Inventory Management");
-        pageTitle.setFont(TITLE_FONT);
-        pageTitle.setForeground(AppTheme.FG_PRIMARY);
-
-        JLabel dateSubtitle = new JLabel();
-        dateSubtitle.setFont(SUB_FONT);
-        dateSubtitle.setForeground(AppTheme.FG_MUTED);
-
-        new javax.swing.Timer(1000, e -> {
-            dateSubtitle.setText("As of " + new SimpleDateFormat("EEEE, MM/dd/yyyy hh:mm:ss a").format(new Date()));
-        }).start();
-
-        JPanel titleStack = new JPanel(new BorderLayout(0, 2));
-        titleStack.setOpaque(false);
-        titleStack.add(pageTitle, BorderLayout.NORTH);
-        titleStack.add(dateSubtitle, BorderLayout.SOUTH);
-        headerPanel.add(titleStack, BorderLayout.WEST);
-
-        inventoryAlertsBellBtn = new JButton("🔔");
-        inventoryAlertsBellBtn.setFont(new Font("Segoe UI", Font.PLAIN, 18));
-        inventoryAlertsBellBtn.setForeground(AppTheme.FG_PRIMARY);
-        inventoryAlertsBellBtn.setBackground(AppTheme.BG_SURFACE);
-        inventoryAlertsBellBtn.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
-        inventoryAlertsBellBtn.setFocusPainted(false);
-        inventoryAlertsBellBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        inventoryAlertsBellBtn.addActionListener(e -> showInventoryAlertsPopup(inventoryAlertsBellBtn));
-        headerPanel.add(inventoryAlertsBellBtn, BorderLayout.EAST);
-
-        jPanelInventory.add(headerPanel, BorderLayout.NORTH);
-
-        // ─── Main Table Card ────────────────────────────────
-        CardPanel mainCard = new CardPanel(16, AppTheme.BG_SURFACE);
-        mainCard.setLayout(new BorderLayout(0, 12));
-        mainCard.setBorder(BorderFactory.createEmptyBorder(16, 20, 20, 20));
-
-        // Controls row
-        JPanel controlsPanel = new JPanel(new BorderLayout(12, 0));
-        controlsPanel.setOpaque(false);
-
-        JPanel leftControls = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        leftControls.setOpaque(false);
-
-        inventorySearchField = new JTextField(18);
-        AppTheme.styleSearchField(inventorySearchField);
-        // UX: placeholder and tooltip so users know the field is interactive
-        inventorySearchField.setText(INVENTORY_SEARCH_PLACEHOLDER);
-        inventorySearchField.setToolTipText("Type to filter ingredients (press Esc to clear)");
-        inventorySearchField.putClientProperty("JTextField.roundPlaceholder", true);
-        inventorySearchField.addFocusListener(new java.awt.event.FocusAdapter() {
-            @Override
-            public void focusGained(java.awt.event.FocusEvent e) {
-                if (isInventorySearchPlaceholderVisible()) {
-                    inventorySearchField.setText("");
-                }
-                inventorySearchField.setBorder(ui.AppTheme.focusInputBorder(new Color(90, 140, 190)));
-            }
-
-            @Override
-            public void focusLost(java.awt.event.FocusEvent e) {
-                if (inventorySearchField.getText().isBlank()) {
-                    inventorySearchField.setText(INVENTORY_SEARCH_PLACEHOLDER);
-                }
-                inventorySearchField.setBorder(ui.AppTheme.inputBorderRegular());
-            }
+        // ── Inventory tab — delegated to InventoryPanel ─────────
+        inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
+        inventoryPanel = new InventoryPanel(isAdmin, inventoryController, () -> {
+            if (monitoringPanel != null)
+                monitoringPanel.refreshData();
         });
-        inventorySearchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
-            @Override
-            public void insertUpdate(javax.swing.event.DocumentEvent e) {
-                applyInventoryFilters();
-            }
+        contentPanel.add(inventoryPanel, "Inventory");
 
-            @Override
-            public void removeUpdate(javax.swing.event.DocumentEvent e) {
-                applyInventoryFilters();
-            }
-
-            @Override
-            public void changedUpdate(javax.swing.event.DocumentEvent e) {
-                applyInventoryFilters();
-            }
-        });
-
-        JLabel searchIconLabel = new JLabel("\uD83D\uDD0D");
-        searchIconLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        searchIconLabel.setForeground(AppTheme.FG_MUTED);
-
-        JPanel searchPill = new JPanel(new BorderLayout(6, 0));
-        searchPill.setOpaque(false);
-        searchPill.setBorder(ui.AppTheme.inputBorderPill());
-        searchPill.add(searchIconLabel, BorderLayout.WEST);
-        searchPill.add(inventorySearchField, BorderLayout.CENTER);
-        leftControls.add(searchPill);
-
-        inventoryCategoryFilter = new JComboBox<>(new String[] {
-                "All",
-                "Coffee",
-                "Non-Coffee",
-                "Fruit Tea",
-                "Herbal Tea",
-                "Food"
-        });
-        inventoryCategoryFilter.setFont(BODY_FONT);
-        inventoryCategoryFilter.addActionListener(e -> applyInventoryFilters());
-        leftControls.add(inventoryCategoryFilter);
-
-        controlsPanel.add(leftControls, BorderLayout.WEST);
-
-        JPanel rightControls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
-        rightControls.setOpaque(false);
-
-        boolean isAdmin = currentUserRole == Role.ADMIN;
-
-        JButton addBtn = new JButton("+ Add Item");
-        addBtn.setFont(BOLD_FONT);
-        addBtn.setForeground(Color.WHITE);
-        addBtn.setBackground(AppTheme.ACCENT);
-        addBtn.setBorder(BorderFactory.createEmptyBorder(10, 22, 10, 22));
-        addBtn.setFocusPainted(false);
-        addBtn.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-        addBtn.addActionListener(e -> InventoryAddActionPerformed(null));
-        addBtn.setVisible(isAdmin);
-        rightControls.add(addBtn);
-
-        controlsPanel.add(rightControls, BorderLayout.EAST);
-
-        mainCard.add(controlsPanel, BorderLayout.NORTH);
-
-        JPanel tableAndDetail = new JPanel(new BorderLayout(16, 0));
-        tableAndDetail.setOpaque(false);
-
-        // Table
-        jScrollPane3 = new javax.swing.JScrollPane();
-        jScrollPane3.setBorder(null);
-        jScrollPane3.getViewport().setBackground(AppTheme.BG_SURFACE);
-
-        inventoryTable = new javax.swing.JTable() {
-            @Override
-            public Component prepareRenderer(javax.swing.table.TableCellRenderer r, int row, int col) {
-                Component c = super.prepareRenderer(r, row, col);
-                if (!isRowSelected(row))
-                    c.setBackground(row % 2 == 0 ? AppTheme.BG_SURFACE : INVENTORY_ROW_ALT);
-                return c;
-            }
-        };
-        inventoryTable.setModel(new DefaultTableModel(
-                new Object[][] {},
-                new String[] { "Item Name", "Quantity", "Alert Level", "ABC", "Reorder Guide", "Batches", "Status", "Actions" }) {
-            boolean[] canEdit = new boolean[] { false, false, false, false, false, false, false, true };
-
-            public boolean isCellEditable(int rowIndex, int columnIndex) {
-                return canEdit[columnIndex];
-            }
-        });
-        AppTheme.applyTableDefaults(inventoryTable);
-        inventoryTable.setShowGrid(false);
-        inventoryTable.setIntercellSpacing(new Dimension(0, 0));
-        inventoryTable.setSelectionBackground(INVENTORY_SELECTION_BG);
-        inventoryTable.setSelectionForeground(AppTheme.FG_PRIMARY);
-        inventoryTable.getTableHeader().setReorderingAllowed(false);
-
-        // Column widths: Name | Quantity | Alert Level | ABC | Reorder Guide |
-        // Batches | Status | Actions
-        inventoryTable.getColumnModel().getColumn(0).setPreferredWidth(160);
-        inventoryTable.getColumnModel().getColumn(1).setPreferredWidth(100);
-        inventoryTable.getColumnModel().getColumn(2).setPreferredWidth(100);
-        inventoryTable.getColumnModel().getColumn(3).setPreferredWidth(70);
-        inventoryTable.getColumnModel().getColumn(4).setPreferredWidth(170);
-        inventoryTable.getColumnModel().getColumn(5).setPreferredWidth(130);
-        inventoryTable.getColumnModel().getColumn(6).setPreferredWidth(100);
-        inventoryTable.getColumnModel().getColumn(7).setPreferredWidth(80);
-
-        // Center align all columns
-        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
-        centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
-        for (int i = 0; i < 8; i++) {
-            inventoryTable.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
-        }
-
-        // ABC column at index 3 — colored badge by tier
-        inventoryTable.getColumnModel().getColumn(3).setCellRenderer(new AbcTierRenderer());
-
-        // Reorder Guide column at index 4 — EOQ/ROP at a glance, ROP highlighted
-        // in red once stock has reached or fallen below it (time to reorder).
-        inventoryTable.getColumnModel().getColumn(4).setCellRenderer(new ReorderGuideRenderer());
-
-        // Batches column at index 5
-        inventoryTable.getColumnModel().getColumn(5).setCellRenderer(new BatchSummaryRenderer());
-
-        // Actions column at index 7
-        inventoryTable.getColumnModel().getColumn(7).setCellRenderer(new ActionsCellRenderer());
-        inventoryTable.getColumnModel().getColumn(7).setCellEditor(new ActionsCellEditor());
-
-        // Single-click: col 5 opens batch modal, col 7 opens actions menu
-        inventoryTable.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override
-            public void mouseClicked(java.awt.event.MouseEvent e) {
-                int col = inventoryTable.columnAtPoint(e.getPoint());
-                int row = inventoryTable.rowAtPoint(e.getPoint());
-                if (row < 0)
-                    return;
-                if (col == 5) {
-                    Object cellVal = inventoryTable.getModel().getValueAt(row, 5);
-                    if (!(cellVal instanceof controller.InventoryRowView rv))
-                        return;
-                    if (inventoryController == null)
-                        return;
-                    new ui.InventoryBatchModal(POSSystem.this, rv.getName(),
-                            inventoryController, () -> {
-                                loadInventoryTable();
-                                if (inventoryRegistrationPanel != null) {
-                                    inventoryRegistrationPanel.refreshFromRepository();
-                                }
-                            }).setVisible(true);
-                } else if (col == 7) {
-                    inventoryTable.editCellAt(row, col);
-                }
-            }
-        });
-
-        // Status column: colored badge renderer at index 6
-        inventoryTable.getColumnModel().getColumn(6).setCellRenderer(new StatusBadgeRenderer());
-
-        inventoryTable.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
-                updateInventoryDetailPanel();
-            }
-        });
-
-        jScrollPane3.setViewportView(inventoryTable);
-
-        CardPanel detailCard = new CardPanel(16, AppTheme.BG_PRIMARY);
-        detailCard.setLayout(new BorderLayout(0, 10));
-        detailCard.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
-        detailCard.setPreferredSize(new Dimension(330, 0));
-
-        JLabel detailTitle = new JLabel("Ingredient Details");
-        detailTitle.setFont(BOLD_FONT);
-        detailTitle.setForeground(AppTheme.FG_PRIMARY);
-        detailCard.add(detailTitle, BorderLayout.NORTH);
-
-        inventoryDetailArea = new JTextArea("Select an ingredient to see its full stock and menu usage.");
-        inventoryDetailArea.setEditable(false);
-        inventoryDetailArea.setLineWrap(true);
-        inventoryDetailArea.setWrapStyleWord(true);
-        inventoryDetailArea.setFont(BODY_FONT);
-        inventoryDetailArea.setForeground(AppTheme.FG_PRIMARY);
-        inventoryDetailArea.setBackground(AppTheme.BG_PRIMARY);
-        inventoryDetailArea.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
-
-        JScrollPane detailScroll = new JScrollPane(inventoryDetailArea);
-        detailScroll.setBorder(
-                new ui.RoundedLineBorder(AppTheme.BORDER, ui.AppTheme.BORDER_THICKNESS, ui.AppTheme.BORDER_RADIUS));
-        detailScroll.getViewport().setBackground(AppTheme.BG_PRIMARY);
-        detailCard.add(detailScroll, BorderLayout.CENTER);
-
-        tableAndDetail.add(jScrollPane3, BorderLayout.CENTER);
-        tableAndDetail.add(detailCard, BorderLayout.EAST);
-        mainCard.add(tableAndDetail, BorderLayout.CENTER);
-
-        jPanelInventory.add(mainCard, BorderLayout.CENTER);
-        contentPanel.add(jPanelInventory, "Inventory");
-
-        // ═══════════════════════════════════════════════════════════
-        // MONITORING TAB (redesigned MonitoringPanel)
-        // ═══════════════════════════════════════════════════════════
+        // ── Monitoring tab ──────────────────────────────────────
         monitoringPanel = new MonitoringPanel(isAdmin);
         monitoringPanel.setBackground(AppTheme.BG_PRIMARY);
         contentPanel.add(monitoringPanel, "Monitoring");
 
-        // Other tabs
+        // ── Other tabs ──────────────────────────────────────────
         try {
             contentPanel.add(new MenuMaintenancePanel(isAdmin), "Menu Maintenance");
         } catch (Exception e) {
@@ -1538,19 +1237,24 @@ public class POSSystem extends javax.swing.JFrame {
         try {
             inventoryRegistrationPanel = new InventoryRegistrationPanel(
                     new SQLiteInventoryRepository(),
-                    this::loadInventoryTable,
                     () -> {
-                        if (monitoringPanel != null) {
+                        if (inventoryPanel != null)
+                            inventoryPanel.refresh();
+                    },
+                    () -> {
+                        if (monitoringPanel != null)
                             monitoringPanel.refreshData();
-                        }
                     });
             contentPanel.add(inventoryRegistrationPanel, "Register Product");
         } catch (Exception e) {
             System.err.println("InventoryRegistrationPanel init failed: " + e.getMessage());
         }
         try {
-            contentPanel.add(new StaffPanel(new SQLiteStaffShiftRepository(), new SQLiteUserRepository(),
-                    new SQLiteProfilePictureRepository(), currentUsername, currentUserRole), "Staff");
+            contentPanel.add(new StaffPanel(
+                    new SQLiteStaffShiftRepository(),
+                    new SQLiteUserRepository(),
+                    new SQLiteProfilePictureRepository(),
+                    currentUsername, currentUserRole), "Staff");
         } catch (Exception e) {
             System.err.println("StaffPanel init failed: " + e.getMessage());
         }
@@ -1571,7 +1275,7 @@ public class POSSystem extends javax.swing.JFrame {
         setLocationRelativeTo(null);
     }
 
-    // ─── Old handler stubs for compatibility ────────────────────
+    // ─── Legacy handler stubs (old POS table) ───────────────────
     public void ItemCost() {
         double preTaxTotal = 0.0;
         for (int i = 0; i < jTable1.getRowCount(); i++) {
@@ -1596,9 +1300,10 @@ public class POSSystem extends javax.swing.JFrame {
             double change = cash - total;
             jTextFieldChange.setText(String.format("\u20B1%.2f", change));
             JOptionPane.showMessageDialog(this,
-                    "Payment Successful!\nSubtotal: " + jTextFieldSubTotal.getText() + "\nVAT (12%): "
-                            + jTextFieldTax.getText()
-                            + "\nTotal: " + jTextFieldTotal.getText() + "\nCash: \u20B1" + String.format("%.2f", cash)
+                    "Payment Successful!\nSubtotal: " + jTextFieldSubTotal.getText()
+                            + "\nVAT (12%): " + jTextFieldTax.getText()
+                            + "\nTotal: " + jTextFieldTotal.getText()
+                            + "\nCash: \u20B1" + String.format("%.2f", cash)
                             + "\nChange: \u20B1" + String.format("%.2f", change),
                     "Success", JOptionPane.INFORMATION_MESSAGE);
             return true;
@@ -1627,221 +1332,22 @@ public class POSSystem extends javax.swing.JFrame {
         ItemCost();
     }
 
-    private void loadInventoryTable() {
-        if (inventoryController == null) {
-            inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
-        }
-        inventoryRowsCache.clear();
-        inventoryRowsCache.addAll(inventoryController.buildInventoryRows());
-        applyInventoryFilters();
-        refreshInventoryAlertsBadge();
-    }
-
-    // ─── Rule-Based Notifications (Inventory page) ───────────────────────────
-    private void refreshInventoryAlertsBadge() {
-        if (inventoryAlertsBellBtn == null) return;
-
-        latestInventoryAlerts = inventoryNotificationService.evaluate(inventoryRowsCache);
-
-        boolean hasCritical = latestInventoryAlerts.stream()
-                .anyMatch(n -> n.getSeverity() == Notification.Severity.CRITICAL);
-        boolean hasAny = !latestInventoryAlerts.isEmpty();
-        if (hasCritical) {
-            inventoryAlertsBellBtn.setText("🔔 " + latestInventoryAlerts.size());
-            inventoryAlertsBellBtn.setForeground(new Color(0xDC2626));
-        } else if (hasAny) {
-            inventoryAlertsBellBtn.setText("🔔 " + latestInventoryAlerts.size());
-            inventoryAlertsBellBtn.setForeground(new Color(0xD97706));
-        } else {
-            inventoryAlertsBellBtn.setText("🔔");
-            inventoryAlertsBellBtn.setForeground(AppTheme.FG_PRIMARY);
-        }
-    }
-
-    private void showInventoryAlertsPopup(java.awt.Component anchor) {
-        Font boldFont = new Font("Segoe UI", Font.BOLD, 14);
-        Font bodyFont = new Font("Segoe UI", Font.PLAIN, 13);
-        Font smallBoldFont = new Font("Segoe UI", Font.BOLD, 10);
-
-        JPanel content = new JPanel(new BorderLayout(0, 8));
-        content.setBackground(AppTheme.BG_SURFACE);
-        content.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
-        content.setPreferredSize(new java.awt.Dimension(340, 280));
-
-        JLabel title = new JLabel("Inventory Alerts");
-        title.setFont(boldFont);
-        title.setForeground(AppTheme.FG_PRIMARY);
-        content.add(title, BorderLayout.NORTH);
-
-        JPanel list = new JPanel();
-        list.setOpaque(false);
-        list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS));
-
-        if (latestInventoryAlerts.isEmpty()) {
-            JLabel empty = new JLabel("No alerts right now — inventory looks healthy.");
-            empty.setFont(bodyFont);
-            empty.setForeground(AppTheme.FG_MUTED);
-            empty.setBorder(BorderFactory.createEmptyBorder(8, 4, 8, 4));
-            list.add(empty);
-        } else {
-            for (Notification notification : latestInventoryAlerts) {
-                Color bg;
-                Color fg;
-                String badge;
-                switch (notification.getSeverity()) {
-                    case CRITICAL -> { bg = new Color(0xFEE2E2); fg = new Color(0xDC2626); badge = "CRITICAL"; }
-                    case WARNING -> { bg = new Color(0xFEF3C7); fg = new Color(0xD97706); badge = "WARNING"; }
-                    default -> { bg = new Color(0xE0F2FE); fg = new Color(0x0284C7); badge = "INFO"; }
-                }
-
-                JPanel row = new JPanel(new BorderLayout(10, 0));
-                row.setOpaque(true);
-                row.setBackground(bg);
-                row.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
-                row.setMaximumSize(new java.awt.Dimension(Integer.MAX_VALUE, 40));
-                row.setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);
-
-                JLabel badgeLbl = new JLabel(badge);
-                badgeLbl.setFont(smallBoldFont);
-                badgeLbl.setForeground(fg);
-                badgeLbl.setPreferredSize(new java.awt.Dimension(64, 20));
-                row.add(badgeLbl, BorderLayout.WEST);
-
-                JLabel messageLbl = new JLabel(notification.getMessage());
-                messageLbl.setFont(bodyFont);
-                messageLbl.setForeground(AppTheme.FG_PRIMARY);
-                row.add(messageLbl, BorderLayout.CENTER);
-
-                list.add(row);
-                list.add(Box.createVerticalStrut(6));
-            }
-        }
-
-        JScrollPane scroll = new JScrollPane(list);
-        scroll.setBorder(BorderFactory.createEmptyBorder());
-        scroll.setOpaque(false);
-        scroll.getViewport().setOpaque(false);
-        scroll.getVerticalScrollBar().setUnitIncrement(14);
-        content.add(scroll, BorderLayout.CENTER);
-
-        JPopupMenu popup = new JPopupMenu();
-        popup.setBorder(BorderFactory.createLineBorder(AppTheme.BG_SURFACE.darker(), 1));
-        popup.add(content);
-        popup.show(anchor, anchor.getWidth() - content.getPreferredSize().width, anchor.getHeight() + 6);
-    }
-
-    private void applyInventoryFilters() {
-        if (inventoryTable == null) {
-            return;
-        }
-        DefaultTableModel model = (DefaultTableModel) inventoryTable.getModel();
-        model.setRowCount(0);
-
-        String query = getInventorySearchQuery();
-        String selectedCategory = inventoryCategoryFilter == null || inventoryCategoryFilter.getSelectedItem() == null
-                ? "All"
-                : inventoryCategoryFilter.getSelectedItem().toString();
-
-        // ABC tiers rank items by usage value relative to the whole inventory,
-        // so they're computed once across all rows up front, not per-row.
-        InventoryPolicyService policyService = new InventoryPolicyService();
-        Map<String, InventoryItem> itemsByName = new java.util.LinkedHashMap<>();
-        for (InventoryRowView r : inventoryRowsCache) {
-            itemsByName.put(r.getName(), new InventoryItem(r.getName(), r.getQuantity(), r.getUnit(), r.getAlertLevel()));
-        }
-        Map<String, String> abcTiers = policyService.classifyAbc(itemsByName);
-
-        for (InventoryRowView row : inventoryRowsCache) {
-            if (!matchesInventoryFilters(row, query, selectedCategory)) {
-                continue;
-            }
-            String qtyDisplay = row.getQuantity() + " " + row.getUnit();
-            String alertDisplay = row.getAlertLevel() + " " + row.getUnit();
-            InventoryItem item = itemsByName.get(row.getName());
-            String tier = abcTiers.getOrDefault(row.getName(), "C");
-            ReorderGuideInfo reorderGuide = new ReorderGuideInfo(
-                    policyService.computeRecommendedEoq(item),
-                    policyService.computeReorderPoint(item),
-                    row.getQuantity(), row.getUnit());
-            model.addRow(new Object[] { row.getName(), qtyDisplay, alertDisplay, tier, reorderGuide, row, row.getStatus(), "..." });
-        }
-
-        if (model.getRowCount() > 0) {
-            inventoryTable.setRowSelectionInterval(0, 0);
-        } else if (inventoryDetailArea != null) {
-            inventoryDetailArea.setText("No ingredients match the current search and category filter.");
-        }
-    }
-
-    private boolean matchesInventoryFilters(InventoryRowView row, String query, String selectedCategory) {
-        boolean categoryMatch = "All".equalsIgnoreCase(selectedCategory)
-                || containsToken(row.getCategories(), selectedCategory);
-
-        if (!categoryMatch) {
-            return false;
-        }
-
-        if (query == null || query.isEmpty()) {
-            return true;
-        }
-
-        String haystack = String.join(" ",
-                row.getName(),
-                row.getUnit(),
-                row.getStatus(),
-                safeText(row.getCategories()),
-                safeText(row.getLastUpdated())).toLowerCase();
-        return haystack.contains(query);
-    }
-
-    private String getInventorySearchQuery() {
-        if (inventorySearchField == null) {
-            return "";
-        }
-        String query = inventorySearchField.getText() == null ? "" : inventorySearchField.getText().trim();
-        if (query.isEmpty() || INVENTORY_SEARCH_PLACEHOLDER.equalsIgnoreCase(query)) {
-            return "";
-        }
-        return query.toLowerCase();
-    }
-
-    private boolean isInventorySearchPlaceholderVisible() {
-        return inventorySearchField != null
-                && INVENTORY_SEARCH_PLACEHOLDER.equalsIgnoreCase(
-                        inventorySearchField.getText() == null ? "" : inventorySearchField.getText().trim());
-    }
-
-    private boolean containsToken(String csv, String token) {
-        if (csv == null || csv.isBlank() || token == null || token.isBlank()) {
-            return false;
-        }
-        for (String part : csv.split(",")) {
-            if (part.trim().equalsIgnoreCase(token.trim())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private String safeText(String value) {
-        return value == null ? "" : value;
-    }
-
     private void chooseHotOrIced(String rawProductName) {
-        String productName = rawProductName;
         Object[] options = { "Hot", "Regular Iced", "Large Iced" };
-        int choice = JOptionPane.showOptionDialog(this, "Choose variant for " + productName + ":", "Choose Variant",
-                JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+        int choice = JOptionPane.showOptionDialog(this,
+                "Choose variant for " + rawProductName + ":", "Choose Variant",
+                JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
+                null, options, options[0]);
         if (choice == JOptionPane.CLOSED_OPTION || choice < 0)
             return;
         String variant = options[choice].toString();
-        String displayName = productName + " (" + variant + ")";
-        double price = Menu.getInstance().getPrice(productName, variant);
+        String displayName = rawProductName + " (" + variant + ")";
+        double price = Menu.getInstance().getPrice(rawProductName, variant);
         if (price > 0)
             addItem(displayName, price);
     }
 
-    // ─── Event handlers ─────────────────────────────────────────
+    // ─── Event handlers (legacy POS table) ──────────────────────
     private void removeitemActionPerformed(java.awt.event.ActionEvent evt) {
         DefaultTableModel model = (DefaultTableModel) jTable1.getModel();
         int selectedRow = jTable1.getSelectedRow();
@@ -1883,8 +1389,8 @@ public class POSSystem extends javax.swing.JFrame {
 
     private void exitActionPerformed(java.awt.event.ActionEvent evt) {
         int option = JOptionPane.showConfirmDialog(this, "Do you want to exit?",
-                "Better Mondays Coffeee Cafe Management System", JOptionPane.YES_NO_OPTION,
-                JOptionPane.QUESTION_MESSAGE);
+                "Better Mondays Coffeee Cafe Management System",
+                JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
         if (option == JOptionPane.YES_OPTION)
             System.exit(0);
     }
@@ -1934,29 +1440,33 @@ public class POSSystem extends javax.swing.JFrame {
                 orderController = new OrderController(new SQLiteSalesRepository());
             orderController.persistCompletedTransaction(transactionRef, salesList, subTotal, cash, change, "Walk-in");
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Unable to save sales to database: " + e.getMessage(), "Database",
-                    JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this,
+                    "Unable to save sales to database: " + e.getMessage(),
+                    "Database", JOptionPane.WARNING_MESSAGE);
         }
 
         String lineSep = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
-        String receiptStr = " ☕ Better Mondays Cafe ☕\n 123 Main St., Manila\n VAT REG TIN: 123-456-789\n" + lineSep
+        String receiptStr = " ☕ Better Mondays Cafe ☕\n 123 Main St., Manila\n VAT REG TIN: 123-456-789\n"
+                + lineSep
                 + "Date: " + new SimpleDateFormat("MM/dd/yyyy HH:mm").format(new Date()) + "\n"
                 + "Txn #: " + transactionRef + "\n" + lineSep
-                + String.format("%-15s %3s %8s\n", "ITEM", "QTY", "AMOUNT") + "───────────────────────────────\n";
+                + String.format("%-15s %3s %8s\n", "ITEM", "QTY", "AMOUNT")
+                + "───────────────────────────────\n";
         for (SalesRecord s : salesList) {
-            receiptStr += String.format("%-15s %3d %8.2f\n", truncate(s.getProductName(), 15), s.getQuantity(),
-                    s.getTotal());
+            receiptStr += String.format("%-15s %3d %8.2f\n",
+                    truncate(s.getProductName(), 15), s.getQuantity(), s.getTotal());
         }
         receiptStr += "───────────────────────────────\n"
                 + String.format("%-23s %8.2f\n", "Subtotal (excl VAT):", subTotal / 1.12)
                 + String.format("%-23s %8.2f\n", "VAT (12%):", subTotal * 0.12 / 1.12)
                 + String.format("%-23s %8.2f\n", "TOTAL (incl VAT):", subTotal)
                 + String.format("%-23s %8.2f\n", "Cash:", cash)
-                + String.format("%-23s %8.2f\n", "Change:", change) + lineSep
+                + String.format("%-23s %8.2f\n", "Change:", change)
+                + lineSep
                 + " Thank you! Come again!\n *** Have a nice day ***\n";
 
-        JOptionPane.showMessageDialog(this, receiptStr, "✅ RECEIPT - " + transactionRef,
-                JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(this, receiptStr,
+                "✅ RECEIPT - " + transactionRef, JOptionPane.INFORMATION_MESSAGE);
 
         orderModel.setRowCount(0);
         jTextFieldChange.setText("");
@@ -1965,8 +1475,10 @@ public class POSSystem extends javax.swing.JFrame {
         jTextFieldSubTotal.setText("");
         cashpayment.setText("");
 
-        loadInventoryTable();
-        monitoringPanel.refreshData();
+        if (inventoryPanel != null)
+            inventoryPanel.refresh();
+        if (monitoringPanel != null)
+            monitoringPanel.refreshData();
     }
 
     private static int loadTransactionCounter() {
@@ -1975,8 +1487,7 @@ public class POSSystem extends javax.swing.JFrame {
                         "SELECT transaction_ref FROM sales_transactions ORDER BY id DESC LIMIT 1");
                 ResultSet rs = ps.executeQuery()) {
             if (rs.next()) {
-                String ref = rs.getString(1);
-                return parseTransactionNumber(ref);
+                return parseTransactionNumber(rs.getString(1));
             }
         } catch (Exception ignored) {
         }
@@ -2001,505 +1512,6 @@ public class POSSystem extends javax.swing.JFrame {
         return "TXN" + String.format("%06d", transactionCounter);
     }
 
-    /** Carries the EOQ/ROP figures for a row so ReorderGuideRenderer can color ROP once stock reaches it. */
-    private static final class ReorderGuideInfo {
-        final double eoq;
-        final double rop;
-        final double quantity;
-        final String unit;
-
-        ReorderGuideInfo(double eoq, double rop, double quantity, String unit) {
-            this.eoq = eoq;
-            this.rop = rop;
-            this.quantity = quantity;
-            this.unit = unit;
-        }
-    }
-
-    private static class AbcTierRenderer extends DefaultTableCellRenderer {
-        @Override
-        public java.awt.Component getTableCellRendererComponent(JTable table, Object value,
-                boolean isSelected, boolean hasFocus, int row, int column) {
-            java.awt.Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-            if (c instanceof JLabel label) {
-                String tier = value == null ? "C" : value.toString();
-                label.setText(tier);
-                label.setHorizontalAlignment(SwingConstants.CENTER);
-                label.setFont(label.getFont().deriveFont(Font.BOLD));
-                if (!isSelected) {
-                    switch (tier) {
-                        case "A" -> label.setForeground(new Color(0x16A34A));
-                        case "B" -> label.setForeground(new Color(0xD97706));
-                        default -> label.setForeground(new Color(0x6B7280));
-                    }
-                }
-            }
-            return c;
-        }
-    }
-
-    private static class ReorderGuideRenderer extends DefaultTableCellRenderer {
-        @Override
-        public java.awt.Component getTableCellRendererComponent(JTable table, Object value,
-                boolean isSelected, boolean hasFocus, int row, int column) {
-            java.awt.Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-            if (c instanceof JLabel label) {
-                label.setHorizontalAlignment(SwingConstants.CENTER);
-                if (value instanceof ReorderGuideInfo info) {
-                    long eoqRounded = Math.round(info.eoq);
-                    long ropRounded = Math.round(info.rop);
-                    label.setText("EOQ~" + eoqRounded + "  ·  ROP~" + ropRounded);
-                    if (!isSelected) {
-                        // Red flags the actionable case: stock has reached its
-                        // reorder point and a new order should be placed now.
-                        label.setForeground(info.quantity <= info.rop
-                                ? new Color(0xDC2626)
-                                : AppTheme.FG_MUTED);
-                    }
-                } else {
-                    label.setText("—");
-                    if (!isSelected) {
-                        label.setForeground(AppTheme.FG_MUTED);
-                    }
-                }
-            }
-            return c;
-        }
-    }
-
-    private static class StatusBadgeRenderer extends DefaultTableCellRenderer {
-        @Override
-        public java.awt.Component getTableCellRendererComponent(JTable table, Object value,
-                boolean isSelected, boolean hasFocus, int row, int column) {
-            java.awt.Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-            if (c instanceof JLabel label) {
-                String text = value == null ? "" : value.toString();
-                label.setText(text);
-                label.setHorizontalAlignment(SwingConstants.CENTER);
-                if (isSelected) {
-                    return label;
-                }
-                switch (text) {
-                    case "Good" -> label.setForeground(new Color(40, 167, 69));
-                    case "Low Stock" -> label.setForeground(new Color(200, 160, 40));
-                    case "Out of Stock" -> label.setForeground(new Color(230, 130, 50));
-                    case "Expired" -> label.setForeground(new Color(200, 50, 50));
-                    default -> label.setForeground(new Color(120, 120, 120));
-                }
-            }
-            return c;
-        }
-    }
-
-    private static class BatchSummaryRenderer extends DefaultTableCellRenderer {
-        @Override
-        public java.awt.Component getTableCellRendererComponent(JTable table, Object value,
-                boolean isSelected, boolean hasFocus, int row, int column) {
-            java.awt.Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-            if (!(c instanceof JLabel label))
-                return c;
-            label.setHorizontalAlignment(SwingConstants.CENTER);
-
-            String text = "—";
-            Color fg = AppTheme.FG_MUTED;
-
-            if (value instanceof controller.InventoryRowView rv) {
-                java.util.List<inventory.InventoryBatch> batches = rv.getBatches();
-                if (batches != null && !batches.isEmpty()) {
-                    int expired = 0, expiring = 0, active = 0;
-                    java.time.LocalDate today = java.time.LocalDate.now();
-                    for (inventory.InventoryBatch b : batches) {
-                        if (b.isArchived())
-                            continue;
-                        active++;
-                        String exp = b.getExpiryDate();
-                        if (exp == null || exp.isBlank())
-                            continue;
-                        try {
-                            java.time.LocalDate d = java.time.LocalDate.parse(exp);
-                            if (!d.isAfter(today))
-                                expired++;
-                            else if (!d.isAfter(today.plusDays(7)))
-                                expiring++;
-                        } catch (Exception ignored) {
-                        }
-                    }
-                    if (expired > 0) {
-                        text = "⚠ " + expired + " expired";
-                        fg = new Color(200, 50, 50);
-                    } else if (expiring > 0) {
-                        text = "⚠ " + expiring + " expiring";
-                        fg = new Color(200, 160, 40);
-                    } else if (active > 0) {
-                        text = active + " batch" + (active == 1 ? "" : "es");
-                    }
-                }
-            }
-
-            label.setText(text);
-            if (!isSelected)
-                label.setForeground(fg);
-            return label;
-        }
-    }
-
-    private static class ActionsCellRenderer extends DefaultTableCellRenderer {
-        @Override
-        public java.awt.Component getTableCellRendererComponent(JTable table, Object value,
-                boolean isSelected, boolean hasFocus, int row, int column) {
-            JLabel label = new JLabel("...", SwingConstants.CENTER);
-            label.setFont(new Font("Segoe UI", Font.BOLD, 16));
-            label.setForeground(new Color(150, 150, 150));
-            label.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-            return label;
-        }
-    }
-
-    private class ActionsCellEditor extends AbstractCellEditor implements TableCellEditor {
-        private final JPanel panel = new JPanel(new BorderLayout());
-        private final JLabel dotsLabel = new JLabel("...", SwingConstants.CENTER);
-        private int editingRow;
-
-        ActionsCellEditor() {
-            dotsLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
-            dotsLabel.setForeground(new Color(150, 150, 150));
-            dotsLabel.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-            panel.add(dotsLabel, BorderLayout.CENTER);
-            panel.addMouseListener(new java.awt.event.MouseAdapter() {
-                @Override
-                public void mouseClicked(java.awt.event.MouseEvent e) {
-                    if (editingRow < 0)
-                        return;
-                    String itemName = inventoryTable.getValueAt(editingRow, 0).toString();
-                    JPopupMenu menu = new JPopupMenu();
-                    JMenuItem editItem = new JMenuItem("Edit");
-                    JMenuItem deleteItem = new JMenuItem("Delete");
-                    editItem.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-                    deleteItem.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-                    final int rowToEdit = editingRow;
-                    editItem.addActionListener(ev -> {
-                        fireEditingStopped();
-                        openInventoryEditDialog(rowToEdit);
-                    });
-                    deleteItem.addActionListener(ev -> {
-                        int confirm = JOptionPane.showConfirmDialog(POSSystem.this,
-                                "Remove " + itemName + " from inventory?", "Confirm",
-                                JOptionPane.YES_NO_OPTION);
-                        if (confirm == JOptionPane.YES_OPTION) {
-                            if (inventoryController == null)
-                                inventoryController = new InventoryController(Inventory.getInstance(),
-                                        new SQLiteInventoryRepository());
-                            inventoryController.removeItem(itemName);
-                            loadInventoryTable();
-                        }
-                    });
-                    menu.add(editItem);
-                    menu.add(deleteItem);
-                    menu.show(panel, e.getX(), e.getY());
-                }
-            });
-        }
-
-        @Override
-        public Object getCellEditorValue() {
-            return "...";
-        }
-
-        @Override
-        public java.awt.Component getTableCellEditorComponent(JTable table, Object value,
-                boolean isSelected, int row, int column) {
-            editingRow = row;
-            return panel;
-        }
-    }
-
-    private void openInventoryEditDialog(int tableRow) {
-        String itemName = inventoryTable.getValueAt(tableRow, 0).toString();
-        InventoryItem item = Inventory.getInstance().getItem(itemName);
-        if (item == null) {
-            javax.swing.JOptionPane.showMessageDialog(this, "Item not found: " + itemName);
-            return;
-        }
-
-        javax.swing.JDialog dialog = new javax.swing.JDialog(
-                (java.awt.Frame) javax.swing.SwingUtilities.getWindowAncestor(this),
-                "Edit Inventory Item", true);
-        dialog.setLayout(new java.awt.BorderLayout(0, 0));
-        dialog.setResizable(false);
-
-        JPanel content = new JPanel(new java.awt.GridBagLayout());
-        content.setBackground(AppTheme.BG_SURFACE);
-        content.setBorder(BorderFactory.createEmptyBorder(24, 28, 16, 28));
-
-        java.awt.GridBagConstraints gc = new java.awt.GridBagConstraints();
-        gc.insets = new java.awt.Insets(6, 0, 6, 12);
-        gc.anchor = java.awt.GridBagConstraints.WEST;
-
-        Font labelFont = new Font("Segoe UI", Font.PLAIN, 13);
-        Font fieldFont = new Font("Segoe UI", Font.PLAIN, 13);
-
-        // Item name (read-only)
-        gc.gridx = 0;
-        gc.gridy = 0;
-        gc.weightx = 0;
-        JLabel nameLabel = new JLabel("Item:");
-        nameLabel.setFont(labelFont);
-        nameLabel.setForeground(AppTheme.FG_MUTED);
-        content.add(nameLabel, gc);
-
-        gc.gridx = 1;
-        gc.weightx = 1;
-        gc.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        JLabel nameValue = new JLabel(item.getName());
-        nameValue.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        nameValue.setForeground(AppTheme.FG_PRIMARY);
-        content.add(nameValue, gc);
-
-        // Quantity field
-        gc.gridx = 0;
-        gc.gridy = 1;
-        gc.weightx = 0;
-        gc.fill = java.awt.GridBagConstraints.NONE;
-        JLabel qtyLabel = new JLabel("Quantity:");
-        qtyLabel.setFont(labelFont);
-        qtyLabel.setForeground(AppTheme.FG_MUTED);
-        content.add(qtyLabel, gc);
-
-        gc.gridx = 1;
-        gc.weightx = 1;
-        gc.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        JTextField qtyField = new JTextField(String.valueOf(item.getQuantity()), 12);
-        qtyField.setFont(fieldFont);
-        qtyField.setBorder(BorderFactory.createCompoundBorder(
-                new ui.RoundedLineBorder(AppTheme.BORDER, 1, 6),
-                BorderFactory.createEmptyBorder(5, 8, 5, 8)));
-        content.add(qtyField, gc);
-
-        // Alert level field
-        gc.gridx = 0;
-        gc.gridy = 2;
-        gc.weightx = 0;
-        gc.fill = java.awt.GridBagConstraints.NONE;
-        JLabel alertLabel = new JLabel("Alert Level:");
-        alertLabel.setFont(labelFont);
-        alertLabel.setForeground(AppTheme.FG_MUTED);
-        content.add(alertLabel, gc);
-
-        gc.gridx = 1;
-        gc.weightx = 1;
-        gc.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        JTextField alertField = new JTextField(String.valueOf(item.getAlertLevel()), 12);
-        alertField.setFont(fieldFont);
-        alertField.setBorder(BorderFactory.createCompoundBorder(
-                new ui.RoundedLineBorder(AppTheme.BORDER, 1, 6),
-                BorderFactory.createEmptyBorder(5, 8, 5, 8)));
-        content.add(alertField, gc);
-
-        dialog.add(content, java.awt.BorderLayout.CENTER);
-
-        // Buttons
-        JPanel btnRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 8, 12));
-        btnRow.setBackground(AppTheme.BG_SURFACE);
-        btnRow.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, AppTheme.BORDER));
-
-        JButton cancelBtn = new JButton("Cancel");
-        cancelBtn.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        cancelBtn.setBackground(AppTheme.BG_PRIMARY);
-        cancelBtn.setForeground(AppTheme.FG_PRIMARY);
-        cancelBtn.setFocusPainted(false);
-        cancelBtn.setBorder(BorderFactory.createCompoundBorder(
-                new ui.RoundedLineBorder(AppTheme.BORDER, 1, 6),
-                BorderFactory.createEmptyBorder(6, 16, 6, 16)));
-        cancelBtn.addActionListener(ev -> dialog.dispose());
-
-        JButton saveBtn = new JButton("Save");
-        saveBtn.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        saveBtn.setBackground(AppTheme.ACCENT);
-        saveBtn.setForeground(Color.WHITE);
-        saveBtn.setOpaque(true);
-        saveBtn.setFocusPainted(false);
-        saveBtn.setBorder(BorderFactory.createCompoundBorder(
-                new ui.RoundedLineBorder(AppTheme.ACCENT, 1, 6),
-                BorderFactory.createEmptyBorder(6, 16, 6, 16)));
-        saveBtn.addActionListener(ev -> {
-            String qtyText = qtyField.getText().trim();
-            String alertText = alertField.getText().trim();
-            if (qtyText.isEmpty() || alertText.isEmpty()) {
-                javax.swing.JOptionPane.showMessageDialog(dialog, "Quantity and Alert Level cannot be empty.");
-                return;
-            }
-            try {
-                Double.parseDouble(qtyText);
-                Double.parseDouble(alertText);
-            } catch (NumberFormatException ex) {
-                javax.swing.JOptionPane.showMessageDialog(dialog,
-                        "Please enter valid numbers for Quantity and Alert Level.");
-                return;
-            }
-            if (inventoryController == null)
-                inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
-            inventoryController.updateItem(itemName, itemName, qtyText, item.getUnit(), alertText);
-            loadInventoryTable();
-            if (monitoringPanel != null)
-                monitoringPanel.refreshData();
-            dialog.dispose();
-        });
-
-        btnRow.add(cancelBtn);
-        btnRow.add(saveBtn);
-        dialog.add(btnRow, java.awt.BorderLayout.SOUTH);
-
-        dialog.pack();
-        dialog.setMinimumSize(new java.awt.Dimension(340, dialog.getHeight()));
-        dialog.setLocationRelativeTo(this);
-        dialog.setVisible(true);
-    }
-
-    private void updateInventoryDetailPanel() {
-        if (inventoryDetailArea == null || inventoryController == null || inventoryTable == null) {
-            return;
-        }
-
-        int selectedRow = inventoryTable.getSelectedRow();
-        if (selectedRow < 0) {
-            inventoryDetailArea.setText("Select an ingredient to see its full stock and menu usage.");
-            return;
-        }
-
-        String itemName = String.valueOf(inventoryTable.getValueAt(selectedRow, 0));
-        List<InventoryRowView> rows = inventoryController.buildInventoryRows();
-
-        // ABC tiers rank items by usage value relative to the whole inventory,
-        // so they must be computed across all rows, not just the selected one.
-        InventoryPolicyService policyService = new InventoryPolicyService();
-        Map<String, InventoryItem> itemsByName = new java.util.LinkedHashMap<>();
-        for (InventoryRowView r : rows) {
-            itemsByName.put(r.getName(), new InventoryItem(r.getName(), r.getQuantity(), r.getUnit(), r.getAlertLevel()));
-        }
-        Map<String, String> abcTiers = policyService.classifyAbc(itemsByName);
-
-        for (InventoryRowView row : rows) {
-            if (!row.getName().equals(itemName)) {
-                continue;
-            }
-
-            InventoryItem item = itemsByName.get(row.getName());
-            double eoq = policyService.computeRecommendedEoq(item);
-            double rop = policyService.computeReorderPoint(item);
-            String tier = abcTiers.getOrDefault(row.getName(), "C");
-
-            StringBuilder details = new StringBuilder();
-            details.append("Name: ").append(row.getName()).append('\n');
-            details.append("Quantity: ").append(row.getQuantity()).append(' ').append(row.getUnit()).append('\n');
-            details.append("Alert Level: ").append(row.getAlertLevel()).append(' ').append(row.getUnit()).append('\n');
-            details.append("Status: ").append(row.getStatus()).append('\n');
-            details.append("Updated: ").append(
-                    row.getLastUpdated() == null || row.getLastUpdated().isBlank() ? "N/A" : row.getLastUpdated())
-                    .append('\n');
-            details.append("Categories: ")
-                    .append(row.getCategories() == null || row.getCategories().isBlank() ? "N/A" : row.getCategories())
-                    .append('\n');
-            details.append('\n');
-            details.append("--- Replenishment Insights ---\n");
-            details.append("ABC Tier: ").append(tier)
-                    .append(" (").append(tier.equals("A") ? "high priority — drives ~80% of usage"
-                            : tier.equals("B") ? "medium priority — next ~15%"
-                            : "low priority — remaining ~5%")
-                    .append(")\n");
-            details.append("Recommended Order Qty (EOQ): ~").append(Math.round(eoq)).append(' ').append(row.getUnit()).append('\n');
-            details.append("Reorder Point (ROP): ~").append(Math.round(rop)).append(' ').append(row.getUnit());
-            if (row.getQuantity() <= rop) {
-                details.append("  ← reorder now, stock has reached its reorder point");
-            }
-            details.append('\n');
-            details.append("Deduction order: FEFO (earliest-expiring batches used first)\n");
-            inventoryDetailArea.setText(details.toString());
-            inventoryDetailArea.setCaretPosition(0);
-            return;
-        }
-
-        inventoryDetailArea.setText("No detail record found for the selected ingredient.");
-    }
-
-    private void InventoryEditActionPerformed(java.awt.event.ActionEvent evt) {
-        int selectedRow = inventoryTable.getSelectedRow();
-        if (selectedRow == -1) {
-            JOptionPane.showMessageDialog(this, "Please select an item to edit.");
-            return;
-        }
-        Inventory inventory = Inventory.getInstance();
-        String currentName = inventoryTable.getValueAt(selectedRow, 0).toString();
-        InventoryItem item = inventory.getItem(currentName);
-        if (item == null) {
-            JOptionPane.showMessageDialog(this, "Error: Item not found in inventory.");
-            return;
-        }
-        try {
-            String newName = JOptionPane.showInputDialog(this, "Enter new name:", item.getName());
-            if (newName == null || newName.trim().isEmpty())
-                return;
-            newName = newName.trim();
-            String quantityStr = JOptionPane.showInputDialog(this, "Enter new quantity:", item.getQuantity());
-            String unit = JOptionPane.showInputDialog(this, "Enter new unit:", item.getUnit());
-            String alertStr = JOptionPane.showInputDialog(this, "Enter new alert level:", item.getAlertLevel());
-            if (inventoryController == null)
-                inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
-            inventoryController.updateItem(currentName.trim(), newName, quantityStr, unit, alertStr);
-            loadInventoryTable();
-            monitoringPanel.refreshData();
-            JOptionPane.showMessageDialog(this, "Item updated successfully!");
-        } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this, "Invalid number entered.");
-        }
-    }
-
-    private void InventoryRemoveActionPerformed(java.awt.event.ActionEvent evt) {
-        int selectedRow = inventoryTable.getSelectedRow();
-        if (selectedRow == -1) {
-            JOptionPane.showMessageDialog(this, "Please select an item to remove.");
-            return;
-        }
-        String name = inventoryTable.getValueAt(selectedRow, 0).toString().trim();
-        int confirm = JOptionPane.showConfirmDialog(this, "Remove " + name + " from inventory?", "Confirm",
-                JOptionPane.YES_NO_OPTION);
-        if (confirm == JOptionPane.YES_OPTION) {
-            if (inventoryController == null)
-                inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
-            inventoryController.removeItem(name);
-            loadInventoryTable();
-        }
-    }
-
-    private void InventoryAddActionPerformed(java.awt.event.ActionEvent evt) {
-        try {
-            String name = JOptionPane.showInputDialog(this, "Enter item name:");
-            if (name == null || name.trim().isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Item name cannot be empty.");
-                return;
-            }
-            String quantityStr = JOptionPane.showInputDialog(this, "Enter quantity:");
-            if (quantityStr == null || quantityStr.trim().isEmpty())
-                return;
-            String unit = JOptionPane.showInputDialog(this, "Enter unit (e.g., kg, pcs):");
-            if (unit == null || unit.trim().isEmpty())
-                return;
-            String alertStr = JOptionPane.showInputDialog(this, "Enter alert level:");
-            if (alertStr == null || alertStr.trim().isEmpty())
-                return;
-            if (inventoryController == null)
-                inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
-            inventoryController.addItem(name, quantityStr, unit, alertStr);
-            loadInventoryTable();
-            monitoringPanel.refreshData();
-            JOptionPane.showMessageDialog(this, "Item added successfully!");
-        } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this,
-                    "Invalid number entered. Please enter valid numeric values for quantity and alert level.");
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "An unexpected error occurred: " + e.getMessage());
-        }
-    }
-
     // ═════════════════════════════════════════════════════════════
     // Variables declaration
     // ═════════════════════════════════════════════════════════════
@@ -2513,7 +1525,6 @@ public class POSSystem extends javax.swing.JFrame {
     private javax.swing.JButton exit;
     private javax.swing.JButton fruitteamenu;
     private javax.swing.JButton herbalteamenu;
-    public javax.swing.JTable inventoryTable;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel6;
     private javax.swing.JLabel jLabelSubTotal;
@@ -2521,13 +1532,11 @@ public class POSSystem extends javax.swing.JFrame {
     private javax.swing.JLabel jLabelTotal1;
     private javax.swing.JLabel jLabelTotal2;
     private javax.swing.JPanel jPanel4;
-    public javax.swing.JPanel jPanelInventory;
     private javax.swing.JPanel jPanelMonitoring;
     private javax.swing.JPanel jPanelPOS;
     private javax.swing.JPanel jPanelSummary;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
-    private javax.swing.JScrollPane jScrollPane3;
     private javax.swing.JScrollPane jScrollPane4;
     private javax.swing.JScrollPane jScrollPane5;
     private CardLayout cardLayout;

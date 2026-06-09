@@ -1903,7 +1903,10 @@ public class OrderingPanel extends JPanel {
         if (cached != null)
             return cached;
 
-        String baseName = IMAGE_MAP.getOrDefault(prodName, prodName);
+        // Normalize large iced variants to their base image name: "Iced Large X" → "Iced X"
+        String lookupName = prodName.replaceFirst("(?i)^(iced)\\s+large\\s+", "$1 ")
+                .replaceFirst("(?i)\\s*\\(large\\)$", "").trim();
+        String baseName = IMAGE_MAP.getOrDefault(lookupName, lookupName);
         List<String> attempts = new ArrayList<>();
         String lc = baseName.toLowerCase();
         if (lc.startsWith("hot ") || lc.startsWith("iced ")) {
@@ -2169,6 +2172,17 @@ public class OrderingPanel extends JPanel {
             for (String n : e.getValue()) {
                 if (n.equals(itemName))
                     return e.getKey();
+            }
+        }
+        // Fallback for large iced variants: "Iced Large X" → "Iced X", "X (Large)" → "X"
+        String normalized = itemName.replaceFirst("(?i)^(iced)\\s+large\\s+", "$1 ")
+                .replaceFirst("(?i)\\s*\\(large\\)$", "").trim();
+        if (!normalized.equals(itemName)) {
+            for (Map.Entry<String, List<String>> e : CATEGORY_ITEMS.entrySet()) {
+                for (String n : e.getValue()) {
+                    if (n.equals(normalized))
+                        return e.getKey();
+                }
             }
         }
         return "";

@@ -128,7 +128,7 @@ public class StaffPanel extends JPanel {
         // Top header + tabs
         JPanel topSection = new JPanel(new BorderLayout(0, 16));
         topSection.setOpaque(false);
-        topSection.setBorder(new EmptyBorder(20, 24, 0, 24));
+        topSection.setBorder(new EmptyBorder(20, 24, 12, 24));
         topSection.add(buildHeader(), BorderLayout.NORTH);
         topSection.add(buildNavigationTabs(), BorderLayout.SOUTH);
 
@@ -201,7 +201,7 @@ public class StaffPanel extends JPanel {
 
         JButton addStaffBtn = styledBtn("+ Add Staff", BtnVariant.PRIMARY);
         addStaffBtn.addActionListener(e -> onCreateAccount());
-        addStaffBtn.setVisible(currentRole == Role.ADMIN);
+        addStaffBtn.setVisible(false); // replaced by placeholder card in grid
 
         JButton staffRequestBtn = styledBtn("Staff Request", BtnVariant.SUCCESS);
         staffRequestBtn.addActionListener(e -> showStaffRequestDialog());
@@ -226,28 +226,25 @@ public class StaffPanel extends JPanel {
                 "Account Management" };
         String defaultTab = currentRole == Role.ADMIN ? "Staff Shifts" : "Weekly Schedule";
         for (String tab : tabs) {
+            boolean active = tab.equals(defaultTab);
             JButton btn = new JButton(tab);
             btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
-            btn.setForeground(TEXT_SECONDARY);
-            btn.setBackground(new Color(0xF1F5F9));
+            btn.setForeground(active ? Color.WHITE : TEXT_PRIMARY);
+            btn.setBackground(active ? ACCENT_BLUE : new Color(0xF1F5F9));
+            btn.setOpaque(true);
+            btn.setContentAreaFilled(true);
             btn.setBorder(BorderFactory.createCompoundBorder(
                     BorderFactory.createMatteBorder(0, 0, 0, 1, CARD_BORDER),
-                    new EmptyBorder(8, 18, 8, 18)));
+                    new EmptyBorder(10, 18, 10, 18)));
+            btn.setBorderPainted(true);
             btn.setFocusPainted(false);
             btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             btn.addActionListener(e -> onTabSelected(tab));
-            if (tab.equals("Staff Shifts")) {
-                if (currentRole != Role.ADMIN) {
-                    btn.setVisible(false);
-                }
+            if (tab.equals("Staff Shifts") && currentRole != Role.ADMIN) {
+                btn.setVisible(false);
             }
             if (tab.equals("Account Management") && currentRole != Role.ADMIN) {
                 btn.setVisible(false);
-            }
-            boolean active = tab.equals(defaultTab);
-            if (active) {
-                btn.setBackground(ACCENT_BLUE);
-                btn.setForeground(Color.WHITE);
             }
             tabBar.add(btn);
         }
@@ -271,9 +268,9 @@ public class StaffPanel extends JPanel {
         // Highlight active tab
         for (Component c : tabBar.getComponents()) {
             if (c instanceof JButton btn) {
-                boolean active = tab.equals(btn.getText());
-                btn.setBackground(active ? ACCENT_BLUE : new Color(0xF1F5F9));
-                btn.setForeground(active ? Color.WHITE : TEXT_SECONDARY);
+                boolean isActive = tab.equals(btn.getText());
+                btn.setBackground(isActive ? ACCENT_BLUE : new Color(0xF1F5F9));
+                btn.setForeground(isActive ? Color.WHITE : TEXT_PRIMARY);
             }
         }
     }
@@ -703,7 +700,7 @@ public class StaffPanel extends JPanel {
     // ─── Admin: Leave Request panel ──────────────────────────
     private JPanel createAdminLeaveRequestsPanel() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(new EmptyBorder(8, 8, 8, 8));
+        panel.setBorder(new EmptyBorder(12, 16, 12, 16));
 
         FilterRow toolbar = new FilterRow();
         toolbar.addLabeled("Status:", leaveStatusFilter);
@@ -757,7 +754,7 @@ public class StaffPanel extends JPanel {
     // ─── Staff: My Requests panel ────────────────────────────
     private JPanel createStaffMyRequestsPanel() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(new EmptyBorder(8, 8, 8, 8));
+        panel.setBorder(new EmptyBorder(12, 16, 12, 16));
 
         // ── Submit form ──
         JTextField startDateField = new JTextField(12);
@@ -827,26 +824,65 @@ public class StaffPanel extends JPanel {
 
     private void refreshStaffCards() {
         staffCardsPanel.removeAll();
-        new SwingWorker<Void, Void>() {
-            private List<UserAccount> users;
+        staffCardsPanel.revalidate();
+        staffCardsPanel.repaint();
+
+        new SwingWorker<java.util.List<Object[]>, Void>() {
             private String errorMsg;
 
             @Override
-            protected Void doInBackground() {
+            protected java.util.List<Object[]> doInBackground() {
+                java.util.List<Object[]> rows = new java.util.ArrayList<>();
                 try {
-                    users = accountRoleRepository.listUsers();
+                    List<UserAccount> users = accountRoleRepository.listUsers();
+                    List<StaffShift> todayShifts = new java.util.ArrayList<>();
+                    try { todayShifts.addAll(shiftRepo.findTodayActiveShifts()); } catch (Exception ignored) {}
+
                     for (UserAccount user : users) {
-                        StaffShift latest = shiftRepo.findLatestShift(user.getUsername());
-                        staffCardsPanel.add(buildStaffCard(user, latest));
+                        StaffShift latest = null;
+                        try { latest = shiftRepo.findLatestShift(user.getUsername()); } catch (Exception ignored) {}
+
+                        StaffShift todayShift = null;
+                        for (StaffShift s : todayShifts) {
+                            if (s.getUsername().equals(user.getUsername())) { todayShift = s; break; }
+                        }
+                        if (todayShift == null) {
+                            try {
+                                for (StaffShift s : shiftRepo.findShifts(user.getUsername())) {
+                                    if (s.getStartedAt() != null && s.getStartedAt().startsWith(
+                                            java.time.LocalDate.now().toString())) { todayShift = s; break; }
+                                }
+                            } catch (Exception ignored) {}
+                        }
+
+                        java.util.Map<Integer, String> schedule = new java.util.HashMap<>();
+                        try { schedule = scheduleRepo.loadSchedule(user.getUsername()); } catch (Exception ignored) {}
+
+                        rows.add(new Object[]{ user, latest, todayShift, schedule });
                     }
                 } catch (Exception ex) {
                     errorMsg = ex.getMessage();
                 }
-                return null;
+                return rows;
             }
 
             @Override
             protected void done() {
+                try {
+                    java.util.List<Object[]> rows = get();
+                    for (Object[] row : rows) {
+                        UserAccount user     = (UserAccount) row[0];
+                        StaffShift latest    = (StaffShift)  row[1];
+                        StaffShift todayShift= (StaffShift)  row[2];
+                        @SuppressWarnings("unchecked")
+                        java.util.Map<Integer, String> schedule =
+                                (java.util.Map<Integer, String>) row[3];
+                        staffCardsPanel.add(buildStaffCard(user, latest, todayShift, schedule));
+                    }
+                    if (currentRole == Role.ADMIN) {
+                        staffCardsPanel.add(buildAddStaffCard());
+                    }
+                } catch (Exception ignored) {}
                 staffCardsPanel.revalidate();
                 staffCardsPanel.repaint();
                 if (errorMsg != null) {
@@ -858,130 +894,301 @@ public class StaffPanel extends JPanel {
         }.execute();
     }
 
-    private JPanel buildStaffCard(UserAccount user, StaffShift latestShift) {
-        JPanel card = new JPanel();
-        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
-        card.setBackground(CARD_BG);
-        card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(CARD_BORDER),
-                new EmptyBorder(16, 16, 12, 16)));
+    private JPanel buildStaffCard(UserAccount user, StaffShift latestShift,
+            StaffShift todayShift, java.util.Map<Integer, String> schedule) {
+        boolean isActive = latestShift != null && latestShift.getEndedAt() == null
+                && !"absent".equals(latestShift.getStatus()) && !"late".equals(latestShift.getStatus());
+        boolean isLate   = latestShift != null && "late".equals(latestShift.getStatus());
+        boolean isAbsent = latestShift != null && "absent".equals(latestShift.getStatus());
+        Color accentLeft = isActive ? STATUS_GREEN : isLate ? STATUS_ORANGE : isAbsent ? STATUS_RED : STATUS_GRAY;
 
-        // ── Top row: avatar + name/role + status badge ──
-        JPanel topRow = new JPanel(new BorderLayout(8, 0));
+        // ── Rounded card panel with custom paint ──────────────────
+        JPanel card = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int arc = 12, w = getWidth(), h = getHeight();
+                g2.setColor(CARD_BG);
+                g2.fillRoundRect(0, 0, w - 1, h - 1, arc, arc);
+                g2.setColor(CARD_BORDER);
+                g2.setStroke(new BasicStroke(1f));
+                g2.drawRoundRect(0, 0, w - 1, h - 1, arc, arc);
+                g2.setClip(new java.awt.geom.RoundRectangle2D.Float(0, 0, w, h, arc, arc));
+                g2.setColor(accentLeft);
+                g2.fillRect(0, 0, 4, h);
+                g2.dispose();
+            }
+        };
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setOpaque(false);
+        card.setBorder(new EmptyBorder(14, 16, 12, 12));
+
+        // ── Top row: avatar + name/role-badge + edit/delete (top-right) ──
+        JPanel topRow = new JPanel(new BorderLayout(10, 0));
         topRow.setOpaque(false);
 
-        JLabel avatar = createAvatarLabel(user, 42, user.getRole() == Role.ADMIN ? ACCENT_BLUE : STATUS_GREEN);
+        // Avatar — first letter of full name or username
+        String displayName = (user.getFullName() != null && !user.getFullName().isEmpty())
+                ? user.getFullName() : user.getUsername();
+        Color avatarColor = user.getRole() == Role.ADMIN ? ACCENT_BLUE : STATUS_GREEN;
+        JLabel avatar = createAvatarLabel(user, 48, avatarColor);
 
+        // Name + role pill
         JPanel nameStack = new JPanel();
         nameStack.setLayout(new BoxLayout(nameStack, BoxLayout.Y_AXIS));
         nameStack.setOpaque(false);
 
-        JLabel nameLabel = new JLabel(user.getFullName() != null && !user.getFullName().isEmpty()
-                ? user.getFullName()
-                : user.getUsername());
+        JLabel nameLabel = new JLabel(displayName);
         nameLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
         nameLabel.setForeground(TEXT_PRIMARY);
 
-        JLabel roleLabel = new JLabel(user.getRole().name());
-        roleLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        roleLabel.setForeground(TEXT_SECONDARY);
+        JLabel rolePill = buildRolePill(user.getRole());
 
         nameStack.add(nameLabel);
-        nameStack.add(roleLabel);
+        nameStack.add(Box.createVerticalStrut(3));
+        nameStack.add(rolePill);
 
-        // Status badge
-        JLabel statusBadge = buildStatusBadge(latestShift);
-        statusBadge.setPreferredSize(new Dimension(70, 22));
-
-        topRow.add(avatar, BorderLayout.WEST);
-        topRow.add(nameStack, BorderLayout.CENTER);
-        topRow.add(statusBadge, BorderLayout.EAST);
-
-        // ── Schedule info ──
-        JPanel infoRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        infoRow.setOpaque(false);
-        JLabel schedLabel = new JLabel("Set shift TBD  |  36 hrs/week");
-        schedLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        schedLabel.setForeground(TEXT_SECONDARY);
-        infoRow.add(schedLabel);
-
-        // ── Quick action buttons ──
-        JPanel actionRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        actionRow.setOpaque(false);
-
-        JButton lateBtn = new JButton("Mark As Late");
-        lateBtn.setFont(new Font("Segoe UI", Font.BOLD, 10));
-        lateBtn.setForeground(STATUS_ORANGE);
-        lateBtn.setBackground(BG_ORANGE);
-        lateBtn.setBorder(BorderFactory.createEmptyBorder(5, 12, 5, 12));
-        lateBtn.setFocusPainted(false);
-        lateBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        lateBtn.putClientProperty("appTheme.variant", "text");
-        lateBtn.addActionListener(e -> onMarkAsLate(user.getUsername()));
-
-        JButton absentBtn = new JButton("Absent");
-        absentBtn.setFont(new Font("Segoe UI", Font.BOLD, 10));
-        absentBtn.setForeground(STATUS_RED);
-        absentBtn.setBackground(BG_RED);
-        absentBtn.setBorder(BorderFactory.createEmptyBorder(5, 12, 5, 12));
-        absentBtn.setFocusPainted(false);
-        absentBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        absentBtn.putClientProperty("appTheme.variant", "text");
-        absentBtn.addActionListener(e -> onMarkAsAbsent(user.getUsername()));
-
-        actionRow.add(lateBtn);
-        actionRow.add(absentBtn);
-
-        boolean hasActiveShift = latestShift != null && latestShift.getEndedAt() == null
-                && !"absent".equals(latestShift.getStatus()) && !"late".equals(latestShift.getStatus());
-        boolean hasLateShift = latestShift != null && "late".equals(latestShift.getStatus());
-        boolean hasAbsentShift = latestShift != null && "absent".equals(latestShift.getStatus());
-
-        lateBtn.setEnabled(hasActiveShift);
-        absentBtn.setEnabled(hasActiveShift || hasLateShift);
-
-        // ── Bottom icon buttons ──
-        JPanel iconRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        // Edit + Delete icon buttons — top-right corner
+        JPanel iconRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
         iconRow.setOpaque(false);
 
-        JButton editBtn = new JButton(pencilIcon());
-        editBtn.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        editBtn.setForeground(new Color(0xCA8A04));
-        editBtn.setBackground(new Color(0xFEF9C3));
-        editBtn.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
-        editBtn.setFocusPainted(false);
-        editBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        JButton editBtn = buildIconBtn(pencilIcon(), new Color(0xCA8A04), new Color(0xFEF9C3));
         editBtn.setToolTipText("Edit profile");
-        editBtn.addActionListener(e -> onViewUserDetails(user.getUsername()));
+        editBtn.addActionListener(e -> onViewUserDetails(user));
 
-        JButton deleteBtn = new JButton(trashIcon());
-        deleteBtn.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        deleteBtn.setForeground(STATUS_RED);
-        deleteBtn.setBackground(BG_RED);
-        deleteBtn.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
-        deleteBtn.setFocusPainted(false);
-        deleteBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        JButton deleteBtn = buildIconBtn(trashIcon(), STATUS_RED, BG_RED);
         deleteBtn.setToolTipText("Delete staff");
         deleteBtn.addActionListener(e -> onDeleteUser(user.getUsername()));
 
         iconRow.add(editBtn);
         iconRow.add(deleteBtn);
 
-        card.add(topRow);
-        card.add(Box.createVerticalStrut(8));
-        card.add(infoRow);
+        // Right column: status badge on top, icons below
+        JPanel rightCol = new JPanel();
+        rightCol.setLayout(new BoxLayout(rightCol, BoxLayout.Y_AXIS));
+        rightCol.setOpaque(false);
 
-        JPanel bottomStack = new JPanel();
-        bottomStack.setLayout(new BoxLayout(bottomStack, BoxLayout.Y_AXIS));
-        bottomStack.setOpaque(false);
-        bottomStack.add(actionRow);
-        bottomStack.add(Box.createVerticalStrut(4));
-        bottomStack.add(iconRow);
+        JLabel statusBadge = buildStatusBadge(latestShift);
+        statusBadge.setAlignmentX(Component.RIGHT_ALIGNMENT);
+        iconRow.setAlignmentX(Component.RIGHT_ALIGNMENT);
+        rightCol.add(statusBadge);
+        rightCol.add(Box.createVerticalGlue());
+        rightCol.add(iconRow);
+
+        topRow.add(avatar, BorderLayout.WEST);
+        topRow.add(nameStack, BorderLayout.CENTER);
+        topRow.add(rightCol, BorderLayout.EAST);
+
+        // ── Today's shift time ────────────────────────────────────
+        String shiftText = buildTodayShiftText(todayShift);
+        JLabel shiftLabel = new JLabel(shiftText);
+        shiftLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        shiftLabel.setForeground(todayShift != null ? TEXT_PRIMARY : TEXT_SECONDARY);
+
+        // ── Weekly schedule summary ───────────────────────────────
+        String schedSummary = buildScheduleSummary(schedule);
+        JLabel schedLabel = new JLabel(schedSummary);
+        schedLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        schedLabel.setForeground(TEXT_SECONDARY);
+
+        JPanel infoBlock = new JPanel();
+        infoBlock.setLayout(new BoxLayout(infoBlock, BoxLayout.Y_AXIS));
+        infoBlock.setOpaque(false);
+        infoBlock.add(shiftLabel);
+        infoBlock.add(Box.createVerticalStrut(2));
+        infoBlock.add(schedLabel);
+
+        // ── Action buttons (rounded, filled) ─────────────────────
+        boolean hasActiveShift = latestShift != null && latestShift.getEndedAt() == null
+                && !"absent".equals(latestShift.getStatus()) && !"late".equals(latestShift.getStatus());
+        boolean hasLateShift   = latestShift != null && "late".equals(latestShift.getStatus());
+
+        JButton lateBtn   = buildRoundedActionBtn("Mark As Late",
+                new Color(0xF59E0B), new Color(0xD97706), Color.WHITE);
+        JButton absentBtn = buildRoundedActionBtn("Absent",
+                new Color(0xEF4444), new Color(0xDC2626), Color.WHITE);
+
+        lateBtn.addActionListener(e -> onMarkAsLate(user.getUsername()));
+        absentBtn.addActionListener(e -> onMarkAsAbsent(user.getUsername()));
+        lateBtn.setEnabled(hasActiveShift);
+        absentBtn.setEnabled(hasActiveShift || hasLateShift);
+
+        JPanel actionRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        actionRow.setOpaque(false);
+        actionRow.add(lateBtn);
+        actionRow.add(absentBtn);
+
+        // ── Assemble card ─────────────────────────────────────────
+        card.add(topRow);
+        card.add(Box.createVerticalStrut(10));
+        card.add(infoBlock);
         card.add(Box.createVerticalStrut(8));
-        card.add(bottomStack);
+        card.add(actionRow);
         card.add(Box.createVerticalGlue());
 
         return card;
+    }
+
+    /** Dashed placeholder card that triggers Add Staff. */
+    private JPanel buildAddStaffCard() {
+        JPanel card = new JPanel(new GridBagLayout()) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int arc = 12, w = getWidth(), h = getHeight();
+                g2.setColor(new Color(0xF9FAFB));
+                g2.fillRoundRect(0, 0, w - 1, h - 1, arc, arc);
+                float[] dash = { 6f, 4f };
+                g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT,
+                        BasicStroke.JOIN_MITER, 10f, dash, 0f));
+                g2.setColor(new Color(0xCBD5E1));
+                g2.drawRoundRect(1, 1, w - 3, h - 3, arc, arc);
+                g2.dispose();
+            }
+        };
+        card.setOpaque(false);
+        card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+        JLabel lbl = new JLabel("+ Add Staff", SwingConstants.CENTER);
+        lbl.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        lbl.setForeground(new Color(0x94A3B8));
+        card.add(lbl);
+
+        card.addMouseListener(new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) { onCreateAccount(); }
+            @Override public void mouseEntered(MouseEvent e) {
+                lbl.setForeground(ACCENT_BLUE); card.repaint();
+            }
+            @Override public void mouseExited(MouseEvent e) {
+                lbl.setForeground(new Color(0x94A3B8)); card.repaint();
+            }
+        });
+        return card;
+    }
+
+    /** Role pill badge — rounded, colored background. */
+    private JLabel buildRolePill(Role role) {
+        boolean admin = role == Role.ADMIN;
+        Color bg = admin ? new Color(0xDBEAFE) : new Color(0xD1FAE5);
+        Color fg = admin ? new Color(0x1E40AF) : new Color(0x065F46);
+        String text = admin ? "Admin" : "Staff";
+
+        JLabel pill = new JLabel(text, SwingConstants.CENTER) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(bg);
+                g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, getHeight(), getHeight());
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        pill.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        pill.setForeground(fg);
+        pill.setOpaque(false);
+        pill.setBorder(new EmptyBorder(2, 8, 2, 8));
+        return pill;
+    }
+
+    /** Small icon button with hover tint — no permanent background fill. */
+    private JButton buildIconBtn(javax.swing.Icon icon, Color fg, Color hoverBg) {
+        boolean[] hovered = { false };
+        JButton btn = new JButton(icon) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                if (hovered[0]) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g2.setColor(hoverBg);
+                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
+                    g2.dispose();
+                }
+                super.paintComponent(g);
+            }
+        };
+        btn.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        btn.setForeground(fg);
+        btn.setOpaque(false);
+        btn.setContentAreaFilled(false);
+        btn.setBorderPainted(false);
+        btn.setFocusPainted(false);
+        btn.setBorder(new EmptyBorder(3, 6, 3, 6));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.addMouseListener(new MouseAdapter() {
+            @Override public void mouseEntered(MouseEvent e) { hovered[0] = true;  btn.repaint(); }
+            @Override public void mouseExited(MouseEvent e)  { hovered[0] = false; btn.repaint(); }
+        });
+        return btn;
+    }
+
+    /** Rounded filled action button with hover darkening. */
+    private JButton buildRoundedActionBtn(String label, Color normalBg, Color hoverBg, Color textColor) {
+        boolean[] hovered = { false };
+        JButton btn = new JButton(label) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(isEnabled() ? (hovered[0] ? hoverBg : normalBg) : new Color(0xE2E8F0));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        btn.setForeground(textColor);
+        btn.setOpaque(false);
+        btn.setContentAreaFilled(false);
+        btn.setBorderPainted(false);
+        btn.setFocusPainted(false);
+        btn.setBorder(new EmptyBorder(5, 12, 5, 12));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.addMouseListener(new MouseAdapter() {
+            @Override public void mouseEntered(MouseEvent e) { hovered[0] = true;  btn.repaint(); }
+            @Override public void mouseExited(MouseEvent e)  { hovered[0] = false; btn.repaint(); }
+        });
+        return btn;
+    }
+
+    /** Format today's shift start/end from a StaffShift, or "No Shift Today". */
+    private String buildTodayShiftText(StaffShift shift) {
+        if (shift == null) return "No Shift Today";
+        try {
+            java.time.format.DateTimeFormatter parser =
+                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            java.time.format.DateTimeFormatter display =
+                    java.time.format.DateTimeFormatter.ofPattern("h:mm a");
+            String start = java.time.LocalDateTime.parse(shift.getStartedAt(), parser).format(display);
+            if (shift.getEndedAt() != null && !shift.getEndedAt().isEmpty()) {
+                String end = java.time.LocalDateTime.parse(shift.getEndedAt(), parser).format(display);
+                return "Today's Shift: " + start + " – " + end;
+            }
+            return "Today's Shift: " + start + " – ongoing";
+        } catch (Exception e) {
+            return "Today's Shift: " + shift.getStartedAt();
+        }
+    }
+
+    /** Summarize weekly schedule from day map, e.g. "Mon–Fri: Morning  |  2 days off". */
+    private String buildScheduleSummary(java.util.Map<Integer, String> schedule) {
+        if (schedule == null || schedule.isEmpty()) return "No schedule set";
+        long working = schedule.values().stream()
+                .filter(v -> v != null && !"off".equalsIgnoreCase(v) && !"rest".equalsIgnoreCase(v))
+                .count();
+        if (working == 0) return "All days off";
+        // Dominant shift type
+        java.util.Map<String, Long> freq = schedule.values().stream()
+                .filter(v -> v != null && !"off".equalsIgnoreCase(v) && !"rest".equalsIgnoreCase(v))
+                .collect(java.util.stream.Collectors.groupingBy(
+                        v -> v.substring(0, 1).toUpperCase() + v.substring(1).toLowerCase(),
+                        java.util.stream.Collectors.counting()));
+        String dominant = freq.entrySet().stream()
+                .max(java.util.Map.Entry.comparingByValue())
+                .map(java.util.Map.Entry::getKey).orElse("Shift");
+        return working + " day" + (working != 1 ? "s" : "") + "/wk · " + dominant;
     }
 
     private JLabel createAvatarLabel(UserAccount user, int size, Color fallbackColor) {
@@ -1002,7 +1209,9 @@ public class StaffPanel extends JPanel {
         } catch (Exception ignored) {
         }
 
-        JLabel avatar = new JLabel(String.valueOf(Character.toUpperCase(user.getUsername().charAt(0)))) {
+        String _initSrc = (user.getFullName() != null && !user.getFullName().isEmpty())
+                ? user.getFullName() : user.getUsername();
+        JLabel avatar = new JLabel(String.valueOf(Character.toUpperCase(_initSrc.charAt(0)))) {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -1168,7 +1377,7 @@ public class StaffPanel extends JPanel {
 
     private JPanel createUsersSubPanel() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(new EmptyBorder(8, 8, 8, 8));
+        panel.setBorder(new EmptyBorder(12, 16, 12, 16));
 
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT));
         buttons.add(createAccountBtn);
@@ -1180,6 +1389,13 @@ public class StaffPanel extends JPanel {
 
         usersTable.setModel(usersModel);
         usersTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        usersTable.setRowHeight(36);
+        AppTheme.applyTableDefaults(usersTable);
+        // Staff ID(70), Username fills, Full Name fills, Role(80), Gender(70), Mobile(110), Created At(130)
+        int[] usersCols = { 70, 0, 0, 80, 70, 110, 130 };
+        for (int i = 0; i < usersCols.length; i++) {
+            if (usersCols[i] > 0) usersTable.getColumnModel().getColumn(i).setPreferredWidth(usersCols[i]);
+        }
         TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(usersModel);
         usersTable.setRowSorter(sorter);
 
@@ -1207,7 +1423,7 @@ public class StaffPanel extends JPanel {
 
     private JPanel createPasswordRequestsPanel() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(new EmptyBorder(8, 8, 8, 8));
+        panel.setBorder(new EmptyBorder(12, 16, 12, 16));
 
         boolean isAdmin = currentRole == Role.ADMIN;
 
@@ -1275,13 +1491,19 @@ public class StaffPanel extends JPanel {
         };
         attendanceTable = new JTable(attendanceModel);
         attendanceTable.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        attendanceTable.setRowHeight(32);
+        attendanceTable.setRowHeight(36);
         attendanceTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        attendanceTable.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 11));
-        attendanceTable.getTableHeader().setBackground(new Color(0xF8FAFC));
+        AppTheme.applyTableDefaults(attendanceTable);
+        // Set preferred column widths: Staff Name fills, others fixed
+        int[] attendanceCols = { 0, 110, 90, 90, 90, 90 }; // 0 = fill
+        for (int i = 1; i < attendanceCols.length; i++) {
+            attendanceTable.getColumnModel().getColumn(i).setPreferredWidth(attendanceCols[i]);
+        }
+        // Colored status badge on the Status column (index 5)
+        attendanceTable.getColumnModel().getColumn(5).setCellRenderer(new AttendanceStatusRenderer());
 
         JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(new EmptyBorder(8, 8, 8, 8));
+        panel.setBorder(new EmptyBorder(12, 16, 12, 16));
 
         if (currentRole == Role.ADMIN) {
             panel.add(buildAttendanceControlBar(), BorderLayout.NORTH);
@@ -1550,7 +1772,6 @@ public class StaffPanel extends JPanel {
             lbl.setBackground(isToday ? new Color(0x2563EB) : Color.WHITE);
             lbl.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             lbl.setPreferredSize(new Dimension(34, 28));
-            int d = day;
             lbl.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseClicked(MouseEvent e) {
@@ -1829,13 +2050,17 @@ public class StaffPanel extends JPanel {
         onViewUserDetails(uname);
     }
 
+    private void onViewUserDetails(UserAccount u) {
+        Window owner = SwingUtilities.getWindowAncestor(this);
+        new StaffProfileDialog(owner, u, accountRoleRepository,
+                profilePictureRepository, scheduleRepo, username, this::refreshAll).setVisible(true);
+    }
+
     private void onViewUserDetails(String uname) {
         try {
             for (UserAccount u : accountRoleRepository.listUsers()) {
                 if (u.getUsername().equals(uname)) {
-                    Window owner = SwingUtilities.getWindowAncestor(this);
-                    new StaffProfileDialog(owner, u, accountRoleRepository,
-                            profilePictureRepository, scheduleRepo, username, this::refreshAll).setVisible(true);
+                    onViewUserDetails(u);
                     return;
                 }
             }
@@ -2234,6 +2459,31 @@ public class StaffPanel extends JPanel {
                 }
             }
         }.execute();
+    }
+
+    // ─── Status badge renderer for attendance/shift status ───────
+    private static class AttendanceStatusRenderer extends javax.swing.table.DefaultTableCellRenderer {
+        @Override
+        public java.awt.Component getTableCellRendererComponent(
+                JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int col) {
+            super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, col);
+            setHorizontalAlignment(SwingConstants.CENTER);
+            if (!isSelected && value != null) {
+                String s = value.toString().toLowerCase();
+                switch (s) {
+                    case "active"    -> { setBackground(new Color(0xD1FAE5)); setForeground(new Color(0x065F46)); }
+                    case "completed" -> { setBackground(new Color(0xDBEAFE)); setForeground(new Color(0x1E40AF)); }
+                    case "late"      -> { setBackground(new Color(0xFEF3C7)); setForeground(new Color(0x92400E)); }
+                    case "absent"    -> { setBackground(new Color(0xFEE2E2)); setForeground(new Color(0x991B1B)); }
+                    default          -> { setBackground(new Color(0xF3F4F6)); setForeground(new Color(0x6B7280)); }
+                }
+                setOpaque(true);
+            } else if (!isSelected) {
+                setBackground(table.getBackground());
+                setForeground(table.getForeground());
+            }
+            return this;
+        }
     }
 
     // ─── Status badge renderer for leave requests ────────────────

@@ -342,6 +342,12 @@ public class Login extends javax.swing.JFrame {
 
         if (UserDataManager.verifyCredentials(username, password)) {
             UserDataManager.Role userRole = UserDataManager.getUserRole(username);
+            try {
+                new persistence.sqlite.SQLiteStaffShiftRepository().startShift(username);
+            } catch (Exception ex) {
+                Logger.getLogger(Login.class.getName())
+                        .log(Level.WARNING, "Could not auto-start shift for " + username, ex);
+            }
             new POSSystem(username, userRole).setVisible(true);
             this.dispose();
         } else {

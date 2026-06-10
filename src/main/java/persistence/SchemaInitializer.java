@@ -192,8 +192,14 @@ public final class SchemaInitializer {
                     + "end_date TEXT NOT NULL, "
                     + "reason TEXT, "
                     + "status TEXT NOT NULL DEFAULT 'pending', "
-                    + "created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))"
+                    + "created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')), "
+                    + "resolved_at TEXT"
                     + ")");
+            // Migration: add resolved_at to existing leave request tables
+            try {
+                statement.execute("ALTER TABLE staff_leave_requests ADD COLUMN resolved_at TEXT");
+            } catch (java.sql.SQLException ignored) {
+            }
             // Staff reports for Admin notification
             statement.execute("CREATE TABLE IF NOT EXISTS staff_reports ("
                     + "id INTEGER PRIMARY KEY AUTOINCREMENT, "

@@ -14,15 +14,15 @@ import javax.swing.border.EmptyBorder;
 public class AboutModule extends JPanel {
 
     // ── Font system (mirrors OrderingPanel) ───────────────────────────────────
-    private static final Font FONT_TITLE = new Font("Segoe UI", Font.BOLD, 16);
-    private static final Font FONT_SUBTITLE = new Font("Segoe UI", Font.BOLD, 13);
+    private static final Font FONT_TITLE = new Font("Segoe UI", Font.PLAIN, 16);
+    private static final Font FONT_SUBTITLE = new Font("Segoe UI", Font.PLAIN, 13);
     private static final Font FONT_BODY = new Font("Segoe UI", Font.PLAIN, 12);
     private static final Font FONT_SMALL = new Font("Segoe UI", Font.PLAIN, 11);
-    private static final Font FONT_BOLD_SM = new Font("Segoe UI", Font.BOLD, 11);
+    private static final Font FONT_BOLD_SM = new Font("Segoe UI", Font.PLAIN, 11);
     private static final Font FONT_XSMALL = new Font("Segoe UI", Font.PLAIN, 9);
-    private static final Font FONT_BADGE = new Font("Segoe UI", Font.BOLD, 9);
+    private static final Font FONT_BADGE = new Font("Segoe UI", Font.PLAIN, 9);
     // App-name display size — one step above FONT_TITLE, kept as a named constant
-    private static final Font FONT_DISPLAY = new Font("Segoe UI", Font.BOLD, 24);
+    private static final Font FONT_DISPLAY = new Font("Segoe UI", Font.PLAIN, 24);
 
     public AboutModule() {
         super(new BorderLayout());

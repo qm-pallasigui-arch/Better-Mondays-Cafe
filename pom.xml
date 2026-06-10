@@ -45,7 +45,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Target a widely-supported Java release -->
         <maven.compiler.release>17</maven.compiler.release>
-        <exec.mainClass>com.mycompany.oop.Login</exec.mainClass>
+        <exec.mainClass>loginregister.Login</exec.mainClass>
     </properties>
 
     <build>

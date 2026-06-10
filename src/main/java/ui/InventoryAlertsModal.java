@@ -8,44 +8,52 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Path2D;
+import java.awt.geom.RoundRectangle2D;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class InventoryAlertsModal extends JDialog {
 
-    // ── Palette (mirrors InventoryPanel exactly) ──────────────────────────────
+    // ── Palette ───────────────────────────────────────────────────────────────
     private static final Color BG_PAGE = Color.WHITE;
     private static final Color BG_SURFACE = new Color(0xF9FAFB);
-    private static final Color BORDER_COLOR = new Color(0xE5E7EB);
-    private static final Color TEXT_PRIMARY = new Color(0x111827);
-    private static final Color TEXT_SECONDARY = new Color(0x374151);
+    private static final Color BORDER = new Color(0xE5E7EB);
+    private static final Color TEXT_PRI = new Color(0x111827);
+    private static final Color TEXT_SEC = new Color(0x374151);
     private static final Color TEXT_MUTED = new Color(0x9CA3AF);
     private static final Color ACCENT = new Color(0x1D4ED8);
-    private static final Color ACCENT_HOVER = new Color(0x1E40AF);
+    private static final Color ACCENT_HOV = new Color(0x1E40AF);
     private static final Color ROW_BASE = Color.WHITE;
     private static final Color ROW_ALT = new Color(0xF9FAFB);
 
-    private static final Color ALERT_CRITICAL_BG = new Color(0xFEE2E2);
-    private static final Color ALERT_CRITICAL_FG = new Color(0xDC2626);
-    private static final Color ALERT_WARN_BG = new Color(0xFEF3C7);
-    private static final Color ALERT_WARN_FG = new Color(0xD97706);
-    private static final Color ALERT_INFO_BG = new Color(0xE0F2FE);
-    private static final Color ALERT_INFO_FG = new Color(0x0284C7);
-    private static final Color STATUS_GOOD_BG = new Color(0xDCFCE7);
-    private static final Color STATUS_GOOD_FG = new Color(0x16A34A);
+    private static final Color CRIT_BG = new Color(0xFEE2E2);
+    private static final Color CRIT_FG = new Color(0xDC2626);
+    private static final Color WARN_BG = new Color(0xFEF3C7);
+    private static final Color WARN_FG = new Color(0xD97706);
+    private static final Color INFO_BG = new Color(0xE0F2FE);
+    private static final Color INFO_FG = new Color(0x0284C7);
+    private static final Color GOOD_BG = new Color(0xDCFCE7);
+    private static final Color GOOD_FG = new Color(0x16A34A);
+
+    // Group header backgrounds
+    private static final Color CRIT_HDR_BG = new Color(0xFEF2F2);
+    private static final Color WARN_HDR_BG = new Color(0xFFFBEB);
+    private static final Color INFO_HDR_BG = new Color(0xF0F9FF);
 
     // ── Fonts ─────────────────────────────────────────────────────────────────
-    private static final Font FONT_TITLE = new Font("Segoe UI", Font.BOLD, 17);
-    private static final Font FONT_BODY = new Font("Segoe UI", Font.PLAIN, 13);
-    private static final Font FONT_BOLD = new Font("Segoe UI", Font.BOLD, 13);
-    private static final Font FONT_SMALL = new Font("Segoe UI", Font.PLAIN, 11);
-    private static final Font FONT_BADGE = new Font("Segoe UI", Font.BOLD, 10);
-    private static final Font FONT_HEADER = new Font("Segoe UI", Font.BOLD, 11);
+    private static final Font F_TITLE = new Font("Segoe UI", Font.PLAIN, 17);
+    private static final Font F_BODY = new Font("Segoe UI", Font.PLAIN, 13);
+    private static final Font F_BOLD = new Font("Segoe UI", Font.BOLD, 13);
+    private static final Font F_SMALL = new Font("Segoe UI", Font.PLAIN, 11);
+    private static final Font F_BADGE = new Font("Segoe UI", Font.BOLD, 10);
+    private static final Font F_COUNT = new Font("Segoe UI", Font.BOLD, 19);
+    private static final Font F_HDR = new Font("Segoe UI", Font.BOLD, 12);
 
     // ── Constructor ───────────────────────────────────────────────────────────
     public InventoryAlertsModal(Window owner, List<Notification> alerts) {
-        super(owner, "Inventory Alerts", ModalityType.APPLICATION_MODAL);
+        super(owner, "Inventory alerts", ModalityType.APPLICATION_MODAL);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
-        setResizable(false);
+        setResizable(true); // allow user to widen if messages are long
 
         boolean hasCrit = alerts.stream()
                 .anyMatch(n -> n.getSeverity() == Notification.Severity.CRITICAL);
@@ -58,288 +66,450 @@ public class InventoryAlertsModal extends JDialog {
 
         setContentPane(root);
         pack();
-        setMinimumSize(new Dimension(500, 260));
+        setMinimumSize(new Dimension(800, 280));
+        // Start wider so long messages fit without scrolling sideways
+        setSize(Math.max(620, getWidth()), getHeight());
         setLocationRelativeTo(owner);
     }
 
     // ── Top bar ───────────────────────────────────────────────────────────────
     private JPanel buildTopBar(List<Notification> alerts, boolean hasCrit) {
-        JPanel topBar = new JPanel(new BorderLayout());
-        topBar.setBackground(BG_PAGE);
-        topBar.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER_COLOR),
-                new EmptyBorder(18, 24, 16, 20)));
+        JPanel bar = new JPanel(new BorderLayout());
+        bar.setBackground(BG_PAGE);
+        bar.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER),
+                new EmptyBorder(16, 20, 14, 16)));
 
-        JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        titleRow.setOpaque(false);
+        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        left.setOpaque(false);
 
-        // Bell icon (painted, no emoji)
-        titleRow.add(makeBellIcon(20, alerts.isEmpty() ? STATUS_GOOD_FG
-                : hasCrit ? ALERT_CRITICAL_FG : ALERT_WARN_FG));
+        Color bellColor = alerts.isEmpty() ? GOOD_FG : hasCrit ? CRIT_FG : WARN_FG;
+        left.add(makeBellIcon(20, bellColor));
 
-        JLabel titleLbl = new JLabel("Inventory Alerts");
-        titleLbl.setFont(FONT_TITLE);
-        titleLbl.setForeground(TEXT_PRIMARY);
-        titleRow.add(titleLbl);
+        JLabel title = new JLabel("Inventory alerts");
+        title.setFont(F_TITLE);
+        title.setForeground(TEXT_PRI);
+        left.add(title);
 
         if (!alerts.isEmpty()) {
-            JLabel countBadge = new JLabel(String.valueOf(alerts.size())) {
-                @Override
-                protected void paintComponent(Graphics g) {
-                    Graphics2D g2 = aa(g);
-                    g2.setColor(hasCrit ? ALERT_CRITICAL_FG : ALERT_WARN_FG);
-                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), getHeight(), getHeight());
-                    super.paintComponent(g);
-                    g2.dispose();
-                }
-            };
-            countBadge.setFont(new Font("Segoe UI", Font.BOLD, 11));
-            countBadge.setForeground(Color.WHITE);
-            countBadge.setHorizontalAlignment(SwingConstants.CENTER);
-            countBadge.setOpaque(false);
-            countBadge.setPreferredSize(new Dimension(alerts.size() > 9 ? 28 : 22, 18));
-            titleRow.add(countBadge);
+            left.add(makeCountBadge(alerts.size(), hasCrit ? CRIT_FG : WARN_FG));
         }
 
-        topBar.add(titleRow, BorderLayout.WEST);
-        topBar.add(buildXButton(), BorderLayout.EAST);
-        return topBar;
+        bar.add(left, BorderLayout.WEST);
+        bar.add(buildXBtn(), BorderLayout.EAST);
+        return bar;
     }
 
-    // ── Center: summary strip + alert list ───────────────────────────────────
+    private JLabel makeCountBadge(int count, Color bg) {
+        JLabel lbl = new JLabel(String.valueOf(count)) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = aa(g);
+                g2.setColor(bg);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), getHeight(), getHeight());
+                super.paintComponent(g);
+                g2.dispose();
+            }
+        };
+        lbl.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        lbl.setForeground(Color.WHITE);
+        lbl.setHorizontalAlignment(SwingConstants.CENTER);
+        lbl.setOpaque(false);
+        int w = count >= 100 ? 32 : count > 9 ? 26 : 20;
+        lbl.setPreferredSize(new Dimension(w, 18));
+        return lbl;
+    }
+
+    // ── Center: summary strip + grouped collapsible sections ──────────────────
     private JPanel buildCenter(List<Notification> alerts) {
         JPanel center = new JPanel(new BorderLayout());
         center.setBackground(BG_PAGE);
 
-        if (!alerts.isEmpty()) {
-            long critCount = alerts.stream().filter(n -> n.getSeverity() == Notification.Severity.CRITICAL).count();
-            long warnCount = alerts.stream().filter(n -> n.getSeverity() == Notification.Severity.WARNING).count();
-            long infoCount = alerts.size() - critCount - warnCount;
+        List<Notification> crits = alerts.stream()
+                .filter(n -> n.getSeverity() == Notification.Severity.CRITICAL)
+                .collect(Collectors.toList());
+        List<Notification> warns = alerts.stream()
+                .filter(n -> n.getSeverity() == Notification.Severity.WARNING)
+                .collect(Collectors.toList());
+        List<Notification> infos = alerts.stream()
+                .filter(n -> n.getSeverity() == Notification.Severity.INFO)
+                .collect(Collectors.toList());
 
+        if (!alerts.isEmpty()) {
             JPanel strip = new JPanel(new GridLayout(1, 3, 8, 0));
             strip.setBackground(BG_SURFACE);
-            strip.setBorder(new EmptyBorder(12, 24, 12, 24));
-            strip.add(buildSummaryChip("Critical", critCount, Notification.Severity.CRITICAL));
-            strip.add(buildSummaryChip("Warning", warnCount, Notification.Severity.WARNING));
-            strip.add(buildSummaryChip("Info", infoCount, Notification.Severity.INFO));
+            strip.setBorder(new EmptyBorder(10, 20, 10, 20));
+            strip.add(buildChip("Critical", crits.size(), Notification.Severity.CRITICAL));
+            strip.add(buildChip("Warning", warns.size(), Notification.Severity.WARNING));
+            strip.add(buildChip("Info", infos.size(), Notification.Severity.INFO));
 
-            JPanel stripWrap = new JPanel(new BorderLayout());
-            stripWrap.setBackground(BG_SURFACE);
-            stripWrap.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER_COLOR));
-            stripWrap.add(strip);
-            center.add(stripWrap, BorderLayout.NORTH);
+            JPanel wrap = new JPanel(new BorderLayout());
+            wrap.setBackground(BG_SURFACE);
+            wrap.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER));
+            wrap.add(strip);
+            center.add(wrap, BorderLayout.NORTH);
         }
 
-        center.add(buildScrollList(alerts), BorderLayout.CENTER);
+        center.add(buildGroupedScrollList(crits, warns, infos), BorderLayout.CENTER);
         return center;
     }
 
-    // ── Scrollable alert list ─────────────────────────────────────────────────
-    private JScrollPane buildScrollList(List<Notification> alerts) {
-        JPanel listPanel = new JPanel();
-        listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
-        listPanel.setBackground(BG_PAGE);
+    // ── Grouped, collapsible scroll list ──────────────────────────────────────
+    private JScrollPane buildGroupedScrollList(
+            List<Notification> crits,
+            List<Notification> warns,
+            List<Notification> infos) {
 
-        if (alerts.isEmpty()) {
-            listPanel.add(buildEmptyState());
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBackground(BG_PAGE);
+
+        boolean anyAlerts = !crits.isEmpty() || !warns.isEmpty() || !infos.isEmpty();
+
+        if (!anyAlerts) {
+            panel.add(buildEmptyState());
         } else {
-            for (int i = 0; i < alerts.size(); i++) {
-                listPanel.add(buildAlertRow(alerts.get(i), i));
-                if (i < alerts.size() - 1) {
-                    JSeparator sep = new JSeparator();
-                    sep.setForeground(BORDER_COLOR);
-                    sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
-                    sep.setAlignmentX(Component.LEFT_ALIGNMENT);
-                    listPanel.add(sep);
-                }
+            if (!crits.isEmpty()) {
+                panel.add(buildGroup("Critical", crits,
+                        Notification.Severity.CRITICAL, CRIT_FG, CRIT_HDR_BG, true));
+            }
+            if (!warns.isEmpty()) {
+                panel.add(buildGroup("Warning", warns,
+                        Notification.Severity.WARNING, WARN_FG, WARN_HDR_BG, crits.isEmpty()));
+            }
+            if (!infos.isEmpty()) {
+                panel.add(buildGroup("Info", infos,
+                        Notification.Severity.INFO, INFO_FG, INFO_HDR_BG,
+                        crits.isEmpty() && warns.isEmpty()));
             }
         }
 
-        JScrollPane scroll = new JScrollPane(listPanel);
+        JScrollPane scroll = new JScrollPane(panel);
         scroll.setBorder(BorderFactory.createEmptyBorder());
-        scroll.setPreferredSize(new Dimension(500, Math.min(360, Math.max(140, alerts.size() * 66 + 16))));
+        scroll.setPreferredSize(new Dimension(0, Math.min(420, Math.max(160,
+                (crits.size() + warns.size() + infos.size()) * 58 + 60))));
         scroll.getVerticalScrollBar().setUnitIncrement(16);
         scroll.getViewport().setBackground(BG_PAGE);
+        scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         return scroll;
+    }
+
+    /**
+     * Builds a collapsible group section with a clickable header row.
+     * The body panel contains all alert rows and is shown/hidden on click.
+     *
+     * @param label    e.g. "Critical"
+     * @param items    alerts in this group
+     * @param sev      severity enum value
+     * @param accentFg foreground colour for accent elements
+     * @param headerBg tinted background for the header row
+     * @param expanded whether the section starts open
+     */
+    private JPanel buildGroup(String label, List<Notification> items,
+            Notification.Severity sev, Color accentFg,
+            Color headerBg, boolean expanded) {
+
+        // ── Body panel (the rows, hidden when collapsed) ──────────────────────
+        JPanel body = new JPanel();
+        body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+        body.setBackground(BG_PAGE);
+
+        for (int i = 0; i < items.size(); i++) {
+            body.add(buildRow(items.get(i), i, sev));
+            if (i < items.size() - 1) {
+                JSeparator sep = new JSeparator();
+                sep.setForeground(BORDER);
+                sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
+                sep.setAlignmentX(Component.LEFT_ALIGNMENT);
+                body.add(sep);
+            }
+        }
+        body.setVisible(expanded);
+
+        // ── Chevron arrow (painted inline) ────────────────────────────────────
+        // We store the expanded state in a single-element boolean array so the
+        // lambda can mutate it.
+        final boolean[] open = { expanded };
+
+        JComponent chevron = new JComponent() {
+            {
+                setPreferredSize(new Dimension(16, 16));
+                setOpaque(false);
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = aa(g);
+                g2.setColor(accentFg);
+                g2.setStroke(new BasicStroke(1.8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                int cx = getWidth() / 2, cy = getHeight() / 2;
+                if (open[0]) {
+                    // Pointing down ∨
+                    g2.drawLine(cx - 4, cy - 2, cx, cy + 3);
+                    g2.drawLine(cx, cy + 3, cx + 4, cy - 2);
+                } else {
+                    // Pointing right ›
+                    g2.drawLine(cx - 2, cy - 4, cx + 3, cy);
+                    g2.drawLine(cx + 3, cy, cx - 2, cy + 4);
+                }
+                g2.dispose();
+            }
+        };
+
+        // ── Header row ────────────────────────────────────────────────────────
+        JPanel header = new JPanel(new BorderLayout(10, 0)) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = aa(g);
+                g2.setColor(headerBg);
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                // Left accent stripe
+                g2.setColor(accentFg);
+                g2.fillRect(0, 0, 3, getHeight());
+                g2.dispose();
+            }
+        };
+        header.setOpaque(false);
+        header.setBorder(new EmptyBorder(9, 20, 9, 16));
+        header.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        header.setMaximumSize(new Dimension(Integer.MAX_VALUE, 38));
+        header.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        // Icon + label
+        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        left.setOpaque(false);
+        left.add(makeSeverityIcon(sev, 18));
+
+        JLabel lbl = new JLabel(label + "  ·  " + items.size()
+                + (items.size() == 1 ? " alert" : " alerts"));
+        lbl.setFont(F_HDR);
+        lbl.setForeground(accentFg);
+        left.add(lbl);
+
+        header.add(left, BorderLayout.CENTER);
+        header.add(chevron, BorderLayout.EAST);
+
+        // Toggle on click
+        header.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                open[0] = !open[0];
+                body.setVisible(open[0]);
+                chevron.repaint();
+                // Revalidate the top-level scroll viewport
+                SwingUtilities.invokeLater(() -> {
+                    Container c = header.getParent();
+                    while (c != null && !(c instanceof JScrollPane))
+                        c = c.getParent();
+                    if (c != null) {
+                        c.revalidate();
+                        c.repaint();
+                    }
+                });
+            }
+
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                header.setBackground(headerBg.darker());
+                header.repaint();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                header.setBackground(headerBg);
+                header.repaint();
+            }
+        });
+
+        // ── Section wrapper ───────────────────────────────────────────────────
+        JPanel section = new JPanel();
+        section.setLayout(new BoxLayout(section, BoxLayout.Y_AXIS));
+        section.setOpaque(false);
+        section.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        // Bottom border under the section
+        JPanel headerWrap = new JPanel(new BorderLayout());
+        headerWrap.setOpaque(false);
+        headerWrap.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER));
+        headerWrap.add(header);
+        headerWrap.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        headerWrap.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        section.add(headerWrap);
+        section.add(body);
+
+        // Bottom separator between sections
+        JSeparator secSep = new JSeparator();
+        secSep.setForeground(BORDER);
+        secSep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
+        secSep.setAlignmentX(Component.LEFT_ALIGNMENT);
+        section.add(secSep);
+
+        return section;
     }
 
     // ── Empty state ───────────────────────────────────────────────────────────
     private JPanel buildEmptyState() {
         JPanel outer = new JPanel(new GridBagLayout());
         outer.setBackground(BG_PAGE);
-        outer.setPreferredSize(new Dimension(500, 180));
+        outer.setPreferredSize(new Dimension(0, 180));
 
         JPanel inner = new JPanel();
         inner.setLayout(new BoxLayout(inner, BoxLayout.Y_AXIS));
         inner.setOpaque(false);
 
-        JComponent checkIco = makeCheckCircleIcon(44);
-        checkIco.setAlignmentX(Component.CENTER_ALIGNMENT);
+        JComponent ico = makeCheckCircleIcon(44);
+        ico.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JLabel title = new JLabel("All Clear");
-        title.setFont(FONT_BOLD);
-        title.setForeground(TEXT_PRIMARY);
-        title.setAlignmentX(Component.CENTER_ALIGNMENT);
+        JLabel t = new JLabel("All clear");
+        t.setFont(F_BOLD);
+        t.setForeground(TEXT_PRI);
+        t.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JLabel sub = new JLabel("Inventory looks healthy — no active alerts.");
-        sub.setFont(FONT_BODY);
-        sub.setForeground(TEXT_MUTED);
-        sub.setAlignmentX(Component.CENTER_ALIGNMENT);
+        JLabel s = new JLabel("Inventory looks healthy — no active alerts.");
+        s.setFont(F_BODY);
+        s.setForeground(TEXT_MUTED);
+        s.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        inner.add(Box.createVerticalStrut(16));
-        inner.add(checkIco);
+        inner.add(Box.createVerticalStrut(12));
+        inner.add(ico);
         inner.add(Box.createVerticalStrut(10));
-        inner.add(title);
+        inner.add(t);
         inner.add(Box.createVerticalStrut(4));
-        inner.add(sub);
+        inner.add(s);
         outer.add(inner);
         return outer;
     }
 
     // ── Single alert row ──────────────────────────────────────────────────────
-    private JPanel buildAlertRow(Notification n, int index) {
-        Color accentBg, accentFg;
-        String sevText;
-        switch (n.getSeverity()) {
-            case CRITICAL -> {
-                accentBg = ALERT_CRITICAL_BG;
-                accentFg = ALERT_CRITICAL_FG;
-                sevText = "CRITICAL";
-            }
-            case WARNING -> {
-                accentBg = ALERT_WARN_BG;
-                accentFg = ALERT_WARN_FG;
-                sevText = "WARNING";
-            }
-            default -> {
-                accentBg = ALERT_INFO_BG;
-                accentFg = ALERT_INFO_FG;
-                sevText = "INFO";
-            }
-        }
+    /**
+     * Each row uses a multi-line HTML label for the message so long strings
+     * wrap instead of getting clipped. The row height is therefore variable;
+     * we remove the fixed maximum so the BoxLayout can size it correctly.
+     */
+    private JPanel buildRow(Notification n, int index, Notification.Severity groupSev) {
+        Color fg = sevFg(groupSev);
+        Color bg = sevBg(groupSev);
 
-        JPanel row = new JPanel(new BorderLayout(14, 0));
+        JPanel row = new JPanel(new BorderLayout(12, 0));
         row.setBackground(index % 2 == 0 ? ROW_BASE : ROW_ALT);
-        row.setBorder(new EmptyBorder(13, 24, 13, 20));
-        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 68));
+        row.setBorder(new EmptyBorder(11, 20, 11, 16));
+        // No fixed maximum height — allow wrapping rows to be taller
         row.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        // Left severity bar
-        JPanel bar = new JPanel() {
+        // Left accent bar
+        final Color barColor = fg;
+        JPanel accentBar = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = aa(g);
-                g2.setColor(accentFg);
-                g2.fillRoundRect(0, 4, getWidth(), getHeight() - 8, 4, 4);
+                g2.setColor(barColor);
+                g2.fillRoundRect(0, 4, getWidth(), getHeight() - 8, 3, 3);
                 g2.dispose();
             }
         };
-        bar.setOpaque(false);
-        bar.setPreferredSize(new Dimension(4, 0));
-        row.add(bar, BorderLayout.WEST);
+        accentBar.setOpaque(false);
+        accentBar.setPreferredSize(new Dimension(3, 0));
+        row.add(accentBar, BorderLayout.WEST);
 
-        // Icon + text block
-        JPanel content = new JPanel(new BorderLayout(12, 0));
-        content.setOpaque(false);
+        // Icon + text body
+        JPanel body = new JPanel(new BorderLayout(10, 0));
+        body.setOpaque(false);
 
         JPanel icoWrap = new JPanel(new GridBagLayout());
         icoWrap.setOpaque(false);
-        icoWrap.add(makeSeverityIcon(n.getSeverity(), 32));
-        content.add(icoWrap, BorderLayout.WEST);
+        // Align icon to top of the cell so it stays put when text wraps
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.anchor = GridBagConstraints.NORTH;
+        gbc.insets = new Insets(2, 0, 0, 0);
+        icoWrap.add(makeSeverityIcon(groupSev, 28), gbc);
+        body.add(icoWrap, BorderLayout.WEST);
 
-        JPanel textCol = new JPanel(new BorderLayout(0, 4));
-        textCol.setOpaque(false);
+        // Text column: message only (severity is shown in the group header)
+        // Use an HTML label so the text wraps naturally instead of being clipped.
+        // The wrapping width is driven by the label's preferred width, which
+        // BorderLayout.CENTER gives as "all remaining space".
+        JLabel msg = new JLabel("<html><body style='width:100%'>"
+                + escapeHtml(n.getMessage()) + "</body></html>");
+        msg.setFont(F_BODY);
+        msg.setForeground(TEXT_PRI);
+        // Ensure the label can shrink below its HTML preferred width
+        msg.setMinimumSize(new Dimension(0, 0));
 
-        // Severity badge pill
-        JLabel badge = new JLabel(sevText) {
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = aa(g);
-                g2.setColor(accentBg);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), getHeight(), getHeight());
-                super.paintComponent(g);
-                g2.dispose();
-            }
-        };
-        badge.setFont(FONT_BADGE);
-        badge.setForeground(accentFg);
-        badge.setOpaque(false);
-        badge.setHorizontalAlignment(SwingConstants.CENTER);
-        FontMetrics bfm = badge.getFontMetrics(FONT_BADGE);
-        badge.setPreferredSize(new Dimension(bfm.stringWidth(sevText) + 16, 16));
-
-        JPanel badgeRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        badgeRow.setOpaque(false);
-        badgeRow.add(badge);
-        textCol.add(badgeRow, BorderLayout.NORTH);
-
-        JLabel msgLbl = new JLabel(n.getMessage());
-        msgLbl.setFont(FONT_BODY);
-        msgLbl.setForeground(TEXT_PRIMARY);
-        textCol.add(msgLbl, BorderLayout.CENTER);
-
-        content.add(textCol, BorderLayout.CENTER);
-        row.add(content, BorderLayout.CENTER);
+        body.add(msg, BorderLayout.CENTER);
+        row.add(body, BorderLayout.CENTER);
         return row;
     }
 
+    /** Minimal HTML escaping so message text is safe inside an HTML label. */
+    private static String escapeHtml(String s) {
+        return s.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
+    }
+
     // ── Summary chip ──────────────────────────────────────────────────────────
-    private JPanel buildSummaryChip(String label, long count, Notification.Severity severity) {
-        boolean hasCount = count > 0;
-        Color fg = hasCount ? severityFg(severity) : TEXT_MUTED;
-        Color bg = hasCount ? severityBg(severity) : BG_SURFACE;
+    private JPanel buildChip(String name, long count, Notification.Severity sev) {
+        boolean active = count > 0;
+        Color fg = active ? sevFg(sev) : TEXT_MUTED;
+        Color bg = active ? sevBg(sev) : BG_SURFACE;
 
         JPanel chip = new JPanel(new BorderLayout(8, 0)) {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = aa(g);
                 g2.setColor(bg);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+                g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 8, 8));
                 g2.dispose();
                 super.paintComponent(g);
             }
         };
         chip.setOpaque(false);
-        chip.setBorder(new EmptyBorder(10, 14, 10, 14));
+        chip.setBorder(new EmptyBorder(10, 12, 10, 12));
 
         JPanel icoWrap = new JPanel(new GridBagLayout());
         icoWrap.setOpaque(false);
-        icoWrap.add(hasCount ? makeSeverityIcon(severity, 26) : makeCheckCircleIcon(26));
+        icoWrap.add(active ? makeSeverityIcon(sev, 24) : makeCheckCircleIcon(24));
         chip.add(icoWrap, BorderLayout.WEST);
 
-        JPanel textStack = new JPanel();
-        textStack.setLayout(new BoxLayout(textStack, BoxLayout.Y_AXIS));
-        textStack.setOpaque(false);
+        JPanel stack = new JPanel();
+        stack.setLayout(new BoxLayout(stack, BoxLayout.Y_AXIS));
+        stack.setOpaque(false);
 
         JLabel countLbl = new JLabel(String.valueOf(count));
-        countLbl.setFont(new Font("Segoe UI", Font.BOLD, 19));
+        countLbl.setFont(F_COUNT);
         countLbl.setForeground(fg);
 
-        JLabel nameLbl = new JLabel(label);
-        nameLbl.setFont(FONT_SMALL);
+        JLabel nameLbl = new JLabel(name);
+        nameLbl.setFont(F_SMALL);
         nameLbl.setForeground(fg);
 
-        textStack.add(countLbl);
-        textStack.add(nameLbl);
-        chip.add(textStack, BorderLayout.CENTER);
+        stack.add(countLbl);
+        stack.add(nameLbl);
+        chip.add(stack, BorderLayout.CENTER);
         return chip;
     }
 
     // ── Footer ────────────────────────────────────────────────────────────────
     private JPanel buildFooter() {
-        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 12));
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 10));
         footer.setBackground(BG_PAGE);
-        footer.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, BORDER_COLOR));
-        footer.add(buildCloseBtn("Close"));
+        footer.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, BORDER));
+        footer.add(buildCloseBtn());
         return footer;
     }
 
-    // ── X button (top-right) ──────────────────────────────────────────────────
-    private JButton buildXButton() {
+    // ── X button ─────────────────────────────────────────────────────────────
+    private JButton buildXBtn() {
         JButton btn = new JButton() {
             private boolean hov;
             {
-                setPreferredSize(new Dimension(30, 30));
+                init();
+            }
+
+            private void init() {
+                setPreferredSize(new Dimension(28, 28));
                 setContentAreaFilled(false);
                 setBorderPainted(false);
                 setFocusPainted(false);
@@ -366,8 +536,8 @@ public class InventoryAlertsModal extends JDialog {
                     g2.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
                 }
                 g2.setColor(TEXT_MUTED);
-                g2.setStroke(new BasicStroke(1.8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                int p = 9;
+                g2.setStroke(new BasicStroke(1.7f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                int p = 8;
                 g2.drawLine(p, p, getWidth() - p, getHeight() - p);
                 g2.drawLine(getWidth() - p, p, p, getHeight() - p);
                 g2.dispose();
@@ -376,11 +546,19 @@ public class InventoryAlertsModal extends JDialog {
         return btn;
     }
 
-    // ── Primary close button (footer) ─────────────────────────────────────────
-    private JButton buildCloseBtn(String text) {
-        JButton btn = new JButton(text) {
+    // ── Close button ──────────────────────────────────────────────────────────
+    private JButton buildCloseBtn() {
+        JButton btn = new JButton("Close") {
             private boolean hov;
             {
+                init();
+            }
+
+            private void init() {
+                setContentAreaFilled(false);
+                setBorderPainted(false);
+                setFocusPainted(false);
+                setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
                 addMouseListener(new MouseAdapter() {
                     public void mouseEntered(MouseEvent e) {
                         hov = true;
@@ -398,9 +576,9 @@ public class InventoryAlertsModal extends JDialog {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = aa(g);
-                g2.setColor(hov ? ACCENT_HOVER : ACCENT);
+                g2.setColor(hov ? ACCENT_HOV : ACCENT);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
-                g2.setFont(FONT_BODY);
+                g2.setFont(F_BODY);
                 g2.setColor(Color.WHITE);
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(getText(),
@@ -409,18 +587,17 @@ public class InventoryAlertsModal extends JDialog {
                 g2.dispose();
             }
         };
-        btn.setPreferredSize(new Dimension(88, 34));
-        btn.setBorderPainted(false);
-        btn.setContentAreaFilled(false);
-        btn.setFocusPainted(false);
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setPreferredSize(new Dimension(84, 32));
         return btn;
     }
 
-    // ── Painted icon helpers ──────────────────────────────────────────────────
+    // ── Painted icons (no emoji, no external resources) ───────────────────────
 
-    /** Triangle-with-exclamation severity icon, no emoji. */
-    static JComponent makeSeverityIcon(Notification.Severity severity, int size) {
+    /**
+     * Triangle + exclamation for CRITICAL/WARNING; circle + "i" for INFO.
+     * All drawn with Java2D — zero emoji, zero font glyphs.
+     */
+    static JComponent makeSeverityIcon(Notification.Severity sev, int size) {
         return new JComponent() {
             {
                 setPreferredSize(new Dimension(size, size));
@@ -431,33 +608,55 @@ public class InventoryAlertsModal extends JDialog {
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = aa(g);
                 int W = getWidth(), H = getHeight();
-                Color bg = switch (severity) {
+
+                Color circleBg = switch (sev) {
                     case CRITICAL -> new Color(0xFECACA);
                     case WARNING -> new Color(0xFDE68A);
                     default -> new Color(0xBAE6FD);
                 };
-                Color fg = severityFg(severity);
+                Color stroke = sevFg(sev);
 
-                // Circle background
-                g2.setColor(bg);
-                g2.fillOval(0, 0, W - 1, H - 1);
+                g2.setColor(circleBg);
+                g2.fillOval(1, 1, W - 2, H - 2);
 
-                // Triangle + exclamation mark (requested alert icon)
-                g2.setColor(fg);
-                g2.setStroke(new BasicStroke(1.4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                int cx = W / 2;
-                int cy = H / 2;
-                int[] tx = { cx, cx - 10, cx + 10 };
-                int[] ty = { cy - 10, cy + 8, cy + 8 };
-                g2.drawPolygon(tx, ty, 3); // triangle
-                g2.drawLine(cx, cy - 4, cx, cy + 1); // exclamation line
-                g2.drawLine(cx, cy + 4, cx, cy + 4); // exclamation dot
+                g2.setColor(stroke);
+                float sw = Math.max(1.3f, size / 20f);
+                g2.setStroke(new BasicStroke(sw, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+
+                int cx = W / 2, cy = H / 2;
+
+                if (sev == Notification.Severity.INFO) {
+                    // "i" — dot above, bar below
+                    int dotR = Math.max(1, size / 12);
+                    g2.fillOval(cx - dotR, cy - H / 4 - dotR, dotR * 2, dotR * 2);
+                    g2.drawLine(cx, cy - H / 10, cx, cy + H / 4);
+                } else {
+                    // Triangle + exclamation
+                    int halfW = W * 9 / 24;
+                    int top = cy - H * 5 / 16;
+                    int bot = cy + H * 5 / 16;
+                    Path2D.Float tri = new Path2D.Float();
+                    tri.moveTo(cx, top);
+                    tri.lineTo(cx + halfW, bot);
+                    tri.lineTo(cx - halfW, bot);
+                    tri.closePath();
+                    g2.draw(tri);
+
+                    int lineTop = top + (bot - top) / 4;
+                    int lineMid = top + (bot - top) * 6 / 10;
+                    int dotY = top + (bot - top) * 76 / 100;
+                    int dotR = Math.max(1, size / 18);
+                    g2.drawLine(cx, lineTop, cx, lineMid);
+                    g2.fillOval(cx - dotR, dotY, dotR * 2, dotR * 2);
+                }
                 g2.dispose();
             }
         };
     }
 
-    /** Green circle with a checkmark. */
+    /**
+     * Green circle with a checkmark. Used in the empty state and zero-count chips.
+     */
     static JComponent makeCheckCircleIcon(int size) {
         return new JComponent() {
             {
@@ -469,21 +668,23 @@ public class InventoryAlertsModal extends JDialog {
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = aa(g);
                 int W = getWidth(), H = getHeight();
-                g2.setColor(STATUS_GOOD_BG);
-                g2.fillOval(0, 0, W - 1, H - 1);
-                g2.setColor(STATUS_GOOD_FG);
-                float stroke = Math.max(1.6f, size / 14f);
-                g2.setStroke(new BasicStroke(stroke, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.setColor(GOOD_BG);
+                g2.fillOval(1, 1, W - 2, H - 2);
+                g2.setColor(GOOD_FG);
+                float sw = Math.max(1.6f, size / 14f);
+                g2.setStroke(new BasicStroke(sw, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                 int pad = Math.max(4, size / 5);
-                // Checkmark: short left leg + long right leg
-                g2.drawLine(pad, H / 2 + 1, W / 2 - 2, H - pad - 1);
-                g2.drawLine(W / 2 - 2, H - pad - 1, W - pad, pad + 2);
+                g2.drawLine(pad, H / 2 + 1, W / 2 - 1, H - pad - 1);
+                g2.drawLine(W / 2 - 1, H - pad - 1, W - pad, pad + 2);
                 g2.dispose();
             }
         };
     }
 
-    /** Bell icon (painted path, no emoji). */
+    /**
+     * Bell icon — cubic Bézier body, flat cap bar, clapper dot.
+     * No emoji, no font glyph, pure Java2D.
+     */
     static JComponent makeBellIcon(int size, Color color) {
         return new JComponent() {
             {
@@ -497,51 +698,47 @@ public class InventoryAlertsModal extends JDialog {
                 int W = getWidth(), H = getHeight();
                 g2.setColor(color);
 
-                // Bell body (simplified arc-based path)
-                int bx = W / 2;
-                int top = H / 6;
-                int bot = H * 4 / 5;
+                int cx = W / 2;
+                int top = H / 7;
+                int bot = H * 13 / 16;
                 int halfW = W * 2 / 5;
 
                 Path2D.Float bell = new Path2D.Float();
-                bell.moveTo(bx - halfW, bot);
-                bell.curveTo(bx - halfW, top + (bot - top) / 2,
-                        bx - halfW, top,
-                        bx, top);
-                bell.curveTo(bx + halfW, top,
-                        bx + halfW, top + (bot - top) / 2,
-                        bx + halfW, bot);
+                bell.moveTo(cx - halfW, bot);
+                bell.curveTo(cx - halfW, top + (bot - top) * 0.55,
+                        cx - halfW * 0.6, top,
+                        cx, top);
+                bell.curveTo(cx + halfW * 0.6, top,
+                        cx + halfW, top + (bot - top) * 0.55,
+                        cx + halfW, bot);
                 bell.closePath();
                 g2.fill(bell);
 
-                // Handle bar at top
-                g2.setStroke(
-                        new BasicStroke(Math.max(1.5f, size / 10f), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                g2.drawLine(bx - halfW - 1, bot, bx + halfW + 1, bot);
+                g2.setStroke(new BasicStroke(Math.max(1.5f, size / 10f),
+                        BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawLine(cx - halfW - 1, bot, cx + halfW + 1, bot);
 
-                // Clapper dot
-                int clapR = Math.max(2, size / 8);
-                g2.fillOval(bx - clapR, bot, clapR * 2, clapR + 1);
-
+                int cr = Math.max(2, size / 8);
+                g2.fillOval(cx - cr, bot, cr * 2, cr + 1);
                 g2.dispose();
             }
         };
     }
 
-    // ── Severity color helpers ────────────────────────────────────────────────
-    private static Color severityFg(Notification.Severity s) {
+    // ── Severity colour helpers ───────────────────────────────────────────────
+    private static Color sevFg(Notification.Severity s) {
         return switch (s) {
-            case CRITICAL -> ALERT_CRITICAL_FG;
-            case WARNING -> ALERT_WARN_FG;
-            default -> ALERT_INFO_FG;
+            case CRITICAL -> CRIT_FG;
+            case WARNING -> WARN_FG;
+            default -> INFO_FG;
         };
     }
 
-    private static Color severityBg(Notification.Severity s) {
+    private static Color sevBg(Notification.Severity s) {
         return switch (s) {
-            case CRITICAL -> ALERT_CRITICAL_BG;
-            case WARNING -> ALERT_WARN_BG;
-            default -> ALERT_INFO_BG;
+            case CRITICAL -> CRIT_BG;
+            case WARNING -> WARN_BG;
+            default -> INFO_BG;
         };
     }
 

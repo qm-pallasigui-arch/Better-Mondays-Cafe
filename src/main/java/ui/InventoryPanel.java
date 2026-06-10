@@ -19,6 +19,7 @@ import javax.swing.table.TableCellRenderer;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.geom.Path2D;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.List;
@@ -125,12 +126,12 @@ public class InventoryPanel extends JPanel {
         titleStack.add(dateSubtitle, BorderLayout.SOUTH);
         header.add(titleStack, BorderLayout.WEST);
 
-        // Warning-icon button with floating red badge — opens inline alerts popup
+        // ── Modern bell icon button ───────────────────────────────────────────
         bellBtn = new JButton() {
             private boolean mouseOver;
+
             {
-                // Extra size so the badge circle (top-right) isn't clipped
-                setPreferredSize(new Dimension(46, 42));
+                setPreferredSize(new Dimension(36, 36));
                 setContentAreaFilled(false);
                 setBorderPainted(false);
                 setFocusPainted(false);
@@ -153,74 +154,112 @@ public class InventoryPanel extends JPanel {
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
                 g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
                 int W = getWidth(), H = getHeight();
 
-                // ── Button background (hover highlight) ──────────────────────
-                if (mouseOver) {
-                    g2.setColor(new Color(0xF3F4F6));
-                    g2.fillRoundRect(2, 2, W - 4, H - 4, 10, 10);
-                }
-
-                // ── Solid filled warning triangle ────────────────────────────
-                // Icon area: inset a few px from all edges, leaving top-right
-                // corner free for the badge.
-                int iL = 4, iT = 8, iR = W - 14, iB = H - 6;
-                int iW = iR - iL, iH = iB - iT;
-                int cx = iL + iW / 2;
-
-                // Triangle vertices
-                int tipX = cx, tipY = iT;
-                int blX = iL, blY = iB;
-                int brX = iR, brY = iB;
-
-                // Choose icon color based on alert severity
+                // Determine alert severity
                 boolean hasCrit = !latestAlerts.isEmpty() && latestAlerts.stream()
                         .anyMatch(n -> n.getSeverity() == Notification.Severity.CRITICAL);
                 boolean hasAny = !latestAlerts.isEmpty();
-                Color iconColor = hasCrit ? new Color(0xDC2626) // red
-                        : hasAny ? new Color(0xD97706) // amber
-                                : new Color(0x6B7280); // grey (no alerts)
 
-                // Fill triangle
+                // ── Hover background ─────────────────────────────────────────
+                if (mouseOver) {
+                    // Faint red tint on critical, neutral gray otherwise
+                    Color hoverBg = hasCrit
+                            ? new Color(220, 38, 38, 28)
+                            : new Color(243, 244, 246, 200);
+                    g2.setColor(hoverBg);
+                    g2.fillRoundRect(1, 1, W - 2, H - 2, 8, 8);
+                }
+
+                // ── Bell icon color ──────────────────────────────────────────
+                Color iconColor = hasCrit ? new Color(0xDC2626)
+                        : hasAny ? new Color(0xD97706)
+                                : new Color(0x9CA3AF);
                 g2.setColor(iconColor);
-                g2.fillPolygon(
-                        new int[] { tipX, blX, brX },
-                        new int[] { tipY, blY, brY }, 3);
 
-                // Rounded corners on the triangle via stroke trick
-                g2.setStroke(new BasicStroke(3.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                g2.drawPolygon(
-                        new int[] { tipX, blX, brX },
-                        new int[] { tipY, blY, brY }, 3);
+                // ── Bell geometry (centred in 36×36 button) ──────────────────
+                // Icon canvas: 20×20 px, centred with 8 px padding on each side
+                float pad = 8f;
+                float iW = W - pad * 2; // 20
+                float iH = H - pad * 2; // 20
+                float iX = pad;
+                float iY = pad;
+                float cx = iX + iW / 2f;
 
-                // Exclamation mark — white, centred in triangle
-                g2.setColor(Color.WHITE);
-                g2.setStroke(new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                int excCx = cx;
-                int excTop = iT + (int) (iH * 0.28);
-                int excMid = iT + (int) (iH * 0.62);
-                int excDot = iT + (int) (iH * 0.75);
-                g2.drawLine(excCx, excTop, excCx, excMid); // shaft
-                g2.setStroke(new BasicStroke(2.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                g2.drawLine(excCx, excDot, excCx, excDot); // dot
+                // Key y-coordinates
+                float stemTopY = iY; // very top (stem)
+                float domeTopY = iY + iH * 0.12f; // dome arc top
+                float shelfY = iY + iH * 0.76f; // shelf (flat bottom bar)
+                float shelfBotY = iY + iH * 0.88f; // shelf bottom edge
+                float clapY = shelfBotY + 1f; // clapper dot
 
-                // ── Floating red badge (top-right) ───────────────────────────
+                // Half-widths at shelf and neck
+                float shelfHW = iW * 0.50f; // half-width at shelf
+                float neckHW = iW * 0.14f; // half-width at neck (near stem)
+
+                // ── Bell body (filled Path2D) ────────────────────────────────
+                Path2D bell = new Path2D.Float();
+
+                // Start: bottom-left of shelf
+                bell.moveTo(cx - shelfHW, shelfBotY);
+                // Shelf bottom → left edge
+                bell.lineTo(cx - shelfHW, shelfY);
+                // Left side: curves inward from shelf up to neck
+                bell.curveTo(
+                        cx - shelfHW, shelfY - iH * 0.18f, // ctrl 1
+                        cx - neckHW, domeTopY + iH * 0.18f, // ctrl 2
+                        cx - neckHW, domeTopY // end
+                );
+                // Dome top arc (left → right)
+                bell.curveTo(
+                        cx - neckHW, domeTopY - iH * 0.10f, // ctrl 1
+                        cx + neckHW, domeTopY - iH * 0.10f, // ctrl 2
+                        cx + neckHW, domeTopY // end
+                );
+                // Right side: mirror of left
+                bell.curveTo(
+                        cx + neckHW, domeTopY + iH * 0.18f,
+                        cx + shelfHW, shelfY - iH * 0.18f,
+                        cx + shelfHW, shelfY);
+                // Shelf right → bottom-right
+                bell.lineTo(cx + shelfHW, shelfBotY);
+                // Shelf bottom arc (slightly rounded)
+                bell.curveTo(
+                        cx + shelfHW, shelfBotY + 1f,
+                        cx - shelfHW, shelfBotY + 1f,
+                        cx - shelfHW, shelfBotY);
+                bell.closePath();
+                g2.fill(bell);
+
+                // ── Clapper dot ──────────────────────────────────────────────
+                float clapR = 1.8f;
+                g2.fillOval(
+                        (int) (cx - clapR), (int) clapY,
+                        (int) (clapR * 2), (int) (clapR * 2));
+
+                // ── Stem (hanging point at top centre) ───────────────────────
+                g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawLine((int) cx, (int) stemTopY, (int) cx, (int) (domeTopY + 1));
+
+                // ── Floating badge (top-right corner) ───────────────────────
                 if (!latestAlerts.isEmpty()) {
                     int count = latestAlerts.size();
                     String label = count > 99 ? "99+" : String.valueOf(count);
                     Font badgeFont = new Font("Segoe UI", Font.BOLD, 9);
                     g2.setFont(badgeFont);
                     FontMetrics bfm = g2.getFontMetrics();
-                    int badgeDiam = Math.max(16, bfm.stringWidth(label) + 8);
-                    int bx = W - badgeDiam - 1; // top-right, 1 px from edge
-                    int by = 1;
+                    int badgeDiam = Math.max(14, bfm.stringWidth(label) + 6);
+                    int bx = W - badgeDiam - 1;
+                    int by = 0;
 
-                    // Red circle
+                    // Red fill
                     g2.setColor(new Color(0xEF4444));
                     g2.fillOval(bx, by, badgeDiam, badgeDiam);
 
-                    // White outline so it pops over the triangle colour
+                    // White outline so it pops against the bell
                     g2.setColor(Color.WHITE);
                     g2.setStroke(new BasicStroke(1.5f));
                     g2.drawOval(bx, by, badgeDiam, badgeDiam);
@@ -228,7 +267,7 @@ public class InventoryPanel extends JPanel {
                     // Count text
                     g2.setColor(Color.WHITE);
                     g2.setFont(badgeFont);
-                    bfm = g2.getFontMetrics(); // refresh after setFont
+                    bfm = g2.getFontMetrics();
                     g2.drawString(label,
                             bx + (badgeDiam - bfm.stringWidth(label)) / 2,
                             by + (badgeDiam - bfm.getHeight()) / 2 + bfm.getAscent());
@@ -237,6 +276,7 @@ public class InventoryPanel extends JPanel {
                 g2.dispose();
             }
         };
+
         header.add(bellBtn, BorderLayout.EAST);
         return header;
     }
@@ -637,13 +677,12 @@ public class InventoryPanel extends JPanel {
      * A "Show All Alerts" footer button opens the full InventoryAlertsModal.
      */
     private void openAlertsPopup() {
-        // ── Constants ────────────────────────────────────────────────────────
-        final int POPUP_W = 480; // wide enough for typical alert messages
-        final int ROW_H = 40; // px per alert row (including separator)
-        final int MAX_ROWS = 5; // rows visible before scrolling
+        final int POPUP_W = 480;
+        final int ROW_H = 40;
+        final int MAX_ROWS = 5;
         final int BADGE_W_CRIT = 62, BADGE_W_WARN = 60, BADGE_W_INFO = 36;
-        final int H_PAD = 14; // horizontal padding inside each row
-        final int BADGE_GAP = 8; // gap between badge and message
+        final int H_PAD = 14;
+        final int BADGE_GAP = 8;
 
         JPopupMenu popup = new JPopupMenu();
         popup.setLayout(new BorderLayout());
@@ -662,7 +701,6 @@ public class InventoryPanel extends JPanel {
         headerLbl.setForeground(TEXT_PRIMARY);
         headerLbl.setOpaque(false);
 
-        // Alert count badge next to title
         if (!latestAlerts.isEmpty()) {
             boolean hasCrit = latestAlerts.stream()
                     .anyMatch(n -> n.getSeverity() == Notification.Severity.CRITICAL);
@@ -707,9 +745,6 @@ public class InventoryPanel extends JPanel {
             empty.setAlignmentX(Component.LEFT_ALIGNMENT);
             listPanel.add(empty);
         } else {
-            // Pre-calculate the pixel budget for the message label so we can
-            // truncate accurately before the component is even laid out.
-            // badge width + gap + 2 * H_PAD = reserved; rest is for text.
             FontMetrics msgFm = new JLabel().getFontMetrics(FONT_BODY);
 
             for (int i = 0; i < latestAlerts.size(); i++) {
@@ -726,12 +761,10 @@ public class InventoryPanel extends JPanel {
                 String sevText = isCrit ? "CRITICAL" : isWarn ? "WARNING" : "INFO";
                 int badgePx = isCrit ? BADGE_W_CRIT : isWarn ? BADGE_W_WARN : BADGE_W_INFO;
 
-                // Compute available width for message text (subtract scrollbar ~12 px)
                 int textBudget = POPUP_W - 2 * H_PAD - badgePx - BADGE_GAP - 12;
                 String rawMsg = n.getMessage();
                 String dispMsg = rawMsg;
                 if (msgFm.stringWidth(rawMsg) > textBudget) {
-                    // Trim with ellipsis
                     String ellipsis = "…";
                     int ellW = msgFm.stringWidth(ellipsis);
                     StringBuilder sb = new StringBuilder();
@@ -743,7 +776,6 @@ public class InventoryPanel extends JPanel {
                     dispMsg = sb.toString().stripTrailing() + ellipsis;
                 }
 
-                // Row uses BorderLayout so badge stays left, text fills remainder
                 JPanel rowPanel = new JPanel(new BorderLayout(BADGE_GAP, 0));
                 rowPanel.setBackground(rowBg);
                 rowPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, ROW_H - 1));
@@ -751,9 +783,7 @@ public class InventoryPanel extends JPanel {
                 rowPanel.setBorder(new EmptyBorder(0, H_PAD, 0, H_PAD));
                 rowPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-                // Severity badge pill (fixed width, vertically centred)
                 final Color bFg = badgeFg;
-                final String bTxt = sevText;
                 JLabel badge = new JLabel(sevText) {
                     @Override
                     protected void paintComponent(Graphics g) {
@@ -771,7 +801,6 @@ public class InventoryPanel extends JPanel {
                 badge.setHorizontalAlignment(SwingConstants.CENTER);
                 badge.setPreferredSize(new Dimension(badgePx, 18));
 
-                // Centre badge vertically in the row
                 JPanel badgeWrap = new JPanel(new GridBagLayout());
                 badgeWrap.setOpaque(false);
                 badgeWrap.add(badge);
@@ -779,7 +808,6 @@ public class InventoryPanel extends JPanel {
                 JLabel msg = new JLabel(dispMsg);
                 msg.setFont(FONT_BODY);
                 msg.setForeground(TEXT_PRIMARY);
-                // Tooltip shows full text so user can hover to read if truncated
                 if (!dispMsg.equals(rawMsg))
                     msg.setToolTipText(rawMsg);
 
@@ -797,7 +825,7 @@ public class InventoryPanel extends JPanel {
             }
         }
 
-        // ── Scroll pane: vertical only ────────────────────────────────────────
+        // ── Scroll pane ───────────────────────────────────────────────────────
         JScrollPane scroll = new JScrollPane(listPanel);
         scroll.setBorder(BorderFactory.createEmptyBorder());
         scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -810,7 +838,7 @@ public class InventoryPanel extends JPanel {
         scroll.getViewport().setBackground(Color.WHITE);
         popup.add(scroll, BorderLayout.CENTER);
 
-        // ── "Show All Alerts" footer button ───────────────────────────────────
+        // ── "Show All Alerts" footer ──────────────────────────────────────────
         JPanel footer = new JPanel(new BorderLayout());
         footer.setBackground(Color.WHITE);
         footer.setBorder(BorderFactory.createCompoundBorder(
@@ -862,10 +890,8 @@ public class InventoryPanel extends JPanel {
         footer.add(showMoreBtn, BorderLayout.CENTER);
         popup.add(footer, BorderLayout.SOUTH);
 
-        // header ~42 + list + footer ~50
         popup.setPreferredSize(new Dimension(POPUP_W, listH + 42 + 50));
 
-        // Anchor to bottom-left of the bell button, shift left so it doesn't clip
         int xOff = Math.min(0, -(POPUP_W - bellBtn.getWidth()));
         popup.show(bellBtn, xOff, bellBtn.getHeight() + 4);
     }
@@ -1012,7 +1038,8 @@ public class InventoryPanel extends JPanel {
                 g2.setFont(FONT_BODY);
                 g2.setColor(Color.WHITE);
                 FontMetrics fm = g2.getFontMetrics();
-                g2.drawString(getText(), (getWidth() - fm.stringWidth(getText())) / 2,
+                g2.drawString(getText(),
+                        (getWidth() - fm.stringWidth(getText())) / 2,
                         (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
                 g2.dispose();
             }
@@ -1055,7 +1082,8 @@ public class InventoryPanel extends JPanel {
                 g2.setFont(FONT_BODY);
                 g2.setColor(TEXT_SECONDARY);
                 FontMetrics fm = g2.getFontMetrics();
-                g2.drawString(getText(), (getWidth() - fm.stringWidth(getText())) / 2,
+                g2.drawString(getText(),
+                        (getWidth() - fm.stringWidth(getText())) / 2,
                         (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
                 g2.dispose();
             }
@@ -1262,7 +1290,8 @@ public class InventoryPanel extends JPanel {
                     g2.setColor(sel ? TEXT_SECONDARY : TEXT_MUTED);
                     FontMetrics fm = g2.getFontMetrics();
                     String dots = "\u2022\u2022\u2022";
-                    g2.drawString(dots, (getWidth() - fm.stringWidth(dots)) / 2,
+                    g2.drawString(dots,
+                            (getWidth() - fm.stringWidth(dots)) / 2,
                             (getHeight() + fm.getAscent() - fm.getDescent()) / 2);
                     g2.dispose();
                 }
@@ -1290,7 +1319,8 @@ public class InventoryPanel extends JPanel {
 
                     JPopupMenu menu = new JPopupMenu();
                     menu.setBorder(BorderFactory.createCompoundBorder(
-                            BorderFactory.createLineBorder(BORDER_COLOR, 1), new EmptyBorder(4, 0, 4, 0)));
+                            BorderFactory.createLineBorder(BORDER_COLOR, 1),
+                            new EmptyBorder(4, 0, 4, 0)));
 
                     JMenuItem editItem = styledMenuItem("Edit", false);
                     JMenuItem delItem = styledMenuItem("Delete", true);

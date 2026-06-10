@@ -7,6 +7,7 @@ import javax.swing.border.*;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.geom.*;
 import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -19,7 +20,7 @@ public class BackupPanel extends JPanel {
     private static final DateTimeFormatter FILE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
     private static final DateTimeFormatter DISPLAY_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    // Brand / palette
+    // Palette
     private static final Color BLUE_HEADER = new Color(0x1A5FA8);
     private static final Color BLUE_BTN = new Color(0x1E6FCC);
     private static final Color BLUE_HOVER = new Color(0x1558A8);
@@ -34,11 +35,166 @@ public class BackupPanel extends JPanel {
     private static final Color TEXT_PRIMARY = new Color(0x111827);
     private static final Color TEXT_SECONDARY = new Color(0x6B7280);
     private static final Color TEXT_MONO = new Color(0x374151);
+    private static final Color GREEN_ICON = new Color(0x15803D);
 
     private static final Font FONT_BODY = new Font("Segoe UI", Font.PLAIN, 13);
     private static final Font FONT_BOLD = new Font("Segoe UI", Font.BOLD, 13);
     private static final Font FONT_LABEL = new Font("Segoe UI", Font.BOLD, 11);
     private static final Font FONT_MONO = new Font("Consolas", Font.PLAIN, 12);
+
+    // ── Painted icon helpers ──────────────────────────────────────────────────
+
+    /** Down-arrow (↓) drawn with Graphics2D — used on Backup button. */
+    private static Component makeArrowDown(Color color) {
+        return new JComponent() {
+            {
+                setPreferredSize(new Dimension(10, 14));
+                setOpaque(false);
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = aa(g);
+                int cx = getWidth() / 2;
+                // shaft
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawLine(cx, 1, cx, getHeight() - 4);
+                // arrowhead
+                int[] xs = { cx - 4, cx + 4, cx };
+                int[] ys = { getHeight() - 5, getHeight() - 5, getHeight() - 1 };
+                g2.fillPolygon(xs, ys, 3);
+                g2.dispose();
+            }
+        };
+    }
+
+    /** Up-arrow (↑) drawn with Graphics2D — used on Restore button. */
+    private static Component makeArrowUp(Color color) {
+        return new JComponent() {
+            {
+                setPreferredSize(new Dimension(10, 14));
+                setOpaque(false);
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = aa(g);
+                int cx = getWidth() / 2;
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawLine(cx, getHeight() - 2, cx, 4);
+                int[] xs = { cx - 4, cx + 4, cx };
+                int[] ys = { 4, 4, 0 };
+                g2.fillPolygon(xs, ys, 3);
+                g2.dispose();
+            }
+        };
+    }
+
+    /** Circular reset arrow (↺) drawn with Graphics2D — used on Reset button. */
+    private static Component makeResetArrow(Color color) {
+        return new JComponent() {
+            {
+                setPreferredSize(new Dimension(14, 14));
+                setOpaque(false);
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = aa(g);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                // Arc ~300 degrees
+                int pad = 2;
+                g2.drawArc(pad, pad, getWidth() - pad * 2 - 1, getHeight() - pad * 2 - 1, 60, 300);
+                // Arrowhead at end of arc (near 60 deg)
+                int cx = getWidth() / 2, cy = getHeight() / 2;
+                int r = (getWidth() - pad * 2) / 2;
+                double ang = Math.toRadians(60);
+                int ax = (int) (cx + r * Math.cos(ang));
+                int ay = (int) (cy - r * Math.sin(ang));
+                int[] xs = { ax - 3, ax + 3, ax };
+                int[] ys = { ay - 1, ay - 1, ay + 4 };
+                g2.fillPolygon(xs, ys, 3);
+                g2.dispose();
+            }
+        };
+    }
+
+    /** Filled red warning triangle with "!" — used in danger card header. */
+    private static JComponent makeWarningIcon() {
+        return new JComponent() {
+            {
+                setPreferredSize(new Dimension(18, 18));
+                setOpaque(false);
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = aa(g);
+                int W = getWidth(), H = getHeight();
+                int[] xs = { W / 2, 0, W };
+                int[] ys = { 0, H - 1, H - 1 };
+                g2.setColor(RED_TITLE);
+                g2.fillPolygon(xs, ys, 3);
+                g2.setColor(Color.WHITE);
+                g2.setFont(new Font("Segoe UI", Font.BOLD, 10));
+                FontMetrics fm = g2.getFontMetrics();
+                String bang = "!";
+                g2.drawString(bang, (W - fm.stringWidth(bang)) / 2, H - 3);
+                g2.dispose();
+            }
+        };
+    }
+
+    /** Green checkmark (✓) drawn with Graphics2D. */
+    private static JComponent makeCheckIcon(Color color) {
+        return new JComponent() {
+            {
+                setPreferredSize(new Dimension(13, 13));
+                setOpaque(false);
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = aa(g);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                // tick: short left leg, long right leg
+                g2.drawLine(1, 6, 4, 10);
+                g2.drawLine(4, 10, 11, 2);
+                g2.dispose();
+            }
+        };
+    }
+
+    /** Red X cross (✗) drawn with Graphics2D. */
+    private static JComponent makeCrossIcon(Color color) {
+        return new JComponent() {
+            {
+                setPreferredSize(new Dimension(13, 13));
+                setOpaque(false);
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = aa(g);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawLine(2, 2, 10, 10);
+                g2.drawLine(10, 2, 2, 10);
+                g2.dispose();
+            }
+        };
+    }
+
+    /** Anti-alias helper. */
+    private static Graphics2D aa(Graphics g) {
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        return g2;
+    }
 
     // ── State ─────────────────────────────────────────────────────────────────
 
@@ -53,9 +209,9 @@ public class BackupPanel extends JPanel {
     private final JLabel statusLabel = new JLabel("Ready");
     private final JLabel rowCountLabel = new JLabel("0 entries");
 
-    private final JButton backupBtn = createPrimaryButton("  Backup Now", "\u2193 ");
-    private final JButton restoreBtn = createGhostButton("  Restore from File", "\u2191 ");
-    private final JButton resetProdBtn = createDangerButton("  Reset for Production", "\u21BA ");
+    private final JButton backupBtn = createPrimaryButton("Backup Now", () -> makeArrowDown(Color.WHITE));
+    private final JButton restoreBtn = createGhostButton("Restore from File", () -> makeArrowUp(TEXT_PRIMARY));
+    private final JButton resetProdBtn = createDangerButton("Reset for Production", () -> makeResetArrow(RED_BTN_FG));
 
     // ── Constructor ───────────────────────────────────────────────────────────
 
@@ -84,10 +240,7 @@ public class BackupPanel extends JPanel {
     private JPanel buildMainCard() {
         JPanel card = createCard();
         card.setLayout(new BorderLayout(0, 0));
-
-        card.add(buildCardHeader(
-                "\uD83D\uDDC4 Database Backup & Restore",
-                "data/coffee-cafe.db"), BorderLayout.NORTH);
+        card.add(buildCardHeader("Database Backup & Restore", "data/coffee-cafe.db"), BorderLayout.NORTH);
 
         JPanel body = new JPanel(new BorderLayout(0, 0));
         body.setOpaque(false);
@@ -105,15 +258,29 @@ public class BackupPanel extends JPanel {
                 new MatteBorder(0, 0, 1, 0, BORDER_COLOR),
                 new EmptyBorder(10, 14, 10, 14)));
 
+        // "DB" pill on the left
+        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        left.setOpaque(false);
+
+        JLabel pill = new JLabel("DB");
+        pill.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        pill.setForeground(Color.WHITE);
+        pill.setBackground(BLUE_HEADER);
+        pill.setOpaque(true);
+        pill.setBorder(new EmptyBorder(2, 6, 2, 6));
+
         JLabel titleLbl = new JLabel(title);
         titleLbl.setFont(FONT_LABEL);
         titleLbl.setForeground(TEXT_SECONDARY);
+
+        left.add(pill);
+        left.add(titleLbl);
 
         JLabel subLbl = new JLabel(subtitle);
         subLbl.setFont(FONT_MONO);
         subLbl.setForeground(TEXT_SECONDARY);
 
-        header.add(titleLbl, BorderLayout.WEST);
+        header.add(left, BorderLayout.WEST);
         header.add(subLbl, BorderLayout.EAST);
         return header;
     }
@@ -143,14 +310,13 @@ public class BackupPanel extends JPanel {
     }
 
     private JPanel buildHistorySection() {
-        // Sub-header
         JPanel subHeader = new JPanel(new BorderLayout(8, 0));
         subHeader.setOpaque(false);
         subHeader.setBorder(new CompoundBorder(
                 new MatteBorder(0, 0, 1, 0, BORDER_COLOR),
                 new EmptyBorder(8, 14, 8, 14)));
 
-        JLabel histLbl = new JLabel("\uD83D\uDD50 Session Backup History");
+        JLabel histLbl = new JLabel("Session Backup History");
         histLbl.setFont(FONT_LABEL);
         histLbl.setForeground(TEXT_SECONDARY);
 
@@ -160,7 +326,6 @@ public class BackupPanel extends JPanel {
         subHeader.add(histLbl, BorderLayout.WEST);
         subHeader.add(rowCountLabel, BorderLayout.EAST);
 
-        // Table
         styleHistoryTable();
         JScrollPane scroll = new JScrollPane(historyTable);
         scroll.setBorder(BorderFactory.createEmptyBorder());
@@ -185,7 +350,6 @@ public class BackupPanel extends JPanel {
         historyTable.setFillsViewportHeight(true);
         historyTable.setFocusable(false);
 
-        // Blue header
         JTableHeader th = historyTable.getTableHeader();
         th.setDefaultRenderer(new DefaultTableCellRenderer() {
             @Override
@@ -205,15 +369,12 @@ public class BackupPanel extends JPanel {
         th.setBorder(BorderFactory.createEmptyBorder());
         th.setReorderingAllowed(false);
 
-        // Alternating rows + badge renderer for Type column
         historyTable.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(
                     JTable t, Object v, boolean sel, boolean foc, int r, int c) {
                 String val = v == null ? "" : v.toString();
-
                 if (c == 1) {
-                    // Badge pill
                     JLabel badge = new JLabel(val, SwingConstants.CENTER);
                     badge.setFont(new Font("Segoe UI", Font.BOLD, 11));
                     badge.setOpaque(true);
@@ -241,7 +402,6 @@ public class BackupPanel extends JPanel {
                     wrap.add(badge);
                     return wrap;
                 }
-
                 super.getTableCellRendererComponent(t, v, sel, foc, r, c);
                 setBackground(sel ? new Color(0xDBEAFE) : (r % 2 == 0 ? ROW_NORMAL : ROW_ALT));
                 setForeground(sel ? TEXT_PRIMARY : (c == 0 ? TEXT_MONO : (c == 3 ? TEXT_SECONDARY : TEXT_PRIMARY)));
@@ -251,7 +411,6 @@ public class BackupPanel extends JPanel {
             }
         });
 
-        // Column widths
         TableColumnModel cm = historyTable.getColumnModel();
         cm.getColumn(1).setPreferredWidth(80);
         cm.getColumn(1).setMaxWidth(100);
@@ -270,40 +429,36 @@ public class BackupPanel extends JPanel {
                 new LineBorder(RED_BORDER, 1, true),
                 new EmptyBorder(0, 0, 0, 0)));
 
-        // Red header bar
+        // Red header bar with painted warning icon
         JPanel header = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 10));
         header.setBackground(RED_BG);
         header.setBorder(new MatteBorder(0, 0, 1, 0, RED_BORDER));
-
-        JLabel icon = new JLabel("⚠");
-        icon.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        icon.setForeground(RED_TITLE);
-
+        header.add(makeWarningIcon());
         JLabel title = new JLabel("PRODUCTION RESET");
         title.setFont(FONT_LABEL);
         title.setForeground(RED_TITLE);
-
-        header.add(icon);
         header.add(title);
 
-        // Body with two columns
+        // Body
         JPanel body = new JPanel(new BorderLayout(0, 12));
         body.setOpaque(false);
         body.setBorder(new EmptyBorder(14, 14, 14, 14));
 
         JPanel columns = new JPanel(new GridLayout(1, 2, 20, 0));
         columns.setOpaque(false);
-        columns.add(buildDangerColumn("WILL ERASE", new Color(0x991B1B), RED_TITLE, new String[] {
-                "All staff shift records",
-                "Sales & transaction history",
-                "Inventory batch quantities",
-                "All user accounts",
-                "Password reset requests"
-        }, false));
-        columns.add(buildDangerColumn("WILL KEEP", new Color(0x166534), new Color(0x15803D), new String[] {
-                "Menu items & ingredients",
-                "Inventory item definitions"
-        }, true));
+        columns.add(buildDangerColumn("WILL ERASE", new Color(0x991B1B), RED_TITLE,
+                new String[] {
+                        "All staff shift records",
+                        "Sales & transaction history",
+                        "Inventory batch quantities",
+                        "All user accounts",
+                        "Password reset requests"
+                }, false));
+        columns.add(buildDangerColumn("WILL KEEP", new Color(0x166534), GREEN_ICON,
+                new String[] {
+                        "Menu items & ingredients",
+                        "Inventory item definitions"
+                }, true));
 
         JPanel footer = new JPanel(new BorderLayout(0, 6));
         footer.setOpaque(false);
@@ -341,9 +496,10 @@ public class BackupPanel extends JPanel {
         for (String item : items) {
             JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
             row.setOpaque(false);
-            JLabel ico = new JLabel(keep ? "✓" : "✗");
-            ico.setFont(new Font("Segoe UI", Font.BOLD, 13));
-            ico.setForeground(iconColor);
+
+            // Painted icon — no font glyph dependency at all
+            JComponent ico = keep ? makeCheckIcon(iconColor) : makeCrossIcon(iconColor);
+
             JLabel txt = new JLabel(item);
             txt.setFont(FONT_BODY);
             txt.setForeground(TEXT_SECONDARY);
@@ -373,16 +529,13 @@ public class BackupPanel extends JPanel {
             showError("Database file not found at: " + DB_PATH.toAbsolutePath());
             return;
         }
-
         String timestamp = LocalDateTime.now().format(FILE_FMT);
         String defaultName = "backup-" + timestamp + ".db";
 
         JFileChooser chooser = new JFileChooser();
         chooser.setDialogTitle("Save Backup As");
         chooser.setSelectedFile(new java.io.File(defaultName));
-        chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
-                "SQLite Database (*.db)", "db"));
-
+        chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("SQLite Database (*.db)", "db"));
         if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION)
             return;
 
@@ -410,8 +563,7 @@ public class BackupPanel extends JPanel {
                     String ts = LocalDateTime.now().format(DISPLAY_FMT);
                     addHistoryRow(finalDest.getFileName().toString(), "Backup", size, ts);
                     setStatus("Backup saved: " + finalDest.toAbsolutePath());
-                    showStyledInfo(
-                            "Backup Created",
+                    showStyledInfo("Backup Created",
                             "<html><b>Backup created successfully.</b><br><br>"
                                     + "<span style='color:#6B7280'>File: " + finalDest.toAbsolutePath()
                                     + "<br>Size: " + size + "</span></html>");
@@ -426,9 +578,7 @@ public class BackupPanel extends JPanel {
     private void onRestore() {
         JFileChooser chooser = new JFileChooser();
         chooser.setDialogTitle("Select Backup File to Restore");
-        chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
-                "SQLite Database (*.db)", "db"));
-
+        chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("SQLite Database (*.db)", "db"));
         if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION)
             return;
 
@@ -438,8 +588,7 @@ public class BackupPanel extends JPanel {
             return;
         }
 
-        int confirm = showStyledConfirm(
-                "Confirm Restore",
+        int confirm = showStyledConfirm("Confirm Restore",
                 "<html><b>Restore database?</b><br><br>"
                         + "<span style='color:#6B7280'>Source: " + src.toAbsolutePath() + "<br><br>"
                         + "This will replace the current database. All unsaved changes will be lost.<br>"
@@ -478,8 +627,7 @@ public class BackupPanel extends JPanel {
     }
 
     private void onResetForProduction() {
-        int first = showStyledConfirm(
-                "Reset for Production — Step 1 of 2",
+        int first = showStyledConfirm("Reset for Production — Step 1 of 2",
                 "<html><b>Reset for production?</b><br><br>"
                         + "<span style='color:#6B7280'>This will permanently erase all operational data including shifts, "
                         + "sales, transactions, inventory batches, and all user accounts.<br><br>"
@@ -488,7 +636,6 @@ public class BackupPanel extends JPanel {
         if (first != JOptionPane.YES_OPTION)
             return;
 
-        // Step 2 — typed confirmation dialog
         JDialog dialog = createStyledDialog("Reset for Production — Step 2 of 2");
         dialog.setResizable(false);
 
@@ -497,7 +644,6 @@ public class BackupPanel extends JPanel {
         panel.setBackground(Color.WHITE);
         panel.setPreferredSize(new Dimension(460, 180));
 
-        // Warning label at top
         JLabel warningLbl = new JLabel(
                 "<html><div style='width:380px;color:#374151'>"
                         + "Type <b>RESET</b> to confirm the production reset. "
@@ -505,7 +651,6 @@ public class BackupPanel extends JPanel {
                         + "</div></html>");
         warningLbl.setFont(FONT_BODY);
 
-        // Input with label stacked
         JPanel inputBlock = new JPanel(new BorderLayout(0, 6));
         inputBlock.setOpaque(false);
 
@@ -523,8 +668,8 @@ public class BackupPanel extends JPanel {
         inputBlock.add(inputLabel, BorderLayout.NORTH);
         inputBlock.add(input, BorderLayout.CENTER);
 
-        JButton cancelBtn = createGhostButton("Cancel", "");
-        JButton confirmBtn = createDangerButton("Reset production data", "");
+        JButton cancelBtn = createGhostButton("Cancel", null);
+        JButton confirmBtn = createDangerButton("Reset production data", null);
         confirmBtn.setEnabled(false);
         confirmBtn.setPreferredSize(new Dimension(200, 34));
 
@@ -569,7 +714,6 @@ public class BackupPanel extends JPanel {
     private void executeProductionReset() {
         resetProdBtn.setEnabled(false);
         setStatus("Resetting…");
-
         new SwingWorker<Void, Void>() {
             private String errorMsg;
 
@@ -621,11 +765,10 @@ public class BackupPanel extends JPanel {
         panel.setBorder(new EmptyBorder(24, 28, 24, 28));
         panel.setBackground(Color.WHITE);
 
-        String wrapped = html.replace("<html>", "<html><div style='width:380px'>");
-        JLabel msg = new JLabel(wrapped);
+        JLabel msg = new JLabel(html.replace("<html>", "<html><div style='width:380px'>"));
         msg.setFont(FONT_BODY);
 
-        JButton ok = createPrimaryButton("Done", "");
+        JButton ok = createPrimaryButton("Done", null);
         ok.addActionListener(e -> dialog.dispose());
 
         JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
@@ -649,12 +792,11 @@ public class BackupPanel extends JPanel {
         panel.setBorder(new EmptyBorder(24, 28, 24, 28));
         panel.setBackground(Color.WHITE);
 
-        String wrapped = html.replace("<html>", "<html><div style='width:380px'>");
-        JLabel msg = new JLabel(wrapped);
+        JLabel msg = new JLabel(html.replace("<html>", "<html><div style='width:380px'>"));
         msg.setFont(FONT_BODY);
 
-        JButton cancel = createGhostButton("Cancel", "");
-        JButton confirm = createDangerButton("Continue", "");
+        JButton cancel = createGhostButton("Cancel", null);
+        JButton confirm = createDangerButton("Continue", null);
         cancel.addActionListener(e -> dialog.dispose());
         confirm.addActionListener(e -> {
             result[0] = JOptionPane.YES_OPTION;
@@ -689,8 +831,13 @@ public class BackupPanel extends JPanel {
 
     // ── Button factories ──────────────────────────────────────────────────────
 
-    private static JButton createPrimaryButton(String text, String prefix) {
-        JButton btn = new JButton(prefix + text.trim()) {
+    /**
+     * iconSupplier — a java.util.function.Supplier<Component> that returns a
+     * freshly painted icon component each time. Pass null for no icon.
+     */
+    private static JButton createPrimaryButton(String text,
+            java.util.function.Supplier<Component> iconSupplier) {
+        JButton btn = new JButton() {
             private boolean hovered = false;
             {
                 addMouseListener(new MouseAdapter() {
@@ -708,23 +855,24 @@ public class BackupPanel extends JPanel {
 
             @Override
             protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                Graphics2D g2 = aa(g);
                 g2.setColor(hovered && isEnabled() ? BLUE_HOVER : (isEnabled() ? BLUE_BTN : new Color(0xAFC4E0)));
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
                 g2.dispose();
                 super.paintComponent(g);
             }
         };
-        styleBtn(btn);
+        buildButtonContent(btn, text, iconSupplier, Color.WHITE);
         btn.setForeground(Color.WHITE);
         btn.setContentAreaFilled(false);
         btn.setBorderPainted(false);
+        styleBtn(btn);
         return btn;
     }
 
-    private static JButton createGhostButton(String text, String prefix) {
-        JButton btn = new JButton(prefix + text.trim()) {
+    private static JButton createGhostButton(String text,
+            java.util.function.Supplier<Component> iconSupplier) {
+        JButton btn = new JButton() {
             private boolean hovered = false;
             {
                 addMouseListener(new MouseAdapter() {
@@ -742,8 +890,7 @@ public class BackupPanel extends JPanel {
 
             @Override
             protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                Graphics2D g2 = aa(g);
                 g2.setColor(hovered ? new Color(0xF3F4F6) : Color.WHITE);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
                 g2.setColor(BORDER_COLOR);
@@ -752,15 +899,17 @@ public class BackupPanel extends JPanel {
                 super.paintComponent(g);
             }
         };
-        styleBtn(btn);
+        buildButtonContent(btn, text, iconSupplier, TEXT_PRIMARY);
         btn.setForeground(TEXT_PRIMARY);
         btn.setContentAreaFilled(false);
         btn.setBorderPainted(false);
+        styleBtn(btn);
         return btn;
     }
 
-    private static JButton createDangerButton(String text, String prefix) {
-        JButton btn = new JButton(prefix + text.trim()) {
+    private static JButton createDangerButton(String text,
+            java.util.function.Supplier<Component> iconSupplier) {
+        JButton btn = new JButton() {
             private boolean hovered = false;
             {
                 addMouseListener(new MouseAdapter() {
@@ -778,8 +927,7 @@ public class BackupPanel extends JPanel {
 
             @Override
             protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                Graphics2D g2 = aa(g);
                 g2.setColor(hovered ? RED_BTN_HBG : Color.WHITE);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
                 g2.setColor(RED_BTN_FG);
@@ -788,19 +936,43 @@ public class BackupPanel extends JPanel {
                 super.paintComponent(g);
             }
         };
-        styleBtn(btn);
+        buildButtonContent(btn, text, iconSupplier, RED_BTN_FG);
         btn.setForeground(RED_BTN_FG);
         btn.setContentAreaFilled(false);
         btn.setBorderPainted(false);
+        styleBtn(btn);
         return btn;
     }
 
+    /**
+     * Replaces the button's default text rendering with a JPanel containing a
+     * painted icon component + JLabel. This avoids any glyph rendering via fonts.
+     */
+    private static void buildButtonContent(JButton btn, String text,
+            java.util.function.Supplier<Component> iconSupplier, Color fgColor) {
+        btn.setLayout(new BorderLayout());
+        JPanel inner = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
+        inner.setOpaque(false);
+        if (iconSupplier != null) {
+            Component ico = iconSupplier.get();
+            // Vertically center the icon inside the button height
+            JPanel icoWrap = new JPanel(new GridBagLayout());
+            icoWrap.setOpaque(false);
+            icoWrap.add(ico);
+            inner.add(icoWrap);
+        }
+        JLabel lbl = new JLabel(text);
+        lbl.setFont(FONT_BOLD);
+        lbl.setForeground(fgColor);
+        inner.add(lbl);
+        btn.add(inner, BorderLayout.CENTER);
+    }
+
     private static void styleBtn(JButton btn) {
-        btn.setFont(FONT_BOLD);
         btn.setFocusPainted(false);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setPreferredSize(new Dimension(170, 34));
-        btn.setMargin(new Insets(0, 12, 0, 12));
+        btn.setPreferredSize(new Dimension(180, 34));
+        btn.setMargin(new Insets(0, 0, 0, 0));
     }
 
     // ── Card container ────────────────────────────────────────────────────────

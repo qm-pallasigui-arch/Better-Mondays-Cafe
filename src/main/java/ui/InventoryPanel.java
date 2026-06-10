@@ -19,23 +19,12 @@ import javax.swing.table.TableCellRenderer;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.List;
 
 /**
  * InventoryPanel — self-contained panel for the Inventory Management tab.
- *
- * Drop-in replacement for the inline inventory UI that was previously built
- * inside POSSystem.initComponents(). Wiring in POSSystem:
- *
- * InventoryPanel inventoryPanel = new InventoryPanel(
- * currentUserRole == Role.ADMIN, inventoryController, monitoringPanel);
- * contentPanel.add(inventoryPanel, "Inventory");
- *
- * The panel fires its own loadInventoryTable() internally. Call
- * inventoryPanel.refresh() from outside (e.g. after a sale) to reload.
  */
 public class InventoryPanel extends JPanel {
 
@@ -55,19 +44,13 @@ public class InventoryPanel extends JPanel {
     private static final Color SELECTION_BG = new Color(0xEFF6FF);
     private static final Color SELECTION_FG = new Color(0x1D4ED8);
 
-    // Status colors
     private static final Color STATUS_GOOD_FG = new Color(0x16A34A);
     private static final Color STATUS_LOW_FG = new Color(0xD97706);
     private static final Color STATUS_OUT_FG = new Color(0xEA580C);
     private static final Color STATUS_EXPIRED_FG = new Color(0xDC2626);
 
-    // Alert pill colors
-    private static final Color ALERT_CRITICAL_BG = new Color(0xFEE2E2);
     private static final Color ALERT_CRITICAL_FG = new Color(0xDC2626);
-    private static final Color ALERT_WARN_BG = new Color(0xFEF3C7);
     private static final Color ALERT_WARN_FG = new Color(0xD97706);
-    private static final Color ALERT_INFO_BG = new Color(0xE0F2FE);
-    private static final Color ALERT_INFO_FG = new Color(0x0284C7);
 
     // ── Fonts ─────────────────────────────────────────────────────────────────
     private static final Font FONT_TITLE = new Font("Segoe UI", Font.BOLD, 22);
@@ -76,7 +59,6 @@ public class InventoryPanel extends JPanel {
     private static final Font FONT_BOLD = new Font("Segoe UI", Font.BOLD, 13);
     private static final Font FONT_HEADER = new Font("Segoe UI", Font.BOLD, 11);
     private static final Font FONT_BADGE = new Font("Segoe UI", Font.BOLD, 11);
-    private static final Font FONT_MONO = new Font("Consolas", Font.PLAIN, 12);
 
     private static final String SEARCH_PLACEHOLDER = "Search ingredients";
 
@@ -97,7 +79,6 @@ public class InventoryPanel extends JPanel {
     private JTextArea detailArea;
     private JLabel dateSubtitle;
     private JButton bellBtn;
-    private JLabel bellCountBadge;
 
     // ── Constructor ───────────────────────────────────────────────────────────
     public InventoryPanel(boolean isAdmin, InventoryController inventoryController, Runnable monitoringRefresh) {
@@ -111,14 +92,9 @@ public class InventoryPanel extends JPanel {
         add(buildHeader(), BorderLayout.NORTH);
         add(buildMainCard(), BorderLayout.CENTER);
 
-        // Start live clock
-        new javax.swing.Timer(1000, e -> updateDateSubtitle()).start();
-        updateDateSubtitle();
-
         refresh();
     }
 
-    /** Reload data from the controller — call after any inventory mutation. */
     public void refresh() {
         if (inventoryController == null)
             inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
@@ -129,7 +105,7 @@ public class InventoryPanel extends JPanel {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Header: title + subtitle + bell
+    // Header
     // ─────────────────────────────────────────────────────────────────────────
     private JPanel buildHeader() {
         JPanel header = new JPanel(new BorderLayout());
@@ -149,28 +125,16 @@ public class InventoryPanel extends JPanel {
         titleStack.add(dateSubtitle, BorderLayout.SOUTH);
         header.add(titleStack, BorderLayout.WEST);
 
-        // Bell button (right side)
-        bellBtn = new JButton("🔔") {
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(isMouseOver() ? new Color(0xF3F4F6) : BG_CARD);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
-                g2.setColor(BORDER_COLOR);
-                g2.setStroke(new java.awt.BasicStroke(1f));
-                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 8, 8);
-                g2.dispose();
-                super.paintComponent(g);
-            }
-
+        // Warning-icon button with floating red badge — opens inline alerts popup
+        bellBtn = new JButton() {
             private boolean mouseOver;
-
-            boolean isMouseOver() {
-                return mouseOver;
-            }
-
             {
+                // Extra size so the badge circle (top-right) isn't clipped
+                setPreferredSize(new Dimension(46, 42));
+                setContentAreaFilled(false);
+                setBorderPainted(false);
+                setFocusPainted(false);
+                setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
                 addMouseListener(new MouseAdapter() {
                     public void mouseEntered(MouseEvent e) {
                         mouseOver = true;
@@ -182,28 +146,103 @@ public class InventoryPanel extends JPanel {
                         repaint();
                     }
                 });
+                addActionListener(e -> openAlertsPopup());
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                int W = getWidth(), H = getHeight();
+
+                // ── Button background (hover highlight) ──────────────────────
+                if (mouseOver) {
+                    g2.setColor(new Color(0xF3F4F6));
+                    g2.fillRoundRect(2, 2, W - 4, H - 4, 10, 10);
+                }
+
+                // ── Solid filled warning triangle ────────────────────────────
+                // Icon area: inset a few px from all edges, leaving top-right
+                // corner free for the badge.
+                int iL = 4, iT = 8, iR = W - 14, iB = H - 6;
+                int iW = iR - iL, iH = iB - iT;
+                int cx = iL + iW / 2;
+
+                // Triangle vertices
+                int tipX = cx, tipY = iT;
+                int blX = iL, blY = iB;
+                int brX = iR, brY = iB;
+
+                // Choose icon color based on alert severity
+                boolean hasCrit = !latestAlerts.isEmpty() && latestAlerts.stream()
+                        .anyMatch(n -> n.getSeverity() == Notification.Severity.CRITICAL);
+                boolean hasAny = !latestAlerts.isEmpty();
+                Color iconColor = hasCrit ? new Color(0xDC2626) // red
+                        : hasAny ? new Color(0xD97706) // amber
+                                : new Color(0x6B7280); // grey (no alerts)
+
+                // Fill triangle
+                g2.setColor(iconColor);
+                g2.fillPolygon(
+                        new int[] { tipX, blX, brX },
+                        new int[] { tipY, blY, brY }, 3);
+
+                // Rounded corners on the triangle via stroke trick
+                g2.setStroke(new BasicStroke(3.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawPolygon(
+                        new int[] { tipX, blX, brX },
+                        new int[] { tipY, blY, brY }, 3);
+
+                // Exclamation mark — white, centred in triangle
+                g2.setColor(Color.WHITE);
+                g2.setStroke(new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                int excCx = cx;
+                int excTop = iT + (int) (iH * 0.28);
+                int excMid = iT + (int) (iH * 0.62);
+                int excDot = iT + (int) (iH * 0.75);
+                g2.drawLine(excCx, excTop, excCx, excMid); // shaft
+                g2.setStroke(new BasicStroke(2.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawLine(excCx, excDot, excCx, excDot); // dot
+
+                // ── Floating red badge (top-right) ───────────────────────────
+                if (!latestAlerts.isEmpty()) {
+                    int count = latestAlerts.size();
+                    String label = count > 99 ? "99+" : String.valueOf(count);
+                    Font badgeFont = new Font("Segoe UI", Font.BOLD, 9);
+                    g2.setFont(badgeFont);
+                    FontMetrics bfm = g2.getFontMetrics();
+                    int badgeDiam = Math.max(16, bfm.stringWidth(label) + 8);
+                    int bx = W - badgeDiam - 1; // top-right, 1 px from edge
+                    int by = 1;
+
+                    // Red circle
+                    g2.setColor(new Color(0xEF4444));
+                    g2.fillOval(bx, by, badgeDiam, badgeDiam);
+
+                    // White outline so it pops over the triangle colour
+                    g2.setColor(Color.WHITE);
+                    g2.setStroke(new BasicStroke(1.5f));
+                    g2.drawOval(bx, by, badgeDiam, badgeDiam);
+
+                    // Count text
+                    g2.setColor(Color.WHITE);
+                    g2.setFont(badgeFont);
+                    bfm = g2.getFontMetrics(); // refresh after setFont
+                    g2.drawString(label,
+                            bx + (badgeDiam - bfm.stringWidth(label)) / 2,
+                            by + (badgeDiam - bfm.getHeight()) / 2 + bfm.getAscent());
+                }
+
+                g2.dispose();
             }
         };
-        bellBtn.setFont(new Font("Segoe UI", Font.PLAIN, 16));
-        bellBtn.setForeground(TEXT_PRIMARY);
-        bellBtn.setBackground(BG_CARD);
-        bellBtn.setBorder(new EmptyBorder(8, 14, 8, 14));
-        bellBtn.setFocusPainted(false);
-        bellBtn.setContentAreaFilled(false);
-        bellBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        bellBtn.addActionListener(e -> showAlertsPopup(bellBtn));
-
         header.add(bellBtn, BorderLayout.EAST);
         return header;
     }
 
-    private void updateDateSubtitle() {
-        if (dateSubtitle != null)
-            dateSubtitle.setText("As of " + new SimpleDateFormat("EEEE, MM/dd/yyyy hh:mm:ss a").format(new Date()));
-    }
-
     // ─────────────────────────────────────────────────────────────────────────
-    // Main card: controls + table/detail
+    // Main card
     // ─────────────────────────────────────────────────────────────────────────
     private JPanel buildMainCard() {
         JPanel card = new JPanel(new BorderLayout(0, 14)) {
@@ -214,7 +253,7 @@ public class InventoryPanel extends JPanel {
                 g2.setColor(BG_CARD);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
                 g2.setColor(BORDER_COLOR);
-                g2.setStroke(new java.awt.BasicStroke(1f));
+                g2.setStroke(new BasicStroke(1f));
                 g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);
                 g2.dispose();
                 super.paintComponent(g);
@@ -222,7 +261,6 @@ public class InventoryPanel extends JPanel {
         };
         card.setOpaque(false);
         card.setBorder(new EmptyBorder(18, 20, 20, 20));
-
         card.add(buildControlsRow(), BorderLayout.NORTH);
         card.add(buildTableAndDetail(), BorderLayout.CENTER);
         return card;
@@ -233,7 +271,6 @@ public class InventoryPanel extends JPanel {
         JPanel row = new JPanel(new BorderLayout(12, 0));
         row.setOpaque(false);
 
-        // Left: search + category
         JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         left.setOpaque(false);
 
@@ -253,8 +290,7 @@ public class InventoryPanel extends JPanel {
                     searchField.setForeground(TEXT_PRIMARY);
                 }
                 searchField.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(ACCENT, 1),
-                        new EmptyBorder(6, 10, 6, 10)));
+                        BorderFactory.createLineBorder(ACCENT, 1), new EmptyBorder(6, 10, 6, 10)));
             }
 
             public void focusLost(java.awt.event.FocusEvent e) {
@@ -263,8 +299,7 @@ public class InventoryPanel extends JPanel {
                     searchField.setForeground(TEXT_MUTED);
                 }
                 searchField.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(BORDER_COLOR, 1),
-                        new EmptyBorder(6, 10, 6, 10)));
+                        BorderFactory.createLineBorder(BORDER_COLOR, 1), new EmptyBorder(6, 10, 6, 10)));
             }
         });
         searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
@@ -291,7 +326,6 @@ public class InventoryPanel extends JPanel {
         left.add(categoryFilter);
         row.add(left, BorderLayout.WEST);
 
-        // Right: Add Item (admin only)
         if (isAdmin) {
             JButton addBtn = buildPrimaryButton("+ Add Item", e -> openAddDialog());
             JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
@@ -299,11 +333,10 @@ public class InventoryPanel extends JPanel {
             right.add(addBtn);
             row.add(right, BorderLayout.EAST);
         }
-
         return row;
     }
 
-    // ── Table + detail side-panel ─────────────────────────────────────────────
+    // ── Table + detail ────────────────────────────────────────────────────────
     private JPanel buildTableAndDetail() {
         JPanel wrap = new JPanel(new BorderLayout(16, 0));
         wrap.setOpaque(false);
@@ -328,18 +361,15 @@ public class InventoryPanel extends JPanel {
             public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
                 if (!isRowSelected(row))
-                    c.setBackground(row == hoveredRow ? ROW_HOVER
-                            : row % 2 == 0 ? ROW_BASE : ROW_ALT);
+                    c.setBackground(row == hoveredRow ? ROW_HOVER : row % 2 == 0 ? ROW_BASE : ROW_ALT);
                 return c;
             }
         };
 
-        // Header
         inventoryTable.getTableHeader().setBackground(Color.WHITE);
         inventoryTable.getTableHeader().setForeground(TEXT_MUTED);
         inventoryTable.getTableHeader().setFont(FONT_HEADER);
-        inventoryTable.getTableHeader().setBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER_COLOR));
+        inventoryTable.getTableHeader().setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER_COLOR));
         inventoryTable.getTableHeader().setReorderingAllowed(false);
         ((DefaultTableCellRenderer) inventoryTable.getTableHeader().getDefaultRenderer())
                 .setHorizontalAlignment(SwingConstants.LEFT);
@@ -353,12 +383,10 @@ public class InventoryPanel extends JPanel {
         inventoryTable.setIntercellSpacing(new Dimension(0, 0));
         inventoryTable.setFillsViewportHeight(true);
 
-        // Column widths
         int[] widths = { 160, 100, 100, 60, 170, 130, 100, 72 };
         for (int i = 0; i < widths.length; i++)
             inventoryTable.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
 
-        // Default left-padded renderer
         StdRenderer std = new StdRenderer();
         for (int i = 0; i < 8; i++)
             inventoryTable.getColumnModel().getColumn(i).setCellRenderer(std);
@@ -372,7 +400,6 @@ public class InventoryPanel extends JPanel {
             inventoryTable.getColumnModel().getColumn(7).setCellEditor(new DotMenuEditor());
         }
 
-        // Hover tracking
         inventoryTable.addMouseMotionListener(new MouseAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
@@ -396,14 +423,12 @@ public class InventoryPanel extends JPanel {
                 int row = inventoryTable.rowAtPoint(e.getPoint());
                 if (row < 0)
                     return;
-                // Click on Batches column → open batch modal
                 if (col == 5) {
                     Object val = tableModel.getValueAt(row, 5);
                     if (val instanceof InventoryRowView rv && inventoryController != null) {
                         new InventoryBatchModal(
                                 SwingUtilities.getWindowAncestor(InventoryPanel.this),
-                                rv.getName(), inventoryController,
-                                () -> refresh()).setVisible(true);
+                                rv.getName(), inventoryController, () -> refresh()).setVisible(true);
                     }
                 } else if (col == 7 && isAdmin) {
                     inventoryTable.editCellAt(row, col);
@@ -411,7 +436,6 @@ public class InventoryPanel extends JPanel {
             }
         });
 
-        // Selection → update detail panel
         inventoryTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting())
                 updateDetail();
@@ -432,7 +456,7 @@ public class InventoryPanel extends JPanel {
                 g2.setColor(BG_SURFACE);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
                 g2.setColor(BORDER_COLOR);
-                g2.setStroke(new java.awt.BasicStroke(1f));
+                g2.setStroke(new BasicStroke(1f));
                 g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
                 g2.dispose();
                 super.paintComponent(g);
@@ -586,10 +610,9 @@ public class InventoryPanel extends JPanel {
                     .append('\n');
             sb.append("Reorder Point (ROP): ~").append(Math.round(rop)).append(' ').append(r.getUnit());
             if (r.getQuantity() <= rop)
-                sb.append("  ← reorder now");
+                sb.append("  \u2190 reorder now");
             sb.append('\n');
             sb.append("Deduction order: FEFO\n");
-
             detailArea.setText(sb.toString());
             detailArea.setCaretPosition(0);
             return;
@@ -598,122 +621,265 @@ public class InventoryPanel extends JPanel {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Alerts bell
+    // Alerts badge + popup
     // ─────────────────────────────────────────────────────────────────────────
     private void refreshAlertsBadge() {
         if (bellBtn == null)
             return;
         latestAlerts = notificationService.evaluate(rowsCache);
-        boolean hasCritical = latestAlerts.stream().anyMatch(n -> n.getSeverity() == Notification.Severity.CRITICAL);
-        boolean hasAny = !latestAlerts.isEmpty();
-        if (hasCritical) {
-            bellBtn.setText("🔔 " + latestAlerts.size());
-            bellBtn.setForeground(ALERT_CRITICAL_FG);
-        } else if (hasAny) {
-            bellBtn.setText("🔔 " + latestAlerts.size());
-            bellBtn.setForeground(ALERT_WARN_FG);
-        } else {
-            bellBtn.setText("🔔");
-            bellBtn.setForeground(TEXT_PRIMARY);
-        }
+        bellBtn.repaint();
     }
 
-    private void showAlertsPopup(Component anchor) {
-        JPanel content = new JPanel(new BorderLayout(0, 8));
-        content.setBackground(Color.WHITE);
-        content.setBorder(new EmptyBorder(14, 14, 14, 14));
-        content.setPreferredSize(new Dimension(340, 280));
+    /**
+     * Opens a lightweight dropdown popup anchored below the bell button.
+     * Vertical scroll only — no horizontal scrollbar, fixed 480 px width.
+     * Long messages are truncated with an ellipsis so they never overflow.
+     * A "Show All Alerts" footer button opens the full InventoryAlertsModal.
+     */
+    private void openAlertsPopup() {
+        // ── Constants ────────────────────────────────────────────────────────
+        final int POPUP_W = 480; // wide enough for typical alert messages
+        final int ROW_H = 40; // px per alert row (including separator)
+        final int MAX_ROWS = 5; // rows visible before scrolling
+        final int BADGE_W_CRIT = 62, BADGE_W_WARN = 60, BADGE_W_INFO = 36;
+        final int H_PAD = 14; // horizontal padding inside each row
+        final int BADGE_GAP = 8; // gap between badge and message
 
-        JLabel title = new JLabel("Inventory Alerts");
-        title.setFont(FONT_BOLD);
-        title.setForeground(TEXT_PRIMARY);
-        content.add(title, BorderLayout.NORTH);
+        JPopupMenu popup = new JPopupMenu();
+        popup.setLayout(new BorderLayout());
+        popup.setBorder(BorderFactory.createLineBorder(BORDER_COLOR, 1));
+        popup.setBackground(Color.WHITE);
 
-        JPanel list = new JPanel();
-        list.setOpaque(false);
-        list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS));
+        // ── Header ───────────────────────────────────────────────────────────
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setBackground(Color.WHITE);
+        headerPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER_COLOR),
+                new EmptyBorder(11, 14, 10, 14)));
+
+        JLabel headerLbl = new JLabel("Inventory Alerts");
+        headerLbl.setFont(FONT_BOLD);
+        headerLbl.setForeground(TEXT_PRIMARY);
+        headerLbl.setOpaque(false);
+
+        // Alert count badge next to title
+        if (!latestAlerts.isEmpty()) {
+            boolean hasCrit = latestAlerts.stream()
+                    .anyMatch(n -> n.getSeverity() == Notification.Severity.CRITICAL);
+            Color cntColor = hasCrit ? new Color(0xDC2626) : new Color(0xD97706);
+            JLabel cntBadge = new JLabel(String.valueOf(latestAlerts.size())) {
+                @Override
+                protected void paintComponent(Graphics g) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g2.setColor(cntColor);
+                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), getHeight(), getHeight());
+                    super.paintComponent(g);
+                    g2.dispose();
+                }
+            };
+            cntBadge.setFont(new Font("Segoe UI", Font.BOLD, 10));
+            cntBadge.setForeground(Color.WHITE);
+            cntBadge.setOpaque(false);
+            cntBadge.setHorizontalAlignment(SwingConstants.CENTER);
+            cntBadge.setPreferredSize(new Dimension(latestAlerts.size() > 9 ? 26 : 20, 16));
+
+            JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+            titleRow.setOpaque(false);
+            titleRow.add(headerLbl);
+            titleRow.add(cntBadge);
+            headerPanel.add(titleRow, BorderLayout.CENTER);
+        } else {
+            headerPanel.add(headerLbl, BorderLayout.CENTER);
+        }
+        popup.add(headerPanel, BorderLayout.NORTH);
+
+        // ── Alert list ────────────────────────────────────────────────────────
+        JPanel listPanel = new JPanel();
+        listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
+        listPanel.setBackground(Color.WHITE);
 
         if (latestAlerts.isEmpty()) {
-            JLabel empty = new JLabel("No alerts — inventory looks healthy.");
+            JLabel empty = new JLabel("No active alerts — inventory looks healthy.");
             empty.setFont(FONT_BODY);
             empty.setForeground(TEXT_MUTED);
-            empty.setBorder(new EmptyBorder(8, 4, 8, 4));
-            list.add(empty);
+            empty.setBorder(new EmptyBorder(14, H_PAD, 14, H_PAD));
+            empty.setAlignmentX(Component.LEFT_ALIGNMENT);
+            listPanel.add(empty);
         } else {
-            for (Notification n : latestAlerts) {
-                Color bg, fg;
-                String badge;
-                switch (n.getSeverity()) {
-                    case CRITICAL -> {
-                        bg = ALERT_CRITICAL_BG;
-                        fg = ALERT_CRITICAL_FG;
-                        badge = "CRITICAL";
+            // Pre-calculate the pixel budget for the message label so we can
+            // truncate accurately before the component is even laid out.
+            // badge width + gap + 2 * H_PAD = reserved; rest is for text.
+            FontMetrics msgFm = new JLabel().getFontMetrics(FONT_BODY);
+
+            for (int i = 0; i < latestAlerts.size(); i++) {
+                Notification n = latestAlerts.get(i);
+
+                boolean isCrit = n.getSeverity() == Notification.Severity.CRITICAL;
+                boolean isWarn = n.getSeverity() == Notification.Severity.WARNING;
+                Color rowBg = isCrit ? new Color(0xFEE2E2)
+                        : isWarn ? new Color(0xFEF3C7)
+                                : new Color(0xE0F2FE);
+                Color badgeFg = isCrit ? new Color(0xDC2626)
+                        : isWarn ? new Color(0xD97706)
+                                : new Color(0x0284C7);
+                String sevText = isCrit ? "CRITICAL" : isWarn ? "WARNING" : "INFO";
+                int badgePx = isCrit ? BADGE_W_CRIT : isWarn ? BADGE_W_WARN : BADGE_W_INFO;
+
+                // Compute available width for message text (subtract scrollbar ~12 px)
+                int textBudget = POPUP_W - 2 * H_PAD - badgePx - BADGE_GAP - 12;
+                String rawMsg = n.getMessage();
+                String dispMsg = rawMsg;
+                if (msgFm.stringWidth(rawMsg) > textBudget) {
+                    // Trim with ellipsis
+                    String ellipsis = "…";
+                    int ellW = msgFm.stringWidth(ellipsis);
+                    StringBuilder sb = new StringBuilder();
+                    for (char c : rawMsg.toCharArray()) {
+                        if (msgFm.stringWidth(sb.toString() + c) + ellW > textBudget)
+                            break;
+                        sb.append(c);
                     }
-                    case WARNING -> {
-                        bg = ALERT_WARN_BG;
-                        fg = ALERT_WARN_FG;
-                        badge = "WARNING";
-                    }
-                    default -> {
-                        bg = ALERT_INFO_BG;
-                        fg = ALERT_INFO_FG;
-                        badge = "INFO";
-                    }
+                    dispMsg = sb.toString().stripTrailing() + ellipsis;
                 }
-                JPanel row = new JPanel(new BorderLayout(10, 0));
-                row.setBackground(bg);
-                row.setBorder(new EmptyBorder(8, 12, 8, 12));
-                row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
-                row.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-                JLabel badgeLbl = new JLabel(badge);
-                badgeLbl.setFont(FONT_BADGE);
-                badgeLbl.setForeground(fg);
-                badgeLbl.setPreferredSize(new Dimension(64, 20));
-                row.add(badgeLbl, BorderLayout.WEST);
+                // Row uses BorderLayout so badge stays left, text fills remainder
+                JPanel rowPanel = new JPanel(new BorderLayout(BADGE_GAP, 0));
+                rowPanel.setBackground(rowBg);
+                rowPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, ROW_H - 1));
+                rowPanel.setPreferredSize(new Dimension(POPUP_W, ROW_H - 1));
+                rowPanel.setBorder(new EmptyBorder(0, H_PAD, 0, H_PAD));
+                rowPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-                JLabel msg = new JLabel(n.getMessage());
+                // Severity badge pill (fixed width, vertically centred)
+                final Color bFg = badgeFg;
+                final String bTxt = sevText;
+                JLabel badge = new JLabel(sevText) {
+                    @Override
+                    protected void paintComponent(Graphics g) {
+                        Graphics2D g2 = (Graphics2D) g.create();
+                        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                        g2.setColor(bFg);
+                        g2.fillRoundRect(0, 0, getWidth(), getHeight(), getHeight(), getHeight());
+                        super.paintComponent(g);
+                        g2.dispose();
+                    }
+                };
+                badge.setFont(new Font("Segoe UI", Font.BOLD, 10));
+                badge.setForeground(Color.WHITE);
+                badge.setOpaque(false);
+                badge.setHorizontalAlignment(SwingConstants.CENTER);
+                badge.setPreferredSize(new Dimension(badgePx, 18));
+
+                // Centre badge vertically in the row
+                JPanel badgeWrap = new JPanel(new GridBagLayout());
+                badgeWrap.setOpaque(false);
+                badgeWrap.add(badge);
+
+                JLabel msg = new JLabel(dispMsg);
                 msg.setFont(FONT_BODY);
                 msg.setForeground(TEXT_PRIMARY);
-                row.add(msg, BorderLayout.CENTER);
+                // Tooltip shows full text so user can hover to read if truncated
+                if (!dispMsg.equals(rawMsg))
+                    msg.setToolTipText(rawMsg);
 
-                list.add(row);
-                list.add(Box.createVerticalStrut(5));
+                rowPanel.add(badgeWrap, BorderLayout.WEST);
+                rowPanel.add(msg, BorderLayout.CENTER);
+                listPanel.add(rowPanel);
+
+                if (i < latestAlerts.size() - 1) {
+                    JSeparator sep = new JSeparator();
+                    sep.setForeground(isCrit ? new Color(0xFCA5A5) : new Color(0xE5E7EB));
+                    sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
+                    sep.setAlignmentX(Component.LEFT_ALIGNMENT);
+                    listPanel.add(sep);
+                }
             }
         }
 
-        JScrollPane scroll = new JScrollPane(list);
+        // ── Scroll pane: vertical only ────────────────────────────────────────
+        JScrollPane scroll = new JScrollPane(listPanel);
         scroll.setBorder(BorderFactory.createEmptyBorder());
-        scroll.setOpaque(false);
-        scroll.getViewport().setOpaque(false);
-        scroll.getVerticalScrollBar().setUnitIncrement(14);
-        content.add(scroll, BorderLayout.CENTER);
+        scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        int listH = latestAlerts.isEmpty()
+                ? 52
+                : Math.min(latestAlerts.size(), MAX_ROWS) * ROW_H + 4;
+        scroll.setPreferredSize(new Dimension(POPUP_W, listH));
+        scroll.getVerticalScrollBar().setUnitIncrement(ROW_H);
+        scroll.getViewport().setBackground(Color.WHITE);
+        popup.add(scroll, BorderLayout.CENTER);
 
-        JPopupMenu popup = new JPopupMenu();
-        popup.setBorder(BorderFactory.createLineBorder(BORDER_COLOR, 1));
-        popup.add(content);
-        popup.show(anchor, anchor.getWidth() - content.getPreferredSize().width, anchor.getHeight() + 6);
+        // ── "Show All Alerts" footer button ───────────────────────────────────
+        JPanel footer = new JPanel(new BorderLayout());
+        footer.setBackground(Color.WHITE);
+        footer.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 0, 0, 0, BORDER_COLOR),
+                new EmptyBorder(8, 14, 8, 14)));
+
+        JButton showMoreBtn = new JButton("Show All Alerts") {
+            private boolean hov;
+            {
+                setContentAreaFilled(false);
+                setBorderPainted(false);
+                setFocusPainted(false);
+                setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                addMouseListener(new MouseAdapter() {
+                    public void mouseEntered(MouseEvent e) {
+                        hov = true;
+                        repaint();
+                    }
+
+                    public void mouseExited(MouseEvent e) {
+                        hov = false;
+                        repaint();
+                    }
+                });
+                addActionListener(e -> {
+                    popup.setVisible(false);
+                    Window owner = SwingUtilities.getWindowAncestor(InventoryPanel.this);
+                    new InventoryAlertsModal(owner, latestAlerts).setVisible(true);
+                });
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(hov ? ACCENT_HOVER : ACCENT);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+                g2.setFont(FONT_BODY);
+                g2.setColor(Color.WHITE);
+                FontMetrics fm = g2.getFontMetrics();
+                g2.drawString(getText(),
+                        (getWidth() - fm.stringWidth(getText())) / 2,
+                        (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
+                g2.dispose();
+            }
+        };
+        showMoreBtn.setPreferredSize(new Dimension(POPUP_W - 28, 32));
+
+        footer.add(showMoreBtn, BorderLayout.CENTER);
+        popup.add(footer, BorderLayout.SOUTH);
+
+        // header ~42 + list + footer ~50
+        popup.setPreferredSize(new Dimension(POPUP_W, listH + 42 + 50));
+
+        // Anchor to bottom-left of the bell button, shift left so it doesn't clip
+        int xOff = Math.min(0, -(POPUP_W - bellBtn.getWidth()));
+        popup.show(bellBtn, xOff, bellBtn.getHeight() + 4);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Add / Edit dialogs
     // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Opens the modernized AddItemModal.
-     * Replaces the old sequential JOptionPane chain.
-     */
     private void openAddDialog() {
         Window owner = SwingUtilities.getWindowAncestor(this);
         new AddItemModal(owner, inventoryController, () -> {
             refresh();
             if (monitoringRefresh != null)
                 monitoringRefresh.run();
-            // Brief success toast
-            JOptionPane.showMessageDialog(
-                    this,
-                    "Item added successfully.",
-                    "Item Added",
+            JOptionPane.showMessageDialog(this, "Item added successfully.", "Item Added",
                     JOptionPane.INFORMATION_MESSAGE);
         }).setVisible(true);
     }
@@ -774,7 +940,6 @@ public class InventoryPanel extends JPanel {
         footer.add(cancel);
         footer.add(save);
         dialog.add(footer, BorderLayout.SOUTH);
-
         dialog.pack();
         dialog.setMinimumSize(new Dimension(320, dialog.getHeight()));
         dialog.setLocationRelativeTo(this);
@@ -803,8 +968,7 @@ public class InventoryPanel extends JPanel {
         f.setBackground(Color.WHITE);
         f.setForeground(TEXT_PRIMARY);
         f.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(BORDER_COLOR, 1),
-                new EmptyBorder(5, 8, 5, 8)));
+                BorderFactory.createLineBorder(BORDER_COLOR, 1), new EmptyBorder(5, 8, 5, 8)));
         f.addFocusListener(new java.awt.event.FocusAdapter() {
             public void focusGained(java.awt.event.FocusEvent e) {
                 f.setBorder(BorderFactory.createCompoundBorder(
@@ -886,7 +1050,7 @@ public class InventoryPanel extends JPanel {
                 g2.setColor(hov ? new Color(0xF3F4F6) : Color.WHITE);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
                 g2.setColor(BORDER_COLOR);
-                g2.setStroke(new java.awt.BasicStroke(1f));
+                g2.setStroke(new BasicStroke(1f));
                 g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 8, 8);
                 g2.setFont(FONT_BODY);
                 g2.setColor(TEXT_SECONDARY);
@@ -922,11 +1086,9 @@ public class InventoryPanel extends JPanel {
     // ─────────────────────────────────────────────────────────────────────────
     // Cell renderers
     // ─────────────────────────────────────────────────────────────────────────
-
     static class StdRenderer extends DefaultTableCellRenderer {
         @Override
-        public Component getTableCellRendererComponent(
-                JTable t, Object v, boolean sel, boolean foc, int row, int col) {
+        public Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean foc, int row, int col) {
             super.getTableCellRendererComponent(t, v, sel, foc, row, col);
             setFont(FONT_BODY);
             setBorder(new EmptyBorder(0, 12, 0, 8));
@@ -940,8 +1102,7 @@ public class InventoryPanel extends JPanel {
 
     static class AbcTierRenderer extends DefaultTableCellRenderer {
         @Override
-        public Component getTableCellRendererComponent(
-                JTable t, Object v, boolean sel, boolean foc, int row, int col) {
+        public Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean foc, int row, int col) {
             super.getTableCellRendererComponent(t, v, sel, foc, row, col);
             setHorizontalAlignment(CENTER);
             setFont(FONT_BOLD);
@@ -960,19 +1121,18 @@ public class InventoryPanel extends JPanel {
 
     static class ReorderGuideRenderer extends DefaultTableCellRenderer {
         @Override
-        public Component getTableCellRendererComponent(
-                JTable t, Object v, boolean sel, boolean foc, int row, int col) {
+        public Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean foc, int row, int col) {
             super.getTableCellRendererComponent(t, v, sel, foc, row, col);
             setHorizontalAlignment(CENTER);
             setFont(FONT_BODY);
             if (!sel)
                 setBackground(row % 2 == 0 ? ROW_BASE : ROW_ALT);
             if (v instanceof ReorderInfo i) {
-                setText("EOQ~" + Math.round(i.eoq) + "  ·  ROP~" + Math.round(i.rop));
+                setText("EOQ~" + Math.round(i.eoq) + "  \u00B7  ROP~" + Math.round(i.rop));
                 if (!sel)
                     setForeground(i.quantity <= i.rop ? STATUS_EXPIRED_FG : TEXT_MUTED);
             } else {
-                setText("—");
+                setText("\u2014");
                 if (!sel)
                     setForeground(TEXT_MUTED);
             }
@@ -982,15 +1142,14 @@ public class InventoryPanel extends JPanel {
 
     static class BatchSummaryRenderer extends DefaultTableCellRenderer {
         @Override
-        public Component getTableCellRendererComponent(
-                JTable t, Object v, boolean sel, boolean foc, int row, int col) {
+        public Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean foc, int row, int col) {
             super.getTableCellRendererComponent(t, v, sel, foc, row, col);
             setHorizontalAlignment(CENTER);
             setFont(FONT_BODY);
             if (!sel)
                 setBackground(row % 2 == 0 ? ROW_BASE : ROW_ALT);
 
-            String text = "—";
+            String text = "\u2014";
             Color fg = TEXT_MUTED;
 
             if (v instanceof InventoryRowView rv) {
@@ -1015,10 +1174,10 @@ public class InventoryPanel extends JPanel {
                         }
                     }
                     if (expired > 0) {
-                        text = "⚠ " + expired + " expired";
+                        text = expired + " expired";
                         fg = STATUS_EXPIRED_FG;
                     } else if (expiring > 0) {
-                        text = "⚠ " + expiring + " expiring";
+                        text = expiring + " expiring";
                         fg = STATUS_LOW_FG;
                     } else if (active > 0) {
                         text = active + " batch" + (active == 1 ? "" : "es");
@@ -1035,8 +1194,7 @@ public class InventoryPanel extends JPanel {
 
     static class StatusPillRenderer implements TableCellRenderer {
         @Override
-        public Component getTableCellRendererComponent(
-                JTable t, Object v, boolean sel, boolean foc, int row, int col) {
+        public Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean foc, int row, int col) {
             String text = v == null ? "" : v.toString();
             Color bg, fg;
             switch (text) {
@@ -1087,8 +1245,7 @@ public class InventoryPanel extends JPanel {
 
     static class DotMenuRenderer implements TableCellRenderer {
         @Override
-        public Component getTableCellRendererComponent(
-                JTable t, Object v, boolean sel, boolean foc, int row, int col) {
+        public Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean foc, int row, int col) {
             return new JComponent() {
                 {
                     setOpaque(false);
@@ -1104,7 +1261,7 @@ public class InventoryPanel extends JPanel {
                     g2.setFont(new Font("Segoe UI", Font.BOLD, 14));
                     g2.setColor(sel ? TEXT_SECONDARY : TEXT_MUTED);
                     FontMetrics fm = g2.getFontMetrics();
-                    String dots = "•••";
+                    String dots = "\u2022\u2022\u2022";
                     g2.drawString(dots, (getWidth() - fm.stringWidth(dots)) / 2,
                             (getHeight() + fm.getAscent() - fm.getDescent()) / 2);
                     g2.dispose();
@@ -1119,7 +1276,7 @@ public class InventoryPanel extends JPanel {
 
         DotMenuEditor() {
             cell.setOpaque(true);
-            JLabel dots = new JLabel("•••", SwingConstants.CENTER);
+            JLabel dots = new JLabel("\u2022\u2022\u2022", SwingConstants.CENTER);
             dots.setFont(new Font("Segoe UI", Font.BOLD, 14));
             dots.setForeground(TEXT_MUTED);
             dots.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -1173,15 +1330,13 @@ public class InventoryPanel extends JPanel {
 
         @Override
         public Object getCellEditorValue() {
-            return "···";
+            return "\u2022\u2022\u2022";
         }
 
         @Override
-        public Component getTableCellEditorComponent(
-                JTable table, Object value, boolean isSelected, int row, int col) {
+        public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int col) {
             editingRow = row;
-            cell.setBackground(isSelected ? table.getSelectionBackground()
-                    : (row % 2 == 0 ? ROW_BASE : ROW_ALT));
+            cell.setBackground(isSelected ? table.getSelectionBackground() : (row % 2 == 0 ? ROW_BASE : ROW_ALT));
             return cell;
         }
     }

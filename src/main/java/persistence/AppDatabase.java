@@ -45,17 +45,17 @@ public final class AppDatabase {
      * the seeded defaults only.
      *
      * Tables wiped:
-     *   staff_shifts, sales_records, sales_transactions,
-     *   sales_transaction_items, sales_order_status,
-     *   password_reset_requests, inventory_batches, users
+     * staff_shifts, sales_records, sales_transactions,
+     * sales_transaction_items, sales_order_status,
+     * password_reset_requests, inventory_batches, users
      *
      * Tables kept:
-     *   menu_items, menu_item_ingredients,
-     *   inventory_items (definitions only, quantities zeroed)
+     * menu_items, menu_item_ingredients,
+     * inventory_items (definitions only, quantities zeroed)
      */
     public static void resetForProduction() throws SQLException {
         try (Connection conn = openConnection();
-             java.sql.Statement st = conn.createStatement()) {
+                java.sql.Statement st = conn.createStatement()) {
             st.execute("DELETE FROM staff_shifts");
             st.execute("DELETE FROM sales_transaction_items");
             st.execute("DELETE FROM sales_order_status");
@@ -105,7 +105,12 @@ public final class AppDatabase {
     }
 
     private static Connection openRawConnection() throws SQLException {
-        return DriverManager.getConnection(JDBC_PREFIX + DATABASE_PATH.toAbsolutePath());
+        Connection connection = DriverManager.getConnection(JDBC_PREFIX + DATABASE_PATH.toAbsolutePath());
+        try (java.sql.Statement statement = connection.createStatement()) {
+            statement.execute("PRAGMA busy_timeout = 5000");
+            statement.execute("PRAGMA foreign_keys = ON");
+        }
+        return connection;
     }
 
     private static void consolidateInventoryItemNames(Connection connection) throws SQLException {

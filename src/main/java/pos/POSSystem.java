@@ -28,10 +28,16 @@ import java.awt.GridLayout;
 import java.awt.FlowLayout;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Insets;
 import java.awt.RenderingHints;
+import java.awt.BasicStroke;
+import java.awt.FontMetrics;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.geom.RoundRectangle2D;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -56,10 +62,6 @@ import loginregister.UserDataManager;
 import loginregister.UserDataManager.Role;
 import javax.swing.JPasswordField;
 import javax.swing.JDialog;
-import java.awt.FontMetrics;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.BasicStroke;
 import javax.swing.border.EmptyBorder;
 import persistence.Phase2Bootstrap;
 import ui.MenuMaintenancePanel;
@@ -93,9 +95,27 @@ public class POSSystem extends javax.swing.JFrame {
     private InventoryController inventoryController;
     private OrderController orderController;
 
+    // ── Top-nav label references (updated on username change) ────
     private JLabel topNavUserIcon;
     private JLabel topNavUserName;
     private JLabel topNavUserRole;
+
+    // ── Modernized nav bar palette ───────────────────────────────
+    private static final Color NAV_BG = new Color(0x12, 0x1A, 0x2B);
+    private static final Color NAV_BORDER_COLOR = new Color(0x27, 0x38, 0x50);
+    private static final Color CLOCK_TIME_FG = new Color(0xF0, 0xF4, 0xFF);
+    private static final Color CLOCK_DATE_FG = new Color(0x70, 0x8A, 0xA8);
+    private static final Color ONLINE_DOT_COLOR = new Color(0x34, 0xD3, 0x99);
+    private static final Color ADMIN_PILL_BG = new Color(0x1E, 0x3A, 0x8A, 100);
+    private static final Color ADMIN_PILL_FG = new Color(0x93, 0xC5, 0xFD);
+    private static final Color ADMIN_PILL_BD = new Color(0x3B, 0x82, 0xF6, 140);
+    private static final Color STAFF_PILL_BG = new Color(0x06, 0x4E, 0x3B, 100);
+    private static final Color STAFF_PILL_FG = new Color(0x6E, 0xE7, 0xB7);
+    private static final Color STAFF_PILL_BD = new Color(0x34, 0xD3, 0x99, 140);
+    private static final Color AVATAR_TOP_ADMIN = new Color(0x3B, 0x82, 0xF6);
+    private static final Color AVATAR_BOT_ADMIN = new Color(0x1D, 0x4E, 0xD8);
+    private static final Color AVATAR_TOP_STAFF = new Color(0x34, 0xD3, 0x99);
+    private static final Color AVATAR_BOT_STAFF = new Color(0x05, 0x96, 0x69);
 
     private static final List<String> ORDERING_CATEGORIES = List.of(
             "Espresso & Coffee",
@@ -218,7 +238,7 @@ public class POSSystem extends javax.swing.JFrame {
 
         categoryItems = buildCategoryItems();
         initComponents();
-        setTitle("Better Mondays Coffeee Cafe Management System - " + username);
+        setTitle("Better Mondays Coffee Cafe Management System - " + username);
         setResizable(true);
         setMinimumSize(new java.awt.Dimension(1100, 700));
         setExtendedState(javax.swing.JFrame.MAXIMIZED_BOTH);
@@ -815,207 +835,321 @@ public class POSSystem extends javax.swing.JFrame {
         refreshOrderDisplay();
     }
 
-    // ─── Top Navigation Bar ──────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════
+    // ─── MODERNIZED Top Navigation Bar ─────────────────────────────
+    // ═══════════════════════════════════════════════════════════════
     private JPanel buildTopNavBar() {
-        JPanel bar = new JPanel(new BorderLayout(0, 0));
-        bar.setBackground(AppTheme.BG_SURFACE);
-        bar.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 0, AppTheme.BORDER),
-                new EmptyBorder(0, 24, 0, 20)));
-        bar.setPreferredSize(new Dimension(0, 56));
+        boolean isAdmin = currentUserRole == Role.ADMIN;
 
-        // Left — live clock
-        JLabel clockLabel = new JLabel();
-        clockLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        clockLabel.setForeground(AppTheme.FG_MUTED);
-        Timer clockTimer = new Timer(1000, e -> {
+        // ── Root bar ──────────────────────────────────────────────────────────
+        JPanel bar = new JPanel(new BorderLayout(0, 0)) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                g.setColor(NAV_BORDER_COLOR);
+                g.fillRect(0, getHeight() - 1, getWidth(), 1);
+            }
+        };
+        bar.setBackground(NAV_BG);
+        bar.setBorder(BorderFactory.createEmptyBorder(0, 28, 0, 20));
+        bar.setPreferredSize(new Dimension(0, 60));
+
+        // ── LEFT: two-line live clock ─────────────────────────────────────────
+        // FIX 1: time label is now PLAIN (not bold)
+        JLabel timeLabel = new JLabel();
+        timeLabel.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        timeLabel.setForeground(CLOCK_TIME_FG);
+
+        JLabel dateLabel = new JLabel();
+        dateLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        dateLabel.setForeground(CLOCK_DATE_FG);
+        dateLabel.setBorder(BorderFactory.createEmptyBorder(1, 0, 0, 0));
+
+        Timer clockTimer = new Timer(500, e -> {
             LocalDateTime now = LocalDateTime.now();
-            clockLabel.setText(now.format(DateTimeFormatter.ofPattern("EEEE, MM/dd/yyyy, hh:mm:ss a")));
+            timeLabel.setText(now.format(DateTimeFormatter.ofPattern("hh:mm:ss a")));
+            dateLabel.setText(now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy")));
         });
         clockTimer.setInitialDelay(0);
         clockTimer.start();
-        JPanel clockPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+
+        JPanel clockPanel = new JPanel();
+        clockPanel.setLayout(new BoxLayout(clockPanel, BoxLayout.Y_AXIS));
         clockPanel.setOpaque(false);
-        clockPanel.add(clockLabel);
+        clockPanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+        clockPanel.add(timeLabel);
+        clockPanel.add(dateLabel);
         bar.add(clockPanel, BorderLayout.WEST);
 
-        // Right side — status indicators + user profile
-        JPanel profilePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
-        profilePanel.setOpaque(false);
-        profilePanel.setBorder(new EmptyBorder(0, 0, 0, 4));
+        // ── RIGHT: all status + profile elements ──────────────────────────────
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        right.setOpaque(false);
 
-        // Online indicator
-        JPanel onlinePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-        onlinePanel.setOpaque(false);
-        JLabel dot = new JLabel() {
+        // --- Animated online pill ---
+        int[] dotAlpha = { 255 };
+        int[] dotDir = { -4 };
+        JPanel dotIcon = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(AppTheme.SUCCESS);
-                int d = 8;
-                g2.fillOval((getWidth() - d) / 2, (getHeight() - d) / 2, d, d);
+                g2.setColor(new Color(
+                        ONLINE_DOT_COLOR.getRed(),
+                        ONLINE_DOT_COLOR.getGreen(),
+                        ONLINE_DOT_COLOR.getBlue(),
+                        dotAlpha[0] / 4));
+                g2.fillOval(0, 0, 12, 12);
+                g2.setColor(ONLINE_DOT_COLOR);
+                g2.fillOval(3, 3, 6, 6);
                 g2.dispose();
             }
         };
-        dot.setPreferredSize(new Dimension(14, 14));
-        dot.setOpaque(false);
+        dotIcon.setOpaque(false);
+        dotIcon.setPreferredSize(new Dimension(12, 12));
+
+        Timer pulseTimer = new Timer(40, e -> {
+            dotAlpha[0] += dotDir[0];
+            if (dotAlpha[0] <= 80)
+                dotDir[0] = 4;
+            if (dotAlpha[0] >= 255)
+                dotDir[0] = -4;
+            dotIcon.repaint();
+        });
+        pulseTimer.start();
+
         JLabel onlineText = new JLabel("Online");
         onlineText.setFont(new Font("Segoe UI", Font.BOLD, 11));
-        onlineText.setForeground(AppTheme.SUCCESS);
-        onlinePanel.add(dot);
+        onlineText.setForeground(ONLINE_DOT_COLOR);
+
+        JPanel onlinePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+        onlinePanel.setOpaque(false);
+        onlinePanel.add(dotIcon);
         onlinePanel.add(onlineText);
 
-        // Notification bell
-        int notifCount = ui.MonitoringPanel.getPendingReportCount();
-        JPanel bellPanel = new JPanel(new GridBagLayout());
-        bellPanel.setOpaque(false);
-        JLabel bellIcon = new JLabel() {
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                int w = getWidth(), h = getHeight();
-                int cx = w / 2, by = h - 6;
-                g2.setColor(new Color(0x2563EB));
-                g2.setStroke(new BasicStroke(1.6f));
-                g2.drawArc(cx - 6, by - 12, 12, 10, 0, 180);
-                g2.drawLine(cx - 4, by, cx + 4, by);
-                g2.fillOval(cx - 1, by - 14, 3, 3);
-                g2.dispose();
-            }
-        };
-        bellIcon.setPreferredSize(new Dimension(22, 22));
-        bellIcon.setOpaque(false);
-        bellIcon.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        bellIcon.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override
-            public void mouseClicked(java.awt.event.MouseEvent e) {
-                ui.MonitoringPanel.showNotificationsDialog(SwingUtilities.windowForComponent(bellPanel));
-            }
-        });
-        bellPanel.add(bellIcon);
+        right.add(onlinePanel);
+        right.add(Box.createRigidArea(new Dimension(12, 0)));
 
-        if (notifCount > 0) {
-            JLabel badge = new JLabel(String.valueOf(notifCount), SwingConstants.CENTER);
-            badge.setFont(new Font("Segoe UI", Font.BOLD, 9));
-            badge.setForeground(Color.WHITE);
-            badge.setBackground(AppTheme.DANGER);
-            badge.setOpaque(true);
-            badge.setPreferredSize(new Dimension(16, 16));
-            badge.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
-            GridBagConstraints bc = new GridBagConstraints();
-            bc.gridx = 1;
-            bc.gridy = 0;
-            bc.anchor = GridBagConstraints.NORTHWEST;
-            bellPanel.add(badge, bc);
+        // --- Bell icon (admin only) ---
+        if (isAdmin) {
+            int notifCount = ui.MonitoringPanel.getPendingReportCount();
+
+            JPanel bellWrap = new JPanel(new GridBagLayout());
+            bellWrap.setOpaque(false);
+            bellWrap.setPreferredSize(new Dimension(notifCount > 0 ? 34 : 28, 34));
+
+            // FIX 2: Bell default = admin blue (#93C5FD); hover = soft grey
+            Color bellDefaultColor = ADMIN_PILL_FG; // #93C5FD
+            Color bellHoverColor = new Color(0xC0, 0xCC, 0xD6); // light grey
+
+            boolean[] bellHovered = { false };
+            JLabel bellIcon = new JLabel() {
+                @Override
+                protected void paintComponent(Graphics g) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    Color c = bellHovered[0] ? bellHoverColor : bellDefaultColor;
+                    g2.setColor(c);
+                    g2.setStroke(new BasicStroke(1.7f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    int cx = getWidth() / 2;
+                    g2.drawArc(cx - 7, 3, 14, 12, 0, 180);
+                    g2.drawLine(cx - 7, 9, cx - 7, 16);
+                    g2.drawLine(cx + 7, 9, cx + 7, 16);
+                    g2.drawLine(cx - 8, 16, cx + 8, 16);
+                    g2.fillOval(cx - 2, 17, 4, 3);
+                    g2.fillOval(cx - 2, 1, 4, 3);
+                    g2.dispose();
+                }
+            };
+            bellIcon.setPreferredSize(new Dimension(22, 22));
+            bellIcon.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            bellIcon.setToolTipText("Notifications");
+            bellIcon.addMouseListener(new java.awt.event.MouseAdapter() {
+                @Override
+                public void mouseEntered(java.awt.event.MouseEvent e) {
+                    bellHovered[0] = true;
+                    bellIcon.repaint();
+                }
+
+                @Override
+                public void mouseExited(java.awt.event.MouseEvent e) {
+                    bellHovered[0] = false;
+                    bellIcon.repaint();
+                }
+
+                @Override
+                public void mouseClicked(java.awt.event.MouseEvent e) {
+                    ui.MonitoringPanel.showNotificationsDialog(SwingUtilities.windowForComponent(bellWrap));
+                }
+            });
+            bellWrap.add(bellIcon);
+
+            if (notifCount > 0) {
+                JLabel badge = new JLabel(notifCount > 9 ? "9+" : String.valueOf(notifCount),
+                        SwingConstants.CENTER) {
+                    @Override
+                    protected void paintComponent(Graphics g) {
+                        Graphics2D g2 = (Graphics2D) g.create();
+                        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                        g2.setColor(new Color(0xEF, 0x44, 0x44));
+                        g2.fillOval(0, 0, getWidth(), getHeight());
+                        super.paintComponent(g);
+                        g2.dispose();
+                    }
+                };
+                badge.setFont(new Font("Segoe UI", Font.BOLD, 8));
+                badge.setForeground(Color.WHITE);
+                badge.setOpaque(false);
+                badge.setPreferredSize(new Dimension(15, 15));
+                GridBagConstraints bc = new GridBagConstraints();
+                bc.gridx = 1;
+                bc.gridy = 0;
+                bc.anchor = GridBagConstraints.NORTHEAST;
+                bellWrap.add(badge, bc);
+            }
+
+            right.add(bellWrap);
+            right.add(Box.createRigidArea(new Dimension(12, 0)));
         }
 
-        // User avatar
-        topNavUserIcon = new JLabel(String.valueOf(Character.toUpperCase(currentUsername.charAt(0)))) {
+        // --- Thin vertical divider ---
+        JPanel divider = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                g.setColor(NAV_BORDER_COLOR);
+                g.fillRect(0, 8, 1, getHeight() - 16);
+            }
+        };
+        divider.setOpaque(false);
+        divider.setPreferredSize(new Dimension(1, 44));
+        right.add(divider);
+        right.add(Box.createRigidArea(new Dimension(14, 0)));
+
+        // --- Gradient rounded-rect avatar ---
+        Color avatarTop = isAdmin ? AVATAR_TOP_ADMIN : AVATAR_TOP_STAFF;
+        Color avatarBot = isAdmin ? AVATAR_BOT_ADMIN : AVATAR_BOT_STAFF;
+        String initLetter = currentUsername.isEmpty() ? "?"
+                : String.valueOf(Character.toUpperCase(currentUsername.charAt(0)));
+
+        topNavUserIcon = new JLabel(initLetter) {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(currentUserRole == Role.ADMIN ? AppTheme.ACCENT_DARK : AppTheme.SUCCESS);
-                int size = Math.min(getWidth(), getHeight());
-                g2.fillOval(0, 0, size - 1, size - 1);
+                int arc = 10;
+                GradientPaint gp = new GradientPaint(0, 0, avatarTop, 0, getHeight(), avatarBot);
+                g2.setPaint(gp);
+                g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), arc, arc));
+                g2.setColor(new Color(255, 255, 255, 40));
+                g2.setStroke(new BasicStroke(1f));
+                g2.draw(new RoundRectangle2D.Float(0.5f, 0.5f, getWidth() - 1f, getHeight() - 1f, arc, arc));
                 g2.setColor(Color.WHITE);
-                g2.setFont(new Font("Segoe UI", Font.BOLD, 14));
+                g2.setFont(new Font("Segoe UI", Font.BOLD, 15));
                 FontMetrics fm = g2.getFontMetrics();
-                String text = getText();
-                g2.drawString(text, (getWidth() - fm.stringWidth(text)) / 2,
+                String txt = getText();
+                g2.drawString(txt,
+                        (getWidth() - fm.stringWidth(txt)) / 2,
                         (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
                 g2.dispose();
             }
         };
         topNavUserIcon.setPreferredSize(new Dimension(36, 36));
         topNavUserIcon.setMinimumSize(new Dimension(36, 36));
-        topNavUserIcon.setHorizontalAlignment(SwingConstants.CENTER);
         topNavUserIcon.setOpaque(false);
+        topNavUserIcon.setHorizontalAlignment(SwingConstants.CENTER);
 
-        JPanel avatarWrap = new JPanel(new GridBagLayout());
-        avatarWrap.setOpaque(false);
-        avatarWrap.setPreferredSize(new Dimension(40, 40));
-        avatarWrap.add(topNavUserIcon);
+        right.add(topNavUserIcon);
+        right.add(Box.createRigidArea(new Dimension(10, 0)));
 
-        // Name + role pill
-        JPanel namePanel = new JPanel();
-        namePanel.setLayout(new BoxLayout(namePanel, BoxLayout.Y_AXIS));
-        namePanel.setOpaque(false);
+        // --- Name + pill-shaped role badge stack ---
+        Color pillBg = isAdmin ? ADMIN_PILL_BG : STAFF_PILL_BG;
+        Color pillFg = isAdmin ? ADMIN_PILL_FG : STAFF_PILL_FG;
+        Color pillBd = isAdmin ? ADMIN_PILL_BD : STAFF_PILL_BD;
 
         topNavUserName = new JLabel(currentUsername);
         topNavUserName.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        topNavUserName.setForeground(AppTheme.FG_PRIMARY);
+        topNavUserName.setForeground(CLOCK_TIME_FG);
 
-        boolean isAdmin = currentUserRole == Role.ADMIN;
-        topNavUserRole = new JLabel(isAdmin ? "Admin" : "Staff");
-        topNavUserRole.setFont(new Font("Segoe UI", Font.BOLD, 10));
-        topNavUserRole.setForeground(isAdmin ? AppTheme.ACCENT_DARK : AppTheme.SUCCESS);
-        topNavUserRole.setBackground(isAdmin ? AppTheme.BG_BADGE_BLUE : AppTheme.BG_BADGE_GREEN);
-        topNavUserRole.setOpaque(true);
-        topNavUserRole.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createEmptyBorder(1, 6, 1, 6),
-                BorderFactory.createLineBorder(isAdmin ? AppTheme.ACCENT_DARK : AppTheme.SUCCESS, 1)));
-        topNavUserRole.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        namePanel.add(topNavUserName);
-        namePanel.add(Box.createVerticalStrut(2));
-        namePanel.add(topNavUserRole);
-
-        JButton settingsBtn = new JButton();
-        settingsBtn.putClientProperty("appTheme.variant", "transparent");
-        settingsBtn.setIcon(createOverflowIcon());
-        settingsBtn.setPreferredSize(new Dimension(24, 24));
-        settingsBtn.setForeground(AppTheme.FG_MUTED);
-        settingsBtn.setBackground(new Color(0, 0, 0, 0));
-        settingsBtn.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
-        settingsBtn.setFocusPainted(false);
-        settingsBtn.setContentAreaFilled(false);
-        settingsBtn.setOpaque(false);
-        settingsBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        settingsBtn.addActionListener(e -> showProfileSettingsDialog());
-
-        profilePanel.add(onlinePanel);
-        if (isAdmin) {
-            profilePanel.add(bellPanel);
-        }
-        profilePanel.add(Box.createHorizontalStrut(4));
-        profilePanel.add(avatarWrap);
-        profilePanel.add(Box.createHorizontalStrut(2));
-        profilePanel.add(namePanel);
-        profilePanel.add(Box.createHorizontalStrut(4));
-        profilePanel.add(settingsBtn);
-
-        bar.add(profilePanel, BorderLayout.EAST);
-        return bar;
-    }
-
-    private Icon createOverflowIcon() {
-        return new Icon() {
+        // FIX 3: preferred width 50 → 68 so "Admin" text is never clipped
+        topNavUserRole = new JLabel(isAdmin ? "Admin" : "Staff", SwingConstants.CENTER) {
             @Override
-            public int getIconWidth() {
-                return 10;
-            }
-
-            @Override
-            public int getIconHeight() {
-                return 14;
-            }
-
-            @Override
-            public void paintIcon(java.awt.Component c, Graphics g, int x, int y) {
+            protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(AppTheme.FG_MUTED);
-                g2.fillOval(x + 3, y + 1, 4, 4);
-                g2.fillOval(x + 3, y + 5, 4, 4);
-                g2.fillOval(x + 3, y + 9, 4, 4);
+                int arc = getHeight();
+                g2.setColor(pillBg);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), arc, arc);
+                g2.setColor(pillBd);
+                g2.setStroke(new BasicStroke(1f));
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, arc, arc);
+                super.paintComponent(g);
                 g2.dispose();
             }
         };
+        topNavUserRole.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        topNavUserRole.setForeground(pillFg);
+        topNavUserRole.setOpaque(false);
+        topNavUserRole.setBorder(BorderFactory.createEmptyBorder(2, 8, 2, 8));
+        topNavUserRole.setPreferredSize(new Dimension(68, 18)); // was 50
+
+        JPanel nameStack = new JPanel();
+        nameStack.setLayout(new BoxLayout(nameStack, BoxLayout.Y_AXIS));
+        nameStack.setOpaque(false);
+        nameStack.add(topNavUserName);
+        nameStack.add(Box.createVerticalStrut(3));
+        nameStack.add(topNavUserRole);
+
+        right.add(nameStack);
+        right.add(Box.createRigidArea(new Dimension(10, 0)));
+
+        // --- Settings ⋮ button ---
+        boolean[] btnHovered = { false };
+        JButton settingsBtn = new JButton() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                if (btnHovered[0]) {
+                    g2.setColor(new Color(255, 255, 255, 20));
+                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
+                }
+                g2.setColor(new Color(0x8A, 0xA8, 0xC4));
+                int cx = getWidth() / 2;
+                int cy = getHeight() / 2;
+                g2.fillOval(cx - 2, cy - 8, 4, 4);
+                g2.fillOval(cx - 2, cy - 2, 4, 4);
+                g2.fillOval(cx - 2, cy + 4, 4, 4);
+                g2.dispose();
+            }
+        };
+        settingsBtn.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                btnHovered[0] = true;
+                settingsBtn.repaint();
+            }
+
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                btnHovered[0] = false;
+                settingsBtn.repaint();
+            }
+        });
+        settingsBtn.setPreferredSize(new Dimension(28, 36));
+        settingsBtn.setOpaque(false);
+        settingsBtn.setContentAreaFilled(false);
+        settingsBtn.setBorderPainted(false);
+        settingsBtn.setFocusPainted(false);
+        settingsBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        settingsBtn.setToolTipText("Settings");
+        settingsBtn.addActionListener(e -> showProfileSettingsDialog());
+
+        right.add(settingsBtn);
+
+        bar.add(right, BorderLayout.EAST);
+        return bar;
     }
 
+    // ─── Profile settings dialog ─────────────────────────────────
     private void showProfileSettingsDialog() {
         JDialog dialog = new JDialog(this, "User Settings", JDialog.ModalityType.APPLICATION_MODAL);
         dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
@@ -1116,7 +1250,8 @@ public class POSSystem extends javax.swing.JFrame {
             currentUsername = newUsername;
             topNavUserName.setText(newUsername);
             topNavUserIcon.setText(String.valueOf(Character.toUpperCase(newUsername.charAt(0))));
-            setTitle("Better Mondays Coffeee Cafe Management System - " + newUsername);
+            topNavUserIcon.repaint();
+            setTitle("Better Mondays Coffee Cafe Management System - " + newUsername);
             JOptionPane.showMessageDialog(this, "Username updated.",
                     "Edit Username", JOptionPane.INFORMATION_MESSAGE);
         } else {
@@ -1215,7 +1350,7 @@ public class POSSystem extends javax.swing.JFrame {
             }
         }));
 
-        // ── Inventory tab — delegated to InventoryPanel ─────────
+        // ── Inventory tab ───────────────────────────────────────
         inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
         inventoryPanel = new InventoryPanel(isAdmin, inventoryController, () -> {
             if (monitoringPanel != null)
@@ -1389,7 +1524,7 @@ public class POSSystem extends javax.swing.JFrame {
 
     private void exitActionPerformed(java.awt.event.ActionEvent evt) {
         int option = JOptionPane.showConfirmDialog(this, "Do you want to exit?",
-                "Better Mondays Coffeee Cafe Management System",
+                "Better Mondays Coffee Cafe Management System",
                 JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
         if (option == JOptionPane.YES_OPTION)
             System.exit(0);

@@ -41,7 +41,10 @@ public class StaffPanel extends JPanel {
     private final JTable usersTable = new JTable();
     private final DefaultTableModel usersModel = new DefaultTableModel(
             new String[] { "Staff ID", "Username", "Full Name", "Role", "Gender", "Mobile", "Created At" }, 0) {
-        @Override public boolean isCellEditable(int row, int col) { return false; }
+        @Override
+        public boolean isCellEditable(int row, int col) {
+            return false;
+        }
     };
     private final JButton makeAdminBtn = new JButton("Make Admin");
     private final JButton makeStaffBtn = new JButton("Make Staff");
@@ -54,11 +57,14 @@ public class StaffPanel extends JPanel {
     private final JTable resetRequestsTable = new JTable();
     private final DefaultTableModel resetRequestsModel = new DefaultTableModel(
             new String[] { "_id", "Username", "Status", "Requested At", "Resolved At" }, 0) {
-        @Override public boolean isCellEditable(int row, int col) { return false; }
+        @Override
+        public boolean isCellEditable(int row, int col) {
+            return false;
+        }
     };
     private TableRowSorter<DefaultTableModel> resetRequestsSorter;
-    private final JButton approveRequestBtn  = new JButton("Approve");
-    private final JButton rejectRequestBtn   = new JButton("Reject");
+    private final JButton approveRequestBtn = new JButton("Approve");
+    private final JButton rejectRequestBtn = new JButton("Reject");
     private final JButton refreshRequestsBtn = new JButton("Refresh");
     private final JComboBox<String> requestStatusFilter = new JComboBox<>(
             new String[] { "All", "Pending", "Approved", "Rejected" });
@@ -178,7 +184,8 @@ public class StaffPanel extends JPanel {
         tabBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         tabBar.setOpaque(false);
 
-        String[] tabs = { "Staff Shifts", "Weekly Schedule", "Attendance History", "Password Request", "Account Management" };
+        String[] tabs = { "Staff Shifts", "Weekly Schedule", "Attendance History", "Password Request",
+                "Account Management" };
         String defaultTab = currentRole == Role.ADMIN ? "Staff Shifts" : "Weekly Schedule";
         for (String tab : tabs) {
             JButton btn = new JButton(tab);
@@ -211,7 +218,8 @@ public class StaffPanel extends JPanel {
 
     private void onTabSelected(String tab) {
         if ("Staff Shifts".equals(tab)) {
-            if (currentRole != Role.ADMIN) return;
+            if (currentRole != Role.ADMIN)
+                return;
             showStaffShiftsView();
         } else if ("Weekly Schedule".equals(tab)) {
             showWeeklyScheduleView();
@@ -279,17 +287,20 @@ public class StaffPanel extends JPanel {
         gc.insets = new Insets(4, 4, 4, 4);
         gc.fill = GridBagConstraints.HORIZONTAL;
 
-        gc.gridx = 0; gc.gridy = 0;
+        gc.gridx = 0;
+        gc.gridy = 0;
         form.add(new JLabel("Start Date (yyyy-MM-dd):"), gc);
         gc.gridx = 1;
         form.add(startDateField, gc);
 
-        gc.gridx = 0; gc.gridy = 1;
+        gc.gridx = 0;
+        gc.gridy = 1;
         form.add(new JLabel("End Date (yyyy-MM-dd):"), gc);
         gc.gridx = 1;
         form.add(endDateField, gc);
 
-        gc.gridx = 0; gc.gridy = 2;
+        gc.gridx = 0;
+        gc.gridy = 2;
         form.add(new JLabel("Reason:"), gc);
         gc.gridx = 1;
         form.add(reasonField, gc);
@@ -308,6 +319,7 @@ public class StaffPanel extends JPanel {
             // Store leave request in background
             new SwingWorker<Void, Void>() {
                 private String errorMsg;
+
                 @Override
                 protected Void doInBackground() {
                     try {
@@ -325,6 +337,7 @@ public class StaffPanel extends JPanel {
                     }
                     return null;
                 }
+
                 @Override
                 protected void done() {
                     if (errorMsg != null) {
@@ -345,6 +358,7 @@ public class StaffPanel extends JPanel {
         new SwingWorker<Void, Void>() {
             private boolean success;
             private String errorMsg;
+
             @Override
             protected Void doInBackground() {
                 try {
@@ -355,6 +369,7 @@ public class StaffPanel extends JPanel {
                 }
                 return null;
             }
+
             @Override
             protected void done() {
                 if (success) {
@@ -404,8 +419,10 @@ public class StaffPanel extends JPanel {
     }
 
     private JPanel attendanceHistoryPanel;
+
     private void refreshWeeklySchedule() {
-        if (weeklyScheduleTable == null) return;
+        if (weeklyScheduleTable == null)
+            return;
         weeklyScheduleTable.removeAll();
         weeklyScheduleTable.setLayout(new GridBagLayout());
 
@@ -421,7 +438,8 @@ public class StaffPanel extends JPanel {
                     for (UserAccount u : users) {
                         try {
                             allSchedules.put(u.getUsername(), scheduleRepo.loadSchedule(u.getUsername()));
-                        } catch (Exception ignored) {}
+                        } catch (Exception ignored) {
+                        }
                     }
                 } catch (Exception ex) {
                     errorMsg = ex.getMessage();
@@ -431,7 +449,8 @@ public class StaffPanel extends JPanel {
 
             @Override
             protected void done() {
-                if (users == null) return;
+                if (users == null)
+                    return;
                 renderScheduleTable(users, allSchedules);
                 if (errorMsg != null) {
                     JOptionPane.showMessageDialog(StaffPanel.this,
@@ -526,33 +545,15 @@ public class StaffPanel extends JPanel {
         JPanel cell = new JPanel(new GridBagLayout());
         cell.setBackground(bg);
 
-        JLabel avatar = new JLabel(String.valueOf(Character.toUpperCase(user.getUsername().charAt(0)))) {
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(new Color(0x2563EB));
-                int d = Math.min(getWidth(), getHeight());
-                g2.fillOval(0, 0, d - 1, d - 1);
-                g2.setColor(Color.WHITE);
-                g2.setFont(new Font("Segoe UI", Font.BOLD, 12));
-                FontMetrics fm = g2.getFontMetrics();
-                String t = getText();
-                g2.drawString(t, (getWidth() - fm.stringWidth(t)) / 2,
-                        (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
-                g2.dispose();
-            }
-        };
-        avatar.setPreferredSize(new Dimension(30, 30));
-        avatar.setMinimumSize(new Dimension(30, 30));
-        avatar.setOpaque(false);
+        JLabel avatar = createAvatarLabel(user, 30, new Color(0x2563EB));
 
         JPanel nameStack = new JPanel();
         nameStack.setLayout(new BoxLayout(nameStack, BoxLayout.Y_AXIS));
         nameStack.setOpaque(false);
 
         String displayName = (user.getFullName() != null && !user.getFullName().isEmpty())
-                ? user.getFullName() : user.getUsername();
+                ? user.getFullName()
+                : user.getUsername();
         JLabel nameLabel = new JLabel(displayName);
         nameLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
         nameLabel.setForeground(new Color(0x0F172A));
@@ -614,9 +615,12 @@ public class StaffPanel extends JPanel {
 
     private String scheduleShiftLabel(String shift) {
         switch (shift) {
-            case "afternoon": return "11:00AM-4PM";
-            case "night": return "4:00PM-11PM";
-            default: return "Rest Day";
+            case "afternoon":
+                return "11:00AM-4PM";
+            case "night":
+                return "4:00PM-11PM";
+            default:
+                return "Rest Day";
         }
     }
 
@@ -689,33 +693,15 @@ public class StaffPanel extends JPanel {
         JPanel topRow = new JPanel(new BorderLayout(8, 0));
         topRow.setOpaque(false);
 
-        JLabel avatar = new JLabel(String.valueOf(Character.toUpperCase(user.getUsername().charAt(0)))) {
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(user.getRole() == Role.ADMIN ? ACCENT_BLUE : STATUS_GREEN);
-                int size = Math.min(getWidth(), getHeight());
-                g2.fillOval(0, 0, size - 1, size - 1);
-                g2.setColor(Color.WHITE);
-                g2.setFont(new Font("Segoe UI", Font.BOLD, 16));
-                FontMetrics fm = g2.getFontMetrics();
-                String text = getText();
-                g2.drawString(text, (getWidth() - fm.stringWidth(text)) / 2,
-                        (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
-                g2.dispose();
-            }
-        };
-        avatar.setPreferredSize(new Dimension(42, 42));
-        avatar.setMinimumSize(new Dimension(42, 42));
-        avatar.setOpaque(false);
+        JLabel avatar = createAvatarLabel(user, 42, user.getRole() == Role.ADMIN ? ACCENT_BLUE : STATUS_GREEN);
 
         JPanel nameStack = new JPanel();
         nameStack.setLayout(new BoxLayout(nameStack, BoxLayout.Y_AXIS));
         nameStack.setOpaque(false);
 
         JLabel nameLabel = new JLabel(user.getFullName() != null && !user.getFullName().isEmpty()
-                ? user.getFullName() : user.getUsername());
+                ? user.getFullName()
+                : user.getUsername());
         nameLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
         nameLabel.setForeground(TEXT_PRIMARY);
 
@@ -821,6 +807,49 @@ public class StaffPanel extends JPanel {
         return card;
     }
 
+    private JLabel createAvatarLabel(UserAccount user, int size, Color fallbackColor) {
+        try {
+            if (profilePictureRepository != null) {
+                byte[] imageBytes = profilePictureRepository.loadPicture(user.getUsername());
+                if (imageBytes != null && imageBytes.length > 0) {
+                    Image image = new ImageIcon(imageBytes).getImage();
+                    Image scaled = image.getScaledInstance(size, size, Image.SCALE_SMOOTH);
+                    JLabel avatar = new JLabel(new ImageIcon(scaled));
+                    avatar.setPreferredSize(new Dimension(size, size));
+                    avatar.setMinimumSize(new Dimension(size, size));
+                    avatar.setHorizontalAlignment(SwingConstants.CENTER);
+                    avatar.setVerticalAlignment(SwingConstants.CENTER);
+                    return avatar;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        JLabel avatar = new JLabel(String.valueOf(Character.toUpperCase(user.getUsername().charAt(0)))) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(fallbackColor);
+                int d = Math.min(getWidth(), getHeight());
+                g2.fillOval(0, 0, d - 1, d - 1);
+                g2.setColor(Color.WHITE);
+                g2.setFont(new Font("Segoe UI", Font.BOLD, size >= 42 ? 16 : 12));
+                FontMetrics fm = g2.getFontMetrics();
+                String text = getText();
+                g2.drawString(text, (getWidth() - fm.stringWidth(text)) / 2,
+                        (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
+                g2.dispose();
+            }
+        };
+        avatar.setPreferredSize(new Dimension(size, size));
+        avatar.setMinimumSize(new Dimension(size, size));
+        avatar.setOpaque(false);
+        avatar.setHorizontalAlignment(SwingConstants.CENTER);
+        avatar.setVerticalAlignment(SwingConstants.CENTER);
+        return avatar;
+    }
+
     private JLabel buildStatusBadge(StaffShift shift) {
         String text;
         Color bg;
@@ -868,12 +897,17 @@ public class StaffPanel extends JPanel {
     private void onMarkAsLate(String targetUser) {
         new SwingWorker<Void, Void>() {
             private String errorMsg;
+
             @Override
             protected Void doInBackground() {
-                try { shiftRepo.markAsLate(targetUser); }
-                catch (Exception ex) { errorMsg = ex.getMessage(); }
+                try {
+                    shiftRepo.markAsLate(targetUser);
+                } catch (Exception ex) {
+                    errorMsg = ex.getMessage();
+                }
                 return null;
             }
+
             @Override
             protected void done() {
                 if (errorMsg != null) {
@@ -888,12 +922,17 @@ public class StaffPanel extends JPanel {
     private void onMarkAsAbsent(String targetUser) {
         new SwingWorker<Void, Void>() {
             private String errorMsg;
+
             @Override
             protected Void doInBackground() {
-                try { shiftRepo.markAsAbsent(targetUser); }
-                catch (Exception ex) { errorMsg = ex.getMessage(); }
+                try {
+                    shiftRepo.markAsAbsent(targetUser);
+                } catch (Exception ex) {
+                    errorMsg = ex.getMessage();
+                }
                 return null;
             }
+
             @Override
             protected void done() {
                 if (errorMsg != null) {
@@ -914,16 +953,22 @@ public class StaffPanel extends JPanel {
         int confirm = JOptionPane.showConfirmDialog(this,
                 "Are you sure you want to delete \"" + targetUser + "\"? This cannot be undone.",
                 "Confirm Delete", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (confirm != JOptionPane.YES_OPTION)
+            return;
 
         new SwingWorker<Void, Void>() {
             private String errorMsg;
+
             @Override
             protected Void doInBackground() {
-                try { accountRoleRepository.deleteUser(targetUser); }
-                catch (Exception ex) { errorMsg = ex.getMessage(); }
+                try {
+                    accountRoleRepository.deleteUser(targetUser);
+                } catch (Exception ex) {
+                    errorMsg = ex.getMessage();
+                }
                 return null;
             }
+
             @Override
             protected void done() {
                 if (errorMsg != null) {
@@ -1046,7 +1091,10 @@ public class StaffPanel extends JPanel {
     private JPanel createAttendanceHistoryPanel() {
         attendanceModel = new DefaultTableModel(
                 new String[] { "Staff Name", "Date", "Clock In", "Clock Out", "Duration", "Status" }, 0) {
-            @Override public boolean isCellEditable(int row, int col) { return false; }
+            @Override
+            public boolean isCellEditable(int row, int col) {
+                return false;
+            }
         };
         attendanceTable = new JTable(attendanceModel);
         attendanceTable.setFont(new Font("Segoe UI", Font.PLAIN, 12));
@@ -1080,7 +1128,8 @@ public class StaffPanel extends JPanel {
                 BorderFactory.createLineBorder(new Color(0xE5E7EB)),
                 BorderFactory.createEmptyBorder(7, 10, 7, 10)));
         attendanceSearchField.addKeyListener(new java.awt.event.KeyAdapter() {
-            @Override public void keyReleased(java.awt.event.KeyEvent e) {
+            @Override
+            public void keyReleased(java.awt.event.KeyEvent e) {
                 applyAttendanceFilter();
             }
         });
@@ -1152,11 +1201,12 @@ public class StaffPanel extends JPanel {
     }
 
     private void showAttendanceDatePicker(JTextField target) {
-        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), "Select Date", ModalityType.APPLICATION_MODAL);
+        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), "Select Date",
+                ModalityType.APPLICATION_MODAL);
         dialog.setResizable(false);
         dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
 
-        final java.time.YearMonth[] currentMonth = {java.time.YearMonth.now()};
+        final java.time.YearMonth[] currentMonth = { java.time.YearMonth.now() };
         JPanel gridPanel = new JPanel(new GridLayout(0, 7, 0, 0));
         gridPanel.setBackground(Color.WHITE);
         JLabel monthLabel = new JLabel("", SwingConstants.CENTER);
@@ -1182,7 +1232,10 @@ public class StaffPanel extends JPanel {
         prevYear.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
         prevYear.setFocusPainted(false);
         prevYear.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        prevYear.addActionListener(ev -> { currentMonth[0] = currentMonth[0].minusYears(1); renderDateGrid(gridPanel, monthLabel, currentMonth[0], target, dialog); });
+        prevYear.addActionListener(ev -> {
+            currentMonth[0] = currentMonth[0].minusYears(1);
+            renderDateGrid(gridPanel, monthLabel, currentMonth[0], target, dialog);
+        });
 
         JButton prevMonth = new JButton("<");
         prevMonth.setFont(new Font("Segoe UI", Font.BOLD, 12));
@@ -1191,7 +1244,10 @@ public class StaffPanel extends JPanel {
         prevMonth.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
         prevMonth.setFocusPainted(false);
         prevMonth.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        prevMonth.addActionListener(ev -> { currentMonth[0] = currentMonth[0].minusMonths(1); renderDateGrid(gridPanel, monthLabel, currentMonth[0], target, dialog); });
+        prevMonth.addActionListener(ev -> {
+            currentMonth[0] = currentMonth[0].minusMonths(1);
+            renderDateGrid(gridPanel, monthLabel, currentMonth[0], target, dialog);
+        });
 
         JButton nextMonth = new JButton(">");
         nextMonth.setFont(new Font("Segoe UI", Font.BOLD, 12));
@@ -1200,7 +1256,10 @@ public class StaffPanel extends JPanel {
         nextMonth.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
         nextMonth.setFocusPainted(false);
         nextMonth.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        nextMonth.addActionListener(ev -> { currentMonth[0] = currentMonth[0].plusMonths(1); renderDateGrid(gridPanel, monthLabel, currentMonth[0], target, dialog); });
+        nextMonth.addActionListener(ev -> {
+            currentMonth[0] = currentMonth[0].plusMonths(1);
+            renderDateGrid(gridPanel, monthLabel, currentMonth[0], target, dialog);
+        });
 
         JButton nextYear = new JButton(">>");
         nextYear.setFont(new Font("Segoe UI", Font.BOLD, 12));
@@ -1209,7 +1268,10 @@ public class StaffPanel extends JPanel {
         nextYear.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
         nextYear.setFocusPainted(false);
         nextYear.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        nextYear.addActionListener(ev -> { currentMonth[0] = currentMonth[0].plusYears(1); renderDateGrid(gridPanel, monthLabel, currentMonth[0], target, dialog); });
+        nextYear.addActionListener(ev -> {
+            currentMonth[0] = currentMonth[0].plusYears(1);
+            renderDateGrid(gridPanel, monthLabel, currentMonth[0], target, dialog);
+        });
 
         nav.add(prevYear);
         nav.add(prevMonth);
@@ -1244,13 +1306,15 @@ public class StaffPanel extends JPanel {
         apply.setFocusPainted(false);
         apply.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
-        final java.time.LocalDate[] picked = {null};
+        final java.time.LocalDate[] picked = { null };
         apply.addActionListener(ev -> {
             if (picked[0] != null) {
                 target.setText(picked[0].format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")));
                 // Update the corresponding LocalDate reference
-                if (target == attendanceDateFrom) attendanceFromDate = picked[0];
-                if (target == attendanceDateTo) attendanceToDate = picked[0];
+                if (target == attendanceDateFrom)
+                    attendanceFromDate = picked[0];
+                if (target == attendanceDateTo)
+                    attendanceToDate = picked[0];
                 loadAttendanceHistory();
             }
             dialog.dispose();
@@ -1270,13 +1334,13 @@ public class StaffPanel extends JPanel {
     }
 
     private void renderDateGrid(JPanel grid, JLabel monthLabel, java.time.YearMonth ym,
-                                JTextField target, JDialog dialog) {
+            JTextField target, JDialog dialog) {
         renderDateGrid(grid, monthLabel, ym, target, dialog, null);
     }
 
     private void renderDateGrid(JPanel grid, JLabel monthLabel, java.time.YearMonth ym,
-                                JTextField target, JDialog dialog,
-                                java.time.LocalDate[] pickedRef) {
+            JTextField target, JDialog dialog,
+            java.time.LocalDate[] pickedRef) {
         grid.removeAll();
         monthLabel.setText(ym.getMonth().getDisplayName(
                 java.time.format.TextStyle.SHORT, java.util.Locale.ENGLISH) + " " + ym.getYear());
@@ -1311,19 +1375,29 @@ public class StaffPanel extends JPanel {
             lbl.setPreferredSize(new Dimension(34, 28));
             int d = day;
             lbl.addMouseListener(new MouseAdapter() {
-                @Override public void mouseClicked(MouseEvent e) {
-                    if (pickedRef != null) pickedRef[0] = date;
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    if (pickedRef != null)
+                        pickedRef[0] = date;
                     target.setText(date.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")));
-                    if (target == attendanceDateFrom) attendanceFromDate = date;
-                    if (target == attendanceDateTo) attendanceToDate = date;
+                    if (target == attendanceDateFrom)
+                        attendanceFromDate = date;
+                    if (target == attendanceDateTo)
+                        attendanceToDate = date;
                     loadAttendanceHistory();
                     dialog.dispose();
                 }
-                @Override public void mouseEntered(MouseEvent e) {
-                    if (!isToday) lbl.setBackground(new Color(0xF3F4F6));
+
+                @Override
+                public void mouseEntered(MouseEvent e) {
+                    if (!isToday)
+                        lbl.setBackground(new Color(0xF3F4F6));
                 }
-                @Override public void mouseExited(MouseEvent e) {
-                    if (!isToday) lbl.setBackground(Color.WHITE);
+
+                @Override
+                public void mouseExited(MouseEvent e) {
+                    if (!isToday)
+                        lbl.setBackground(Color.WHITE);
                 }
             });
             grid.add(lbl);
@@ -1338,6 +1412,7 @@ public class StaffPanel extends JPanel {
         new SwingWorker<Void, Void>() {
             private List<StaffShift> shifts;
             private String errorMsg;
+
             @Override
             protected Void doInBackground() {
                 try {
@@ -1346,10 +1421,12 @@ public class StaffPanel extends JPanel {
                     } else {
                         shifts = shiftRepo.findShifts(username);
                     }
+                } catch (Exception ex) {
+                    errorMsg = ex.getMessage();
                 }
-                catch (Exception ex) { errorMsg = ex.getMessage(); }
                 return null;
             }
+
             @Override
             protected void done() {
                 if (shifts == null) {
@@ -1359,7 +1436,8 @@ public class StaffPanel extends JPanel {
                     return;
                 }
                 String search = attendanceSearchField != null
-                        ? attendanceSearchField.getText().trim().toLowerCase() : "";
+                        ? attendanceSearchField.getText().trim().toLowerCase()
+                        : "";
 
                 for (StaffShift s : shifts) {
                     // Apply search filter
@@ -1378,14 +1456,18 @@ public class StaffPanel extends JPanel {
                     if (attendanceFromDate != null && !date.isEmpty()) {
                         try {
                             java.time.LocalDate rowDate = java.time.LocalDate.parse(date);
-                            if (rowDate.isBefore(attendanceFromDate)) continue;
-                        } catch (Exception ignored) {}
+                            if (rowDate.isBefore(attendanceFromDate))
+                                continue;
+                        } catch (Exception ignored) {
+                        }
                     }
                     if (attendanceToDate != null && !date.isEmpty()) {
                         try {
                             java.time.LocalDate rowDate = java.time.LocalDate.parse(date);
-                            if (rowDate.isAfter(attendanceToDate)) continue;
-                        } catch (Exception ignored) {}
+                            if (rowDate.isAfter(attendanceToDate))
+                                continue;
+                        } catch (Exception ignored) {
+                        }
                     }
 
                     if (s.getEndedAt() != null && !s.getEndedAt().isEmpty()) {
@@ -1436,11 +1518,17 @@ public class StaffPanel extends JPanel {
         usersModel.setRowCount(0);
         new SwingWorker<List<UserAccount>, Void>() {
             private String errorMsg;
+
             @Override
             protected List<UserAccount> doInBackground() {
-                try { return accountRoleRepository.listUsers(); }
-                catch (Exception ex) { errorMsg = ex.getMessage(); return List.of(); }
+                try {
+                    return accountRoleRepository.listUsers();
+                } catch (Exception ex) {
+                    errorMsg = ex.getMessage();
+                    return List.of();
+                }
             }
+
             @Override
             protected void done() {
                 try {
@@ -1465,11 +1553,17 @@ public class StaffPanel extends JPanel {
         resetRequestsModel.setRowCount(0);
         new SwingWorker<List<PasswordResetRequest>, Void>() {
             private String errorMsg;
+
             @Override
             protected List<PasswordResetRequest> doInBackground() {
-                try { return UserDataManager.listAllResetRequests(); }
-                catch (Exception ex) { errorMsg = ex.getMessage(); return List.of(); }
+                try {
+                    return UserDataManager.listAllResetRequests();
+                } catch (Exception ex) {
+                    errorMsg = ex.getMessage();
+                    return List.of();
+                }
             }
+
             @Override
             protected void done() {
                 try {
@@ -1509,16 +1603,22 @@ public class StaffPanel extends JPanel {
         int confirm = JOptionPane.showConfirmDialog(this,
                 "Are you sure you want to change " + selectedUser + "'s role to " + newRole.name() + "?",
                 "Confirm Role Change", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (confirm != JOptionPane.YES_OPTION)
+            return;
 
         new SwingWorker<Void, Void>() {
             private String errorMsg;
+
             @Override
             protected Void doInBackground() {
-                try { accountRoleRepository.updateUserRole(selectedUser, newRole); }
-                catch (Exception ex) { errorMsg = ex.getMessage(); }
+                try {
+                    accountRoleRepository.updateUserRole(selectedUser, newRole);
+                } catch (Exception ex) {
+                    errorMsg = ex.getMessage();
+                }
                 return null;
             }
+
             @Override
             protected void done() {
                 if (errorMsg != null) {
@@ -1542,7 +1642,8 @@ public class StaffPanel extends JPanel {
 
     private void onViewUserDetails() {
         int viewRow = usersTable.getSelectedRow();
-        if (viewRow < 0) return;
+        if (viewRow < 0)
+            return;
         int modelRow = usersTable.convertRowIndexToModel(viewRow);
         String uname = usersModel.getValueAt(modelRow, 1).toString();
         onViewUserDetails(uname);
@@ -1568,20 +1669,24 @@ public class StaffPanel extends JPanel {
 
     private void onAdminResetPassword() {
         int viewRow = usersTable.getSelectedRow();
-        if (viewRow < 0) return;
+        if (viewRow < 0)
+            return;
         int modelRow = usersTable.convertRowIndexToModel(viewRow);
         String targetUser = usersModel.getValueAt(modelRow, 1).toString();
 
         JPasswordField pwField = new JPasswordField(20);
         JPasswordField confirmField = new JPasswordField(20);
         JPanel form = new JPanel(new GridLayout(0, 2, 8, 8));
-        form.add(new JLabel("New password for \"" + targetUser + "\":")); form.add(pwField);
-        form.add(new JLabel("Confirm password:")); form.add(confirmField);
+        form.add(new JLabel("New password for \"" + targetUser + "\":"));
+        form.add(pwField);
+        form.add(new JLabel("Confirm password:"));
+        form.add(confirmField);
 
         int result = JOptionPane.showConfirmDialog(this, form,
                 "Reset Password for " + targetUser,
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-        if (result != JOptionPane.OK_OPTION) return;
+        if (result != JOptionPane.OK_OPTION)
+            return;
 
         String newPw = new String(pwField.getPassword()).trim();
         String confirm = new String(confirmField.getPassword()).trim();
@@ -1597,12 +1702,17 @@ public class StaffPanel extends JPanel {
         final String finalPw = newPw;
         new SwingWorker<Void, Void>() {
             private String errorMsg;
+
             @Override
             protected Void doInBackground() {
-                try { UserDataManager.resetPassword(targetUser, finalPw); }
-                catch (Exception ex) { errorMsg = ex.getMessage(); }
+                try {
+                    UserDataManager.resetPassword(targetUser, finalPw);
+                } catch (Exception ex) {
+                    errorMsg = ex.getMessage();
+                }
                 return null;
             }
+
             @Override
             protected void done() {
                 if (errorMsg != null) {
@@ -1619,7 +1729,8 @@ public class StaffPanel extends JPanel {
 
     private void onApproveRequest() {
         int viewRow = resetRequestsTable.getSelectedRow();
-        if (viewRow < 0) return;
+        if (viewRow < 0)
+            return;
         int modelRow = resetRequestsTable.convertRowIndexToModel(viewRow);
         int requestId = (int) resetRequestsModel.getValueAt(modelRow, 0);
         String reqUser = resetRequestsModel.getValueAt(modelRow, 1).toString();
@@ -1627,13 +1738,16 @@ public class StaffPanel extends JPanel {
         JPasswordField pwField = new JPasswordField(20);
         JPasswordField confirmField = new JPasswordField(20);
         JPanel form = new JPanel(new GridLayout(0, 2, 8, 8));
-        form.add(new JLabel("New password for \"" + reqUser + "\":")); form.add(pwField);
-        form.add(new JLabel("Confirm password:")); form.add(confirmField);
+        form.add(new JLabel("New password for \"" + reqUser + "\":"));
+        form.add(pwField);
+        form.add(new JLabel("Confirm password:"));
+        form.add(confirmField);
 
         int result = JOptionPane.showConfirmDialog(this, form,
                 "Approve Reset — Set New Password",
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-        if (result != JOptionPane.OK_OPTION) return;
+        if (result != JOptionPane.OK_OPTION)
+            return;
 
         String newPw = new String(pwField.getPassword()).trim();
         String cfm = new String(confirmField.getPassword()).trim();
@@ -1649,12 +1763,17 @@ public class StaffPanel extends JPanel {
         final String finalPw = newPw;
         new SwingWorker<Void, Void>() {
             private String errorMsg;
+
             @Override
             protected Void doInBackground() {
-                try { UserDataManager.approveResetRequest(requestId, reqUser, finalPw); }
-                catch (Exception ex) { errorMsg = ex.getMessage(); }
+                try {
+                    UserDataManager.approveResetRequest(requestId, reqUser, finalPw);
+                } catch (Exception ex) {
+                    errorMsg = ex.getMessage();
+                }
                 return null;
             }
+
             @Override
             protected void done() {
                 if (errorMsg != null) {
@@ -1672,7 +1791,8 @@ public class StaffPanel extends JPanel {
 
     private void onRejectRequest() {
         int viewRow = resetRequestsTable.getSelectedRow();
-        if (viewRow < 0) return;
+        if (viewRow < 0)
+            return;
         int modelRow = resetRequestsTable.convertRowIndexToModel(viewRow);
         int requestId = (int) resetRequestsModel.getValueAt(modelRow, 0);
         String reqUser = resetRequestsModel.getValueAt(modelRow, 1).toString();
@@ -1680,16 +1800,22 @@ public class StaffPanel extends JPanel {
         int confirm = JOptionPane.showConfirmDialog(this,
                 "Reject the password reset request for \"" + reqUser + "\"?",
                 "Confirm Reject", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (confirm != JOptionPane.YES_OPTION)
+            return;
 
         new SwingWorker<Void, Void>() {
             private String errorMsg;
+
             @Override
             protected Void doInBackground() {
-                try { UserDataManager.rejectResetRequest(requestId); }
-                catch (Exception ex) { errorMsg = ex.getMessage(); }
+                try {
+                    UserDataManager.rejectResetRequest(requestId);
+                } catch (Exception ex) {
+                    errorMsg = ex.getMessage();
+                }
                 return null;
             }
+
             @Override
             protected void done() {
                 if (errorMsg != null) {
@@ -1718,8 +1844,16 @@ public class StaffPanel extends JPanel {
     // ─── Icon helpers ────────────────────────────────────────────
     private Icon pencilIcon() {
         return new Icon() {
-            @Override public int getIconWidth() { return 12; }
-            @Override public int getIconHeight() { return 12; }
+            @Override
+            public int getIconWidth() {
+                return 12;
+            }
+
+            @Override
+            public int getIconHeight() {
+                return 12;
+            }
+
             @Override
             public void paintIcon(Component c, Graphics g, int x, int y) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -1736,8 +1870,16 @@ public class StaffPanel extends JPanel {
 
     private Icon trashIcon() {
         return new Icon() {
-            @Override public int getIconWidth() { return 12; }
-            @Override public int getIconHeight() { return 12; }
+            @Override
+            public int getIconWidth() {
+                return 12;
+            }
+
+            @Override
+            public int getIconHeight() {
+                return 12;
+            }
+
             @Override
             public void paintIcon(Component c, Graphics g, int x, int y) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -1754,7 +1896,10 @@ public class StaffPanel extends JPanel {
 
     private static void hideColumn(JTable table, int col) {
         TableColumn tc = table.getColumnModel().getColumn(col);
-        tc.setMinWidth(0); tc.setMaxWidth(0); tc.setWidth(0);
-        tc.setPreferredWidth(0); tc.setResizable(false);
+        tc.setMinWidth(0);
+        tc.setMaxWidth(0);
+        tc.setWidth(0);
+        tc.setPreferredWidth(0);
+        tc.setResizable(false);
     }
 }

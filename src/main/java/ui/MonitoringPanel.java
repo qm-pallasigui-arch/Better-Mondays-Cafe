@@ -1,5 +1,6 @@
-package ui;
+﻿package ui;
 
+import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -19,6 +20,7 @@ import java.awt.RenderingHints;
 import java.awt.Window;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.geom.Path2D;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -63,7 +65,7 @@ import persistence.sqlite.SQLiteInventoryRepository;
 
 public class MonitoringPanel extends JPanel {
 
-    // ─── Global Refresh Listener ─────────────────────────────────────────────
+    // ─── Global Refresh Listener ──────────────────────────────────────────────
     private static final CopyOnWriteArrayList<Runnable> REFRESH_LISTENERS = new CopyOnWriteArrayList<>();
 
     public static void notifyRefresh() {
@@ -71,7 +73,7 @@ public class MonitoringPanel extends JPanel {
             SwingUtilities.invokeLater(r);
     }
 
-    // ─── Fonts ───────────────────────────────────────────────────────────────
+    // ─── Fonts ────────────────────────────────────────────────────────────────
     private static final Font TITLE_FONT = new Font("Segoe UI", Font.BOLD, 28);
     private static final Font SUB_FONT = new Font("Segoe UI", Font.PLAIN, 13);
     private static final Font BODY_FONT = new Font("Segoe UI", Font.PLAIN, 13);
@@ -80,7 +82,7 @@ public class MonitoringPanel extends JPanel {
     private static final Font CARD_LABEL_FONT = new Font("Segoe UI", Font.PLAIN, 12);
     private static final Font SMALL_FONT = new Font("Segoe UI", Font.PLAIN, 10);
 
-    // ─── Card Config ─────────────────────────────────────────────────────────
+    // ─── Card Config ──────────────────────────────────────────────────────────
     private static final Color[] CARD_TINTS = {
             new Color(0xDBEAFE), new Color(0xFEF3C7),
             new Color(0xFEE2E2), new Color(0xF3F4F6)
@@ -93,7 +95,7 @@ public class MonitoringPanel extends JPanel {
             "Total Items", "Low Stock", "Expired", "Out of Stock"
     };
 
-    // ─── State ───────────────────────────────────────────────────────────────
+    // ─── State ────────────────────────────────────────────────────────────────
     private final boolean isAdmin;
     private JLabel[] cardCountLabels = new JLabel[4];
     private JLabel[] cardSubtextLabels = new JLabel[4];
@@ -138,7 +140,7 @@ public class MonitoringPanel extends JPanel {
                     "Red Velvet Cream Cheese Cookie", "Brownies", "Banana Bread",
                     "Chocolate Tiramisu", "Matcha Tiramisu", "Creamy Spinach", "Blueberry Cheesecake")));
 
-    // ─── Constructor ─────────────────────────────────────────────────────────
+    // ─── Constructor ──────────────────────────────────────────────────────────
     public MonitoringPanel() {
         this(true);
     }
@@ -167,7 +169,7 @@ public class MonitoringPanel extends JPanel {
         });
     }
 
-    // ─── Public API ──────────────────────────────────────────────────────────
+    // ─── Public API ───────────────────────────────────────────────────────────
     public void refreshData() {
         loadSummaryCards();
         loadSalesTable();
@@ -176,7 +178,7 @@ public class MonitoringPanel extends JPanel {
         lineChart.refreshData();
     }
 
-    // ─── UI Construction ─────────────────────────────────────────────────────
+    // ─── UI Construction ──────────────────────────────────────────────────────
     private void buildUI() {
         add(buildHeader(), BorderLayout.NORTH);
 
@@ -193,7 +195,7 @@ public class MonitoringPanel extends JPanel {
         add(contentBody, BorderLayout.CENTER);
     }
 
-    // ─── Header ──────────────────────────────────────────────────────────────
+    // ─── Header ───────────────────────────────────────────────────────────────
     private JPanel buildHeader() {
         JPanel header = new JPanel(new BorderLayout());
         header.setOpaque(false);
@@ -201,18 +203,7 @@ public class MonitoringPanel extends JPanel {
         JLabel title = new JLabel("Monitoring");
         title.setFont(TITLE_FONT);
         title.setForeground(AppTheme.FG_PRIMARY);
-
-        JLabel subtitle = new JLabel();
-        subtitle.setFont(SUB_FONT);
-        subtitle.setForeground(AppTheme.FG_MUTED);
-        new javax.swing.Timer(1000, e -> subtitle.setText(
-                "As of " + new SimpleDateFormat("EEEE, MM/dd/yyyy hh:mm:ss a").format(new Date()))).start();
-
-        JPanel stack = new JPanel(new BorderLayout(0, 2));
-        stack.setOpaque(false);
-        stack.add(title, BorderLayout.NORTH);
-        stack.add(subtitle, BorderLayout.SOUTH);
-        header.add(stack, BorderLayout.WEST);
+        header.add(title, BorderLayout.WEST);
 
         JButton reportBtn = new JButton("\uD83D\uDCCA Sales Report");
         reportBtn.setFont(BOLD_FONT);
@@ -223,16 +214,142 @@ public class MonitoringPanel extends JPanel {
         reportBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         reportBtn.addActionListener(e -> showReportChooserModal());
 
-        notificationsBellBtn = new JButton("\uD83D\uDD14");
-        notificationsBellBtn.setFont(new Font("Segoe UI", Font.PLAIN, 18));
-        notificationsBellBtn.setForeground(AppTheme.FG_PRIMARY);
-        notificationsBellBtn.setBackground(AppTheme.BG_SURFACE);
-        notificationsBellBtn.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
-        notificationsBellBtn.setFocusPainted(false);
-        notificationsBellBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        notificationsBellBtn.addActionListener(e -> showNotificationsPopup(notificationsBellBtn));
+        // ── Modern bell icon button ───────────────────────────────────────────
+        notificationsBellBtn = new JButton() {
+            private boolean mouseOver;
 
-        JPanel actions = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 10, 0));
+            {
+                setPreferredSize(new Dimension(36, 36));
+                setContentAreaFilled(false);
+                setBorderPainted(false);
+                setFocusPainted(false);
+                setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                addMouseListener(new MouseAdapter() {
+                    @Override
+                    public void mouseEntered(MouseEvent e) {
+                        mouseOver = true;
+                        repaint();
+                    }
+
+                    @Override
+                    public void mouseExited(MouseEvent e) {
+                        mouseOver = false;
+                        repaint();
+                    }
+                });
+                addActionListener(e -> openAlertsPopup());
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+                int W = getWidth(), H = getHeight();
+
+                // Determine alert severity
+                boolean hasCrit = !latestNotifications.isEmpty() && latestNotifications.stream()
+                        .anyMatch(n -> n.getSeverity() == Notification.Severity.CRITICAL);
+                boolean hasAny = !latestNotifications.isEmpty();
+
+                // ── Hover background ─────────────────────────────────────────
+                if (mouseOver) {
+                    Color hoverBg = hasCrit
+                            ? new Color(220, 38, 38, 28)
+                            : new Color(243, 244, 246, 200);
+                    g2.setColor(hoverBg);
+                    g2.fillRoundRect(1, 1, W - 2, H - 2, 8, 8);
+                }
+
+                // ── Bell icon color ──────────────────────────────────────────
+                Color iconColor = hasCrit ? new Color(0xDC2626)
+                        : hasAny ? new Color(0xD97706)
+                                : new Color(0x9CA3AF);
+                g2.setColor(iconColor);
+
+                // ── Bell geometry (centred in 36×36 button) ──────────────────
+                float pad = 8f;
+                float iW = W - pad * 2;
+                float iH = H - pad * 2;
+                float iX = pad;
+                float iY = pad;
+                float cx = iX + iW / 2f;
+
+                float stemTopY = iY;
+                float domeTopY = iY + iH * 0.12f;
+                float shelfY = iY + iH * 0.76f;
+                float shelfBotY = iY + iH * 0.88f;
+                float clapY = shelfBotY + 1f;
+
+                float shelfHW = iW * 0.50f;
+                float neckHW = iW * 0.14f;
+
+                // ── Bell body (filled Path2D) ────────────────────────────────
+                Path2D bell = new Path2D.Float();
+
+                bell.moveTo(cx - shelfHW, shelfBotY);
+                bell.lineTo(cx - shelfHW, shelfY);
+                bell.curveTo(
+                        cx - shelfHW, shelfY - iH * 0.18f,
+                        cx - neckHW, domeTopY + iH * 0.18f,
+                        cx - neckHW, domeTopY);
+                bell.curveTo(
+                        cx - neckHW, domeTopY - iH * 0.10f,
+                        cx + neckHW, domeTopY - iH * 0.10f,
+                        cx + neckHW, domeTopY);
+                bell.curveTo(
+                        cx + neckHW, domeTopY + iH * 0.18f,
+                        cx + shelfHW, shelfY - iH * 0.18f,
+                        cx + shelfHW, shelfY);
+                bell.lineTo(cx + shelfHW, shelfBotY);
+                bell.curveTo(
+                        cx + shelfHW, shelfBotY + 1f,
+                        cx - shelfHW, shelfBotY + 1f,
+                        cx - shelfHW, shelfBotY);
+                bell.closePath();
+                g2.fill(bell);
+
+                // ── Clapper dot ──────────────────────────────────────────────
+                float clapR = 1.8f;
+                g2.fillOval(
+                        (int) (cx - clapR), (int) clapY,
+                        (int) (clapR * 2), (int) (clapR * 2));
+
+                // ── Stem ─────────────────────────────────────────────────────
+                g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawLine((int) cx, (int) stemTopY, (int) cx, (int) (domeTopY + 1));
+
+                // ── Floating badge (top-right) ───────────────────────────────
+                if (!latestNotifications.isEmpty()) {
+                    int count = latestNotifications.size();
+                    String label = count > 99 ? "99+" : String.valueOf(count);
+                    Font badgeFont = new Font("Segoe UI", Font.BOLD, 9);
+                    g2.setFont(badgeFont);
+                    FontMetrics bfm = g2.getFontMetrics();
+                    int badgeDiam = Math.max(14, bfm.stringWidth(label) + 6);
+                    int bx = W - badgeDiam - 1;
+                    int by = 0;
+
+                    g2.setColor(new Color(0xEF4444));
+                    g2.fillOval(bx, by, badgeDiam, badgeDiam);
+                    g2.setColor(Color.WHITE);
+                    g2.setStroke(new BasicStroke(1.5f));
+                    g2.drawOval(bx, by, badgeDiam, badgeDiam);
+                    g2.setColor(Color.WHITE);
+                    g2.setFont(badgeFont);
+                    bfm = g2.getFontMetrics();
+                    g2.drawString(label,
+                            bx + (badgeDiam - bfm.stringWidth(label)) / 2,
+                            by + (badgeDiam - bfm.getHeight()) / 2 + bfm.getAscent());
+                }
+
+                g2.dispose();
+            }
+        };
+
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         actions.setOpaque(false);
         actions.add(notificationsBellBtn);
         actions.add(reportBtn);
@@ -241,46 +358,136 @@ public class MonitoringPanel extends JPanel {
         return header;
     }
 
-    // \u2500\u2500\u2500 Notifications Popup \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-    private void showNotificationsPopup(Component anchor) {
-        JPanel content = new JPanel(new BorderLayout(0, 8));
-        content.setBackground(AppTheme.BG_SURFACE);
-        content.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
-        content.setPreferredSize(new Dimension(340, 280));
+    // ─── Notifications Popup ─────────────────────────────────────────────────
+    private void openAlertsPopup() {
+        final int POPUP_W = 480;
+        final int ROW_H = 40;
+        final int MAX_ROWS = 5;
+        final int H_PAD = 14;
 
-        JLabel title = new JLabel("Inventory Alerts");
-        title.setFont(BOLD_FONT);
-        title.setForeground(AppTheme.FG_PRIMARY);
-        content.add(title, BorderLayout.NORTH);
+        JPopupMenu popup = new JPopupMenu();
+        popup.setLayout(new BorderLayout());
+        popup.setBorder(BorderFactory.createLineBorder(AppTheme.BORDER, 1));
+        popup.setBackground(AppTheme.BG_SURFACE);
 
-        JPanel list = new JPanel();
-        list.setOpaque(false);
-        list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS));
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setBackground(AppTheme.BG_SURFACE);
+        headerPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, AppTheme.BORDER),
+                BorderFactory.createEmptyBorder(11, 14, 10, 14)));
+
+        JLabel headerLbl = new JLabel("Inventory Alerts");
+        headerLbl.setFont(BOLD_FONT);
+        headerLbl.setForeground(AppTheme.FG_PRIMARY);
+
+        if (!latestNotifications.isEmpty()) {
+            JLabel cntBadge = new JLabel(String.valueOf(latestNotifications.size()));
+            cntBadge.setFont(new Font("Segoe UI", Font.BOLD, 10));
+            cntBadge.setForeground(Color.WHITE);
+            cntBadge.setHorizontalAlignment(SwingConstants.CENTER);
+            cntBadge.setOpaque(false);
+            cntBadge.setPreferredSize(new Dimension(latestNotifications.size() > 9 ? 26 : 20, 16));
+
+            JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+            titleRow.setOpaque(false);
+            titleRow.add(headerLbl);
+            titleRow.add(cntBadge);
+            headerPanel.add(titleRow, BorderLayout.CENTER);
+        } else {
+            headerPanel.add(headerLbl, BorderLayout.CENTER);
+        }
+        popup.add(headerPanel, BorderLayout.NORTH);
+
+        JPanel listPanel = new JPanel();
+        listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
+        listPanel.setBackground(AppTheme.BG_SURFACE);
 
         if (latestNotifications.isEmpty()) {
-            JLabel empty = new JLabel("No alerts right now \u2014 inventory looks healthy.");
+            JLabel empty = new JLabel("No active alerts — inventory looks healthy.");
             empty.setFont(BODY_FONT);
             empty.setForeground(AppTheme.FG_MUTED);
-            empty.setBorder(BorderFactory.createEmptyBorder(8, 4, 8, 4));
-            list.add(empty);
+            empty.setBorder(BorderFactory.createEmptyBorder(14, H_PAD, 14, H_PAD));
+            empty.setAlignmentX(Component.LEFT_ALIGNMENT);
+            listPanel.add(empty);
         } else {
-            for (Notification notification : latestNotifications) {
-                list.add(buildNotificationRow(notification));
-                list.add(Box.createVerticalStrut(6));
+            for (Notification n : latestNotifications) {
+                listPanel.add(buildNotificationRow(n));
+                listPanel.add(Box.createVerticalStrut(6));
             }
         }
 
-        JScrollPane scroll = new JScrollPane(list);
+        JScrollPane scroll = new JScrollPane(listPanel);
         scroll.setBorder(BorderFactory.createEmptyBorder());
-        scroll.setOpaque(false);
-        scroll.getViewport().setOpaque(false);
-        scroll.getVerticalScrollBar().setUnitIncrement(14);
-        content.add(scroll, BorderLayout.CENTER);
+        scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        int listH = latestNotifications.isEmpty()
+                ? 52
+                : Math.min(latestNotifications.size(), MAX_ROWS) * ROW_H + 4;
+        scroll.setPreferredSize(new Dimension(POPUP_W, listH));
+        scroll.getVerticalScrollBar().setUnitIncrement(ROW_H);
+        scroll.getViewport().setBackground(AppTheme.BG_SURFACE);
+        popup.add(scroll, BorderLayout.CENTER);
 
-        JPopupMenu popup = new JPopupMenu();
-        popup.setBorder(BorderFactory.createLineBorder(AppTheme.BG_SURFACE.darker(), 1));
-        popup.add(content);
-        popup.show(anchor, anchor.getWidth() - content.getPreferredSize().width, anchor.getHeight() + 6);
+        JPanel footer = new JPanel(new BorderLayout());
+        footer.setBackground(AppTheme.BG_SURFACE);
+        footer.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 0, 0, 0, AppTheme.BORDER),
+                BorderFactory.createEmptyBorder(8, 14, 8, 14)));
+
+        JButton showMoreBtn = new JButton("Show All Alerts") {
+            private boolean hover;
+            {
+                setContentAreaFilled(false);
+                setBorderPainted(false);
+                setFocusPainted(false);
+                setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                addMouseListener(new MouseAdapter() {
+                    @Override
+                    public void mouseEntered(MouseEvent e) {
+                        hover = true;
+                        repaint();
+                    }
+
+                    @Override
+                    public void mouseExited(MouseEvent e) {
+                        hover = false;
+                        repaint();
+                    }
+                });
+                addActionListener(e -> {
+                    popup.setVisible(false);
+                    Window owner = SwingUtilities.getWindowAncestor(MonitoringPanel.this);
+                    new InventoryAlertsModal(owner, latestNotifications).setVisible(true);
+                });
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(hover ? AppTheme.ACCENT_DARK : AppTheme.ACCENT);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+                g2.setColor(Color.WHITE);
+                g2.setFont(BODY_FONT);
+                FontMetrics fm = g2.getFontMetrics();
+                g2.drawString(getText(),
+                        (getWidth() - fm.stringWidth(getText())) / 2,
+                        (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
+                g2.dispose();
+            }
+        };
+        showMoreBtn.setPreferredSize(new Dimension(POPUP_W - 28, 32));
+        footer.add(showMoreBtn, BorderLayout.CENTER);
+        popup.add(footer, BorderLayout.SOUTH);
+
+        popup.setPreferredSize(new Dimension(POPUP_W, listH + 42 + 50));
+        int xOff = Math.min(0, -(POPUP_W - notificationsBellBtn.getWidth()));
+        popup.show(notificationsBellBtn, xOff, notificationsBellBtn.getHeight() + 4);
+    }
+
+    private void openAlertsModal() {
+        Window owner = SwingUtilities.getWindowAncestor(this);
+        new InventoryAlertsModal(owner, latestNotifications).setVisible(true);
     }
 
     // ─── Report Chooser Modal ─────────────────────────────────────────────────
@@ -295,7 +502,6 @@ public class MonitoringPanel extends JPanel {
         JPanel root = new JPanel(new BorderLayout(0, 0));
         root.setBackground(AppTheme.BG_SURFACE);
 
-        // Banner
         JPanel banner = new JPanel(new BorderLayout());
         banner.setBackground(AppTheme.ACCENT);
         banner.setBorder(BorderFactory.createEmptyBorder(18, 24, 18, 24));
@@ -321,25 +527,16 @@ public class MonitoringPanel extends JPanel {
         banner.add(bannerIcon, BorderLayout.WEST);
         banner.add(bannerText, BorderLayout.CENTER);
 
-        // Three card buttons (Weekly / Monthly / Archive)
         JPanel btnRow = new JPanel(new GridLayout(1, 3, 16, 0));
         btnRow.setBackground(AppTheme.BG_SURFACE);
         btnRow.setBorder(BorderFactory.createEmptyBorder(24, 28, 20, 28));
 
-        JButton weeklyBtn = makeReportTypeButton(
-                "\uD83D\uDCC5", "Weekly Report",
-                "Current week breakdown\nby day & category",
-                new Color(0x2563EB));
-
-        JButton monthlyBtn = makeReportTypeButton(
-                "\uD83D\uDCC6", "Monthly Report",
-                "4-week summary for\nthe current month",
-                new Color(0x059669));
-
-        JButton archiveBtn = makeReportTypeButton(
-                "\uD83D\uDDC4", "Archive",
-                "Browse & export past\nweekly / monthly reports",
-                new Color(0x7C3AED));
+        JButton weeklyBtn = makeReportTypeButton("\uD83D\uDCC5", "Weekly Report",
+                "Current week breakdown\nby day & category", new Color(0x2563EB));
+        JButton monthlyBtn = makeReportTypeButton("\uD83D\uDCC6", "Monthly Report",
+                "4-week summary for\nthe current month", new Color(0x059669));
+        JButton archiveBtn = makeReportTypeButton("\uD83D\uDDC4", "Archive",
+                "Browse & export past\nweekly / monthly reports", new Color(0x7C3AED));
 
         weeklyBtn.addActionListener(e -> {
             dialog.dispose();
@@ -358,7 +555,6 @@ public class MonitoringPanel extends JPanel {
         btnRow.add(monthlyBtn);
         btnRow.add(archiveBtn);
 
-        // Cancel link
         JPanel footer = new JPanel();
         footer.setBackground(AppTheme.BG_SURFACE);
         footer.setBorder(BorderFactory.createEmptyBorder(0, 0, 16, 0));
@@ -448,21 +644,6 @@ public class MonitoringPanel extends JPanel {
     }
 
     // ─── Archive Modal ────────────────────────────────────────────────────────
-
-    /**
-     * Displays the Sales Archive browser.
-     *
-     * Layout:
-     * ┌──────────────────────────────────────────────────┐
-     * │ Banner (purple) │
-     * ├──────────────────────────────────────────────────┤
-     * │ [Weekly ▼] [Month picker ▼] [Year picker ▼] │ ← filter bar
-     * ├──────────────────────────────────────────────────┤
-     * │ JTable — Period | Transactions | Total Revenue │
-     * ├──────────────────────────────────────────────────┤
-     * │ [ Generate Report ] [ Close ] │
-     * └──────────────────────────────────────────────────┘
-     */
     private void showArchiveModal() {
         JDialog dialog = new JDialog(
                 SwingUtilities.getWindowAncestor(this),
@@ -474,7 +655,6 @@ public class MonitoringPanel extends JPanel {
         JPanel root = new JPanel(new BorderLayout(0, 0));
         root.setBackground(AppTheme.BG_SURFACE);
 
-        // ── Banner ──────────────────────────────────────────────────────────
         JPanel banner = new JPanel(new BorderLayout());
         banner.setBackground(new Color(0x7C3AED));
         banner.setBorder(BorderFactory.createEmptyBorder(16, 24, 16, 24));
@@ -498,7 +678,6 @@ public class MonitoringPanel extends JPanel {
         banner.add(bannerIcon, BorderLayout.WEST);
         banner.add(bannerText, BorderLayout.CENTER);
 
-        // ── Filter Bar ──────────────────────────────────────────────────────
         JPanel filterBar = new JPanel();
         filterBar.setBackground(AppTheme.BG_SURFACE);
         filterBar.setBorder(BorderFactory.createEmptyBorder(12, 24, 8, 24));
@@ -553,7 +732,6 @@ public class MonitoringPanel extends JPanel {
         filterBar.add(yearCombo);
         filterBar.add(Box.createHorizontalGlue());
 
-        // ── Archive Table ────────────────────────────────────────────────────
         String[] cols = { "Period", "Transactions", "Total Revenue", "Avg. Order" };
         DefaultTableModel archiveModel = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) {
@@ -570,7 +748,6 @@ public class MonitoringPanel extends JPanel {
         archiveTable.getColumnModel().getColumn(2).setPreferredWidth(140);
         archiveTable.getColumnModel().getColumn(3).setPreferredWidth(120);
 
-        // Right-align numeric columns
         DefaultTableCellRenderer rightAlign = new DefaultTableCellRenderer();
         rightAlign.setHorizontalAlignment(SwingConstants.RIGHT);
         archiveTable.getColumnModel().getColumn(1).setCellRenderer(rightAlign);
@@ -581,7 +758,6 @@ public class MonitoringPanel extends JPanel {
         scroll.setBorder(BorderFactory.createMatteBorder(1, 0, 1, 0, AppTheme.BORDER));
         scroll.setPreferredSize(new Dimension(600, 300));
 
-        // Summary label beneath table
         JLabel summaryLbl = new JLabel(" ");
         summaryLbl.setFont(new Font("Segoe UI", Font.ITALIC, 11));
         summaryLbl.setForeground(AppTheme.FG_MUTED);
@@ -589,14 +765,13 @@ public class MonitoringPanel extends JPanel {
 
         AtomicInteger archiveLoadVersion = new AtomicInteger();
 
-        // Runnable to reload the archive table
         Runnable reloadArchive = () -> {
             String view = (String) viewCombo.getSelectedItem();
-            int month = monthCombo.getSelectedIndex() + 1; // 1-12
+            int month = monthCombo.getSelectedIndex() + 1;
             int year = (Integer) yearCombo.getSelectedItem();
             int loadVersion = archiveLoadVersion.incrementAndGet();
 
-            summaryLbl.setText("  Loading archive data…");
+            summaryLbl.setText("  Loading archive data\u2026");
 
             SwingWorker<DefaultTableModel, Void> worker = new SwingWorker<>() {
                 @Override
@@ -608,48 +783,40 @@ public class MonitoringPanel extends JPanel {
                             return false;
                         }
                     };
-
-                    if ("Weekly".equals(view)) {
+                    if ("Weekly".equals(view))
                         loadWeeklyArchive(tempModel, month, year);
-                    } else {
+                    else
                         loadMonthlyArchive(tempModel, year);
-                    }
                     return tempModel;
                 }
 
                 @Override
                 protected void done() {
-                    if (loadVersion != archiveLoadVersion.get()) {
+                    if (loadVersion != archiveLoadVersion.get())
                         return;
-                    }
-
                     archiveModel.setRowCount(0);
                     try {
                         DefaultTableModel loadedModel = get();
                         for (int r = 0; r < loadedModel.getRowCount(); r++) {
                             archiveModel.addRow(new Object[] {
-                                    loadedModel.getValueAt(r, 0),
-                                    loadedModel.getValueAt(r, 1),
-                                    loadedModel.getValueAt(r, 2),
-                                    loadedModel.getValueAt(r, 3)
+                                    loadedModel.getValueAt(r, 0), loadedModel.getValueAt(r, 1),
+                                    loadedModel.getValueAt(r, 2), loadedModel.getValueAt(r, 3)
                             });
                         }
-
-                        // Ignore non-numeric placeholders like "—" in empty/archive rows.
                         double grandTotal = 0;
                         int grandTx = 0;
                         for (int r = 0; r < archiveModel.getRowCount(); r++) {
                             try {
                                 String txStr = archiveModel.getValueAt(r, 1).toString().replace(",", "");
                                 String revStr = archiveModel.getValueAt(r, 2).toString()
-                                        .replace("₱", "").replace(",", "").trim();
+                                        .replace("\u20B1", "").replace(",", "").trim();
                                 grandTx += Integer.parseInt(txStr);
                                 grandTotal += Double.parseDouble(revStr);
                             } catch (NumberFormatException ignored) {
                             }
                         }
                         summaryLbl.setText(String.format(
-                                "  %d period(s) found  ·  %d total transactions  ·  Grand total: ₱%,.2f",
+                                "  %d period(s) found  \u00B7  %d total transactions  \u00B7  Grand total: \u20B1%,.2f",
                                 archiveModel.getRowCount(), grandTx, grandTotal));
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -660,7 +827,6 @@ public class MonitoringPanel extends JPanel {
             worker.execute();
         };
 
-        // Wire filters
         viewCombo.addActionListener(e -> {
             boolean isWeekly = "Weekly".equals(viewCombo.getSelectedItem());
             monthCombo.setEnabled(isWeekly);
@@ -669,11 +835,8 @@ public class MonitoringPanel extends JPanel {
         });
         monthCombo.addActionListener(e -> reloadArchive.run());
         yearCombo.addActionListener(e -> reloadArchive.run());
-
-        // Initial load
         reloadArchive.run();
 
-        // ── Footer Buttons ───────────────────────────────────────────────────
         JPanel footerRow = new JPanel(new BorderLayout(12, 0));
         footerRow.setBackground(AppTheme.BG_SURFACE);
         footerRow.setBorder(BorderFactory.createEmptyBorder(12, 24, 16, 24));
@@ -719,7 +882,6 @@ public class MonitoringPanel extends JPanel {
         footerRow.add(summaryLbl, BorderLayout.WEST);
         footerRow.add(btnGroup, BorderLayout.EAST);
 
-        // ── Assemble ─────────────────────────────────────────────────────────
         JPanel center = new JPanel(new BorderLayout(0, 0));
         center.setBackground(AppTheme.BG_SURFACE);
         center.add(filterBar, BorderLayout.NORTH);
@@ -736,28 +898,19 @@ public class MonitoringPanel extends JPanel {
         dialog.setVisible(true);
     }
 
-    /**
-     * Loads weekly rows for a given month+year into archiveModel.
-     * Each row = one ISO-week range that overlaps the selected month.
-     */
     private void loadWeeklyArchive(DefaultTableModel model, int month, int year) {
-        // Build week ranges that overlap the chosen month
-        List<long[]> weeks = getWeeksForMonth(month, year); // [startEpoch, endEpoch]
-
+        List<long[]> weeks = getWeeksForMonth(month, year);
         SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy");
-
         try (Connection conn = AppDatabase.openConnection()) {
             for (long[] range : weeks) {
                 String startStr = new SimpleDateFormat("yyyy-MM-dd").format(new Date(range[0]));
                 String endStr = new SimpleDateFormat("yyyy-MM-dd").format(new Date(range[1]));
-
-                String label = sdf.format(new Date(range[0])) + " – " + sdf.format(new Date(range[1]));
-
+                String label = sdf.format(new Date(range[0])) + " \u2013 " + sdf.format(new Date(range[1]));
                 try (PreparedStatement ps = conn.prepareStatement(
-                        "SELECT COUNT(*) AS cnt, COALESCE(SUM(total),0) AS rev, " +
-                                "       COALESCE(AVG(total),0) AS avg_ord " +
-                                "FROM sales_transactions " +
-                                "WHERE DATE(created_at) BETWEEN ? AND ?")) {
+                        "SELECT COUNT(*) AS cnt, COALESCE(SUM(total),0) AS rev, "
+                                + "COALESCE(AVG(total),0) AS avg_ord "
+                                + "FROM sales_transactions "
+                                + "WHERE DATE(created_at) BETWEEN ? AND ?")) {
                     ps.setString(1, startStr);
                     ps.setString(2, endStr);
                     ResultSet rs = ps.executeQuery();
@@ -768,8 +921,8 @@ public class MonitoringPanel extends JPanel {
                         model.addRow(new Object[] {
                                 label,
                                 String.valueOf(cnt),
-                                String.format("₱%,.2f", rev),
-                                cnt > 0 ? String.format("₱%,.2f", avgOrd) : "—"
+                                String.format("\u20B1%,.2f", rev),
+                                cnt > 0 ? String.format("\u20B1%,.2f", avgOrd) : "\u2014"
                         });
                     }
                 }
@@ -777,32 +930,30 @@ public class MonitoringPanel extends JPanel {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
         if (model.getRowCount() == 0)
-            model.addRow(new Object[] { "No data for this period", "—", "—", "—" });
+            model.addRow(new Object[] { "No data for this period", "\u2014", "\u2014", "\u2014" });
     }
 
-    /**
-     * Loads one row per month within the chosen year into archiveModel.
-     */
     private void loadMonthlyArchive(DefaultTableModel model, int year) {
         SimpleDateFormat labelFmt = new SimpleDateFormat("MMMM yyyy");
         Calendar cal = Calendar.getInstance();
-
         try (Connection conn = AppDatabase.openConnection()) {
             for (int m = 1; m <= 12; m++) {
                 cal.set(year, m - 1, 1);
                 String startStr = String.format("%04d-%02d-01", year, m);
                 cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH));
                 String endStr = new SimpleDateFormat("yyyy-MM-dd").format(cal.getTime());
-                String label = labelFmt.format(new Date(
-                        new SimpleDateFormat("yyyy-MM-dd").parse(startStr).getTime()));
-
+                String label;
+                try {
+                    label = labelFmt.format(new SimpleDateFormat("yyyy-MM-dd").parse(startStr));
+                } catch (Exception ex) {
+                    label = startStr;
+                }
                 try (PreparedStatement ps = conn.prepareStatement(
-                        "SELECT COUNT(*) AS cnt, COALESCE(SUM(total),0) AS rev, " +
-                                "       COALESCE(AVG(total),0) AS avg_ord " +
-                                "FROM sales_transactions " +
-                                "WHERE DATE(created_at) BETWEEN ? AND ?")) {
+                        "SELECT COUNT(*) AS cnt, COALESCE(SUM(total),0) AS rev, "
+                                + "COALESCE(AVG(total),0) AS avg_ord "
+                                + "FROM sales_transactions "
+                                + "WHERE DATE(created_at) BETWEEN ? AND ?")) {
                     ps.setString(1, startStr);
                     ps.setString(2, endStr);
                     ResultSet rs = ps.executeQuery();
@@ -813,8 +964,8 @@ public class MonitoringPanel extends JPanel {
                         model.addRow(new Object[] {
                                 label,
                                 String.valueOf(cnt),
-                                String.format("₱%,.2f", rev),
-                                cnt > 0 ? String.format("₱%,.2f", avgOrd) : "—"
+                                String.format("\u20B1%,.2f", rev),
+                                cnt > 0 ? String.format("\u20B1%,.2f", avgOrd) : "\u2014"
                         });
                     }
                 }
@@ -824,21 +975,15 @@ public class MonitoringPanel extends JPanel {
         }
     }
 
-    /**
-     * Returns a list of [mondayEpoch, sundayEpoch] pairs for all weeks
-     * that overlap the given month/year.
-     */
     private List<long[]> getWeeksForMonth(int month, int year) {
         List<long[]> result = new ArrayList<>();
         Calendar cal = Calendar.getInstance();
         cal.set(year, month - 1, 1);
 
-        // Find the Monday of the first week that contains day 1
-        int dow = cal.get(Calendar.DAY_OF_WEEK); // 1=Sun … 7=Sat
+        int dow = cal.get(Calendar.DAY_OF_WEEK);
         int daysBack = (dow == Calendar.SUNDAY) ? 6 : dow - Calendar.MONDAY;
         cal.add(Calendar.DAY_OF_MONTH, -daysBack);
 
-        // Iterate week-by-week, stopping when Monday is past month end
         Calendar monthEnd = Calendar.getInstance();
         monthEnd.set(year, month - 1, 1);
         monthEnd.set(Calendar.DAY_OF_MONTH, monthEnd.getActualMaximum(Calendar.DAY_OF_MONTH));
@@ -848,59 +993,54 @@ public class MonitoringPanel extends JPanel {
             cal.add(Calendar.DAY_OF_MONTH, 6);
             long sunday = cal.getTimeInMillis();
             result.add(new long[] { monday, sunday });
-            cal.add(Calendar.DAY_OF_MONTH, 1); // move to next Monday
+            cal.add(Calendar.DAY_OF_MONTH, 1);
         }
         return result;
     }
 
-    /**
-     * Delegates to SalesReportGenerator using the selected archive view mode.
-     */
     private void generateArchiveReport(String view) {
-        if ("Weekly".equals(view)) {
+        if ("Weekly".equals(view))
             SalesReportGenerator.generateWeekly(MonitoringPanel.this);
-        } else {
+        else
             SalesReportGenerator.generateMonthly(MonitoringPanel.this);
-        }
     }
 
     // ─── Summary Cards ────────────────────────────────────────────────────────
-    // ─── Rule-Based Notifications ────────────────────────────────────────────
+    // ─── Rule-Based Notifications ─────────────────────────────────────────────
     private void loadNotifications() {
-        if (notificationsBellBtn == null) return;
-
+        if (notificationsBellBtn == null)
+            return;
         List<Notification> notifications;
         try {
-            InventoryController controller = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
+            InventoryController controller = new InventoryController(
+                    Inventory.getInstance(), new SQLiteInventoryRepository());
             notifications = notificationService.evaluate(controller.buildInventoryRows());
         } catch (Exception ex) {
             notifications = List.of();
         }
-
         latestNotifications = notifications;
-
-        boolean hasCritical = notifications.stream().anyMatch(n -> n.getSeverity() == Notification.Severity.CRITICAL);
-        boolean hasAny = !notifications.isEmpty();
-        if (hasCritical) {
-            notificationsBellBtn.setText("🔔 " + notifications.size());
-            notificationsBellBtn.setForeground(new Color(0xDC2626));
-        } else if (hasAny) {
-            notificationsBellBtn.setText("🔔 " + notifications.size());
-            notificationsBellBtn.setForeground(new Color(0xD97706));
-        } else {
-            notificationsBellBtn.setText("🔔");
-            notificationsBellBtn.setForeground(AppTheme.FG_PRIMARY);
-        }
+        notificationsBellBtn.repaint();
     }
 
     private JPanel buildNotificationRow(Notification notification) {
-        Color bg;
-        Color fg;
+        Color bg, fg;
         String badge;
         switch (notification.getSeverity()) {
-            case CRITICAL -> { bg = new Color(0xFEE2E2); fg = new Color(0xDC2626); badge = "CRITICAL"; }
-            case WARNING -> { bg = new Color(0xFEF3C7); fg = new Color(0xD97706); badge = "WARNING"; }
-            default -> { bg = new Color(0xE0F2FE); fg = new Color(0x0284C7); badge = "INFO"; }
+            case CRITICAL -> {
+                bg = new Color(0xFEE2E2);
+                fg = new Color(0xDC2626);
+                badge = "CRITICAL";
+            }
+            case WARNING -> {
+                bg = new Color(0xFEF3C7);
+                fg = new Color(0xD97706);
+                badge = "WARNING";
+            }
+            default -> {
+                bg = new Color(0xE0F2FE);
+                fg = new Color(0x0284C7);
+                badge = "INFO";
+            }
         }
 
         JPanel row = new JPanel(new BorderLayout(10, 0));
@@ -1035,8 +1175,7 @@ public class MonitoringPanel extends JPanel {
     private void loadSummaryCards() {
         int totalItems = 0, lowStock = 0, expired = 0, outOfStock = 0;
         try (Connection conn = AppDatabase.openConnection()) {
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT COUNT(*) FROM inventory_items")) {
+            try (PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM inventory_items")) {
                 ResultSet rs = ps.executeQuery();
                 if (rs.next())
                     totalItems = rs.getInt(1);
@@ -1087,19 +1226,18 @@ public class MonitoringPanel extends JPanel {
         int confirm = JOptionPane.showConfirmDialog(this,
                 "Dispose all expired inventory batches?\nThis will archive them permanently.",
                 "Dispose Expired", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (confirm != JOptionPane.YES_OPTION)
+            return;
         try (Connection conn = persistence.AppDatabase.openConnection()) {
             try (PreparedStatement ps = conn.prepareStatement(
                     "UPDATE inventory_batches SET archived = 1, quantity = 0 "
-                    + "WHERE expiry_date < date('now') AND quantity > 0")) {
+                            + "WHERE expiry_date < date('now') AND quantity > 0")) {
                 int n = ps.executeUpdate();
-                JOptionPane.showMessageDialog(this,
-                        n + " expired batch(es) disposed.", "Disposed",
-                        JOptionPane.INFORMATION_MESSAGE);
+                JOptionPane.showMessageDialog(this, n + " expired batch(es) disposed.",
+                        "Disposed", JOptionPane.INFORMATION_MESSAGE);
             }
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this,
-                    "Failed to dispose expired items:\n" + ex.getMessage(),
+            JOptionPane.showMessageDialog(this, "Failed to dispose expired items:\n" + ex.getMessage(),
                     "Error", JOptionPane.ERROR_MESSAGE);
         }
         refreshData();
@@ -1109,13 +1247,12 @@ public class MonitoringPanel extends JPanel {
         String label = CARD_TITLES[type];
         List<String[]> relevant = new ArrayList<>();
         try (Connection conn = persistence.AppDatabase.openConnection();
-             PreparedStatement ps = conn.prepareStatement(
-                     "SELECT id, item_name, value FROM staff_reports WHERE type = ? AND status = 'pending'")) {
+                PreparedStatement ps = conn.prepareStatement(
+                        "SELECT id, item_name, value FROM staff_reports WHERE type = ? AND status = 'pending'")) {
             ps.setInt(1, type);
             ResultSet rs = ps.executeQuery();
-            while (rs.next()) {
-                relevant.add(new String[]{rs.getString(1), rs.getString(2), rs.getString(3)});
-            }
+            while (rs.next())
+                relevant.add(new String[] { rs.getString(1), rs.getString(2), rs.getString(3) });
         } catch (Exception ex) {
             ex.printStackTrace();
         }
@@ -1126,23 +1263,20 @@ public class MonitoringPanel extends JPanel {
             return;
         }
         StringBuilder msg = new StringBuilder("Acknowledge the following reports?\n\n");
-        for (String[] n : relevant) {
-            msg.append("• ").append(n[2]).append(" (").append(n[1]).append(")\n");
-        }
-        int confirm = JOptionPane.showConfirmDialog(this,
-                msg.toString(), "Acknowledge " + label,
-                JOptionPane.YES_NO_OPTION, JOptionPane.INFORMATION_MESSAGE);
+        for (String[] n : relevant)
+            msg.append("\u2022 ").append(n[2]).append(" (").append(n[1]).append(")\n");
+        int confirm = JOptionPane.showConfirmDialog(this, msg.toString(),
+                "Acknowledge " + label, JOptionPane.YES_NO_OPTION, JOptionPane.INFORMATION_MESSAGE);
         if (confirm == JOptionPane.YES_OPTION) {
             try (Connection conn = persistence.AppDatabase.openConnection();
-                 PreparedStatement ps = conn.prepareStatement(
-                         "UPDATE staff_reports SET status = 'acknowledged', acknowledged_at = datetime('now','localtime') WHERE type = ? AND status = 'pending'")) {
+                    PreparedStatement ps = conn.prepareStatement(
+                            "UPDATE staff_reports SET status = 'acknowledged', acknowledged_at = datetime('now','localtime') WHERE type = ? AND status = 'pending'")) {
                 ps.setInt(1, type);
                 ps.executeUpdate();
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
-            JOptionPane.showMessageDialog(this,
-                    "Acknowledged " + relevant.size() + " report(s).",
+            JOptionPane.showMessageDialog(this, "Acknowledged " + relevant.size() + " report(s).",
                     "Done", JOptionPane.INFORMATION_MESSAGE);
         }
     }
@@ -1178,7 +1312,6 @@ public class MonitoringPanel extends JPanel {
         content.setBackground(AppTheme.BG_SURFACE);
         content.setBorder(BorderFactory.createEmptyBorder(12, 16, 12, 16));
 
-        // ── Header with title, category filter, and + button ──
         JPanel headerPanel = new JPanel(new BorderLayout(8, 0));
         headerPanel.setOpaque(false);
 
@@ -1190,7 +1323,6 @@ public class MonitoringPanel extends JPanel {
         JPanel rightGroup = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         rightGroup.setOpaque(false);
 
-        // ── Table ──
         String[] columns = switch (idx) {
             case 0 -> new String[] { "Item Name", "Qty", "Unit", "Storage" };
             case 1 -> new String[] { "Item Name", "Qty", "Unit", "Alert Level", "Storage" };
@@ -1200,7 +1332,9 @@ public class MonitoringPanel extends JPanel {
         };
 
         DefaultTableModel model = new DefaultTableModel(columns, 0) {
-            public boolean isCellEditable(int r, int c) { return false; }
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
         };
         for (String[] row : rows)
             model.addRow(row);
@@ -1213,9 +1347,11 @@ public class MonitoringPanel extends JPanel {
         scrollPane.setBorder(BorderFactory.createLineBorder(AppTheme.BORDER));
         content.add(scrollPane, BorderLayout.CENTER);
 
-        // ── Category filter (storage_location) ──
         int locCol = switch (idx) {
-            case 0 -> 3; case 1 -> 4; case 2 -> 4; case 3 -> 2;
+            case 0 -> 3;
+            case 1 -> 4;
+            case 2 -> 4;
+            case 3 -> 2;
             default -> -1;
         };
         List<String[]> allRows = new ArrayList<>(rows);
@@ -1224,66 +1360,63 @@ public class MonitoringPanel extends JPanel {
             Set<String> locSet = new LinkedHashSet<>();
             for (String[] r : rows) {
                 String loc = r.length > locCol ? r[locCol].trim() : "";
-                if (!loc.isEmpty()) locSet.add(loc);
+                if (!loc.isEmpty())
+                    locSet.add(loc);
             }
             if (!locSet.isEmpty()) {
                 JComboBox<String> catFilter = new JComboBox<>();
                 catFilter.addItem("All Categories");
-                for (String loc : locSet) catFilter.addItem(loc);
+                for (String loc : locSet)
+                    catFilter.addItem(loc);
                 catFilter.setFont(new Font("Segoe UI", Font.PLAIN, 11));
                 catFilter.setPreferredSize(new Dimension(150, 24));
-
-                JComboBox<String> finalCatFilter = catFilter;
                 catFilter.addActionListener(e -> {
-                    String sel = (String) finalCatFilter.getSelectedItem();
+                    String sel = (String) catFilter.getSelectedItem();
                     model.setRowCount(0);
                     for (String[] r : allRows) {
-                        if (sel == null || sel.equals("All Categories") || (r.length > locCol && sel.equals(r[locCol].trim()))) {
+                        if (sel == null || sel.equals("All Categories")
+                                || (r.length > locCol && sel.equals(r[locCol].trim())))
                             model.addRow(r);
-                        }
                     }
                     headerLbl.setText(title + " (" + model.getRowCount() + ")");
                 });
-
                 rightGroup.add(catFilter);
             }
         }
 
         if (!isAdmin && idx >= 1 && idx <= 3) {
-            JButton reportBtn = new JButton("+");
-            reportBtn.setFont(new Font("Segoe UI", Font.BOLD, 16));
-            reportBtn.setForeground(Color.WHITE);
-            reportBtn.setBackground(AppTheme.ACCENT);
-            reportBtn.setBorder(BorderFactory.createEmptyBorder(2, 10, 2, 10));
-            reportBtn.setFocusPainted(false);
-            reportBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            JButton reportBtn2 = new JButton("+");
+            reportBtn2.setFont(new Font("Segoe UI", Font.BOLD, 16));
+            reportBtn2.setForeground(Color.WHITE);
+            reportBtn2.setBackground(AppTheme.ACCENT);
+            reportBtn2.setBorder(BorderFactory.createEmptyBorder(2, 10, 2, 10));
+            reportBtn2.setFocusPainted(false);
+            reportBtn2.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             final int fIdx = idx;
-            reportBtn.addActionListener(e -> {
+            reportBtn2.addActionListener(e -> {
                 Window w = SwingUtilities.windowForComponent(headerPanel);
-                if (w instanceof JDialog) ((JDialog) w).dispose();
+                if (w instanceof JDialog)
+                    ((JDialog) w).dispose();
                 showStaffReportForm(fIdx);
             });
-            rightGroup.add(reportBtn);
+            rightGroup.add(reportBtn2);
         }
 
         headerPanel.add(rightGroup, BorderLayout.EAST);
         content.add(headerPanel, BorderLayout.NORTH);
 
-        // ── Pending Staff Reports section (Admin only) ──
         if (isAdmin && idx >= 1 && idx <= 3) {
             List<String[]> pending = new ArrayList<>();
             try (Connection conn = AppDatabase.openConnection();
-                 PreparedStatement ps = conn.prepareStatement(
-                         "SELECT id, item_name, value, created_at FROM staff_reports "
-                         + "WHERE type = ? AND status = 'pending' ORDER BY created_at")) {
+                    PreparedStatement ps = conn.prepareStatement(
+                            "SELECT id, item_name, value, created_at FROM staff_reports "
+                                    + "WHERE type = ? AND status = 'pending' ORDER BY created_at")) {
                 ps.setInt(1, idx);
                 ResultSet rs = ps.executeQuery();
                 while (rs.next()) {
-                    pending.add(new String[]{
-                        String.valueOf(rs.getInt(1)),
-                        rs.getString(2),
-                        rs.getString(3),
-                        rs.getString(4)
+                    pending.add(new String[] {
+                            String.valueOf(rs.getInt(1)), rs.getString(2),
+                            rs.getString(3), rs.getString(4)
                     });
                 }
             } catch (Exception e) {
@@ -1303,17 +1436,17 @@ public class MonitoringPanel extends JPanel {
                 JPanel listPanel = new JPanel();
                 listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
                 listPanel.setOpaque(false);
+
                 for (String[] r : pending) {
                     int reportId = Integer.parseInt(r[0]);
                     String itemName = r[1];
-                    String reportValue = r[2];
                     boolean canAck = false;
                     String subtext = "";
 
                     if (idx == 1 || idx == 3) {
                         try (Connection conn = AppDatabase.openConnection();
-                             PreparedStatement ps = conn.prepareStatement(
-                                     "SELECT quantity, alert_level FROM inventory_items WHERE name = ?")) {
+                                PreparedStatement ps = conn.prepareStatement(
+                                        "SELECT quantity, alert_level FROM inventory_items WHERE name = ?")) {
                             ps.setString(1, itemName);
                             ResultSet rs = ps.executeQuery();
                             if (rs.next()) {
@@ -1321,26 +1454,26 @@ public class MonitoringPanel extends JPanel {
                                 double alert = rs.getDouble(2);
                                 if (idx == 1) {
                                     canAck = qty >= alert;
-                                    if (!canAck) subtext = "Need to refill (qty: " + qty + " < alert: " + alert + ")";
+                                    if (!canAck)
+                                        subtext = "Need to refill (qty: " + qty + " < alert: " + alert + ")";
                                 } else {
                                     canAck = qty > 0;
-                                    if (!canAck) subtext = "Need to restock (currently out)";
+                                    if (!canAck)
+                                        subtext = "Need to restock (currently out)";
                                 }
                             }
                         } catch (Exception ex) {
                             ex.printStackTrace();
                         }
                     } else if (idx == 2) {
-                        canAck = false;
                         subtext = "Dispose expired batch first";
                     }
 
                     JPanel rowPanel = new JPanel(new BorderLayout(6, 0));
                     rowPanel.setBackground(AppTheme.BG_SURFACE);
                     rowPanel.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createMatteBorder(0, 0, 1, 0, AppTheme.BORDER),
-                        BorderFactory.createEmptyBorder(6, 8, 6, 8)
-                    ));
+                            BorderFactory.createMatteBorder(0, 0, 1, 0, AppTheme.BORDER),
+                            BorderFactory.createEmptyBorder(6, 8, 6, 8)));
 
                     JPanel textCol = new JPanel(new BorderLayout(0, 2));
                     textCol.setOpaque(false);
@@ -1365,7 +1498,8 @@ public class MonitoringPanel extends JPanel {
                         disposeBtn.addActionListener(e -> {
                             onDisposeSingle(itemName, rid);
                             Window w = SwingUtilities.windowForComponent(content);
-                            if (w instanceof JDialog) ((JDialog) w).dispose();
+                            if (w instanceof JDialog)
+                                ((JDialog) w).dispose();
                         });
                         rowPanel.add(disposeBtn, BorderLayout.EAST);
                     } else {
@@ -1381,11 +1515,11 @@ public class MonitoringPanel extends JPanel {
                         ackBtn.addActionListener(e -> {
                             onAcknowledgeSingle(rid, itemName);
                             Window w = SwingUtilities.windowForComponent(content);
-                            if (w instanceof JDialog) ((JDialog) w).dispose();
+                            if (w instanceof JDialog)
+                                ((JDialog) w).dispose();
                         });
                         rowPanel.add(ackBtn, BorderLayout.EAST);
                     }
-
                     listPanel.add(rowPanel);
                 }
 
@@ -1393,7 +1527,6 @@ public class MonitoringPanel extends JPanel {
                 reportScroll.setPreferredSize(new Dimension(500, Math.min(200, pending.size() * 40 + 10)));
                 reportScroll.setBorder(BorderFactory.createLineBorder(AppTheme.BORDER));
                 reportsPanel.add(reportScroll, BorderLayout.CENTER);
-
                 content.add(reportsPanel, BorderLayout.SOUTH);
             }
         }
@@ -1435,12 +1568,11 @@ public class MonitoringPanel extends JPanel {
 
     private void onAcknowledgeSingle(int reportId, String itemName) {
         try (Connection conn = persistence.AppDatabase.openConnection();
-             PreparedStatement ps = conn.prepareStatement(
-                     "UPDATE staff_reports SET status = 'acknowledged', acknowledged_at = datetime('now','localtime') WHERE id = ?")) {
+                PreparedStatement ps = conn.prepareStatement(
+                        "UPDATE staff_reports SET status = 'acknowledged', acknowledged_at = datetime('now','localtime') WHERE id = ?")) {
             ps.setInt(1, reportId);
             ps.executeUpdate();
-            JOptionPane.showMessageDialog(this,
-                    "Acknowledged report for " + itemName + ".",
+            JOptionPane.showMessageDialog(this, "Acknowledged report for " + itemName + ".",
                     "Done", JOptionPane.INFORMATION_MESSAGE);
             refreshData();
         } catch (Exception ex) {
@@ -1453,35 +1585,31 @@ public class MonitoringPanel extends JPanel {
     private void showStaffReportForm(int type) {
         String label = CARD_TITLES[type];
         Map<String, String[]> itemMap = new LinkedHashMap<>();
-
-        // Load ALL inventory items — users can select any ingredient
         String sql = "SELECT name, quantity, alert_level, unit FROM inventory_items ORDER BY name";
         try (Connection conn = persistence.AppDatabase.openConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
+                PreparedStatement ps = conn.prepareStatement(sql);
+                ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 String name = rs.getString(1);
                 String qty = String.valueOf(rs.getDouble(2));
                 String alert = String.valueOf(rs.getDouble(3));
                 String unit = rs.getString(4);
-                itemMap.put(name, new String[]{name, qty, alert, unit});
+                itemMap.put(name, new String[] { name, qty, alert, unit });
             }
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this,
-                    "Failed to load items:\n" + ex.getMessage(),
+            JOptionPane.showMessageDialog(this, "Failed to load items:\n" + ex.getMessage(),
                     "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
         if (itemMap.isEmpty()) {
-            JOptionPane.showMessageDialog(this,
-                    "No inventory items found.",
+            JOptionPane.showMessageDialog(this, "No inventory items found.",
                     "Report", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
 
         String[] names = itemMap.keySet().toArray(new String[0]);
-
-        JDialog dialog = new JDialog(SwingUtilities.windowForComponent(this), "Report " + label, ModalityType.APPLICATION_MODAL);
+        JDialog dialog = new JDialog(SwingUtilities.windowForComponent(this),
+                "Report " + label, ModalityType.APPLICATION_MODAL);
         dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
 
         JPanel form = new JPanel(new GridBagLayout());
@@ -1491,29 +1619,33 @@ public class MonitoringPanel extends JPanel {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.insets = new Insets(4, 4, 4, 4);
 
-        // ── Row 0: Item Name selection ──
-        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 0;
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0;
         JLabel nameLbl = new JLabel("Item Name:");
         nameLbl.setFont(BOLD_FONT);
         form.add(nameLbl, gbc);
 
-        gbc.gridx = 1; gbc.gridy = 0; gbc.weightx = 1;
+        gbc.gridx = 1;
+        gbc.gridy = 0;
+        gbc.weightx = 1;
         JComboBox<String> itemCombo = new JComboBox<>(names);
         itemCombo.setFont(BODY_FONT);
         itemCombo.setPreferredSize(new Dimension(250, 28));
         form.add(itemCombo, gbc);
         gbc.weightx = 0;
 
-        // ── Row 1 (Low Stock / Out of Stock): current qty + alert level info ──
         JLabel infoLbl = new JLabel(" ");
         infoLbl.setFont(BODY_FONT);
         infoLbl.setForeground(AppTheme.FG_MUTED);
 
         if (type != 2) {
-            gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 2;
+            gbc.gridx = 0;
+            gbc.gridy = 1;
+            gbc.gridwidth = 2;
             gbc.fill = GridBagConstraints.HORIZONTAL;
             form.add(infoLbl, gbc);
-
             Runnable updateInfo = () -> {
                 String sel = (String) itemCombo.getSelectedItem();
                 if (sel != null && itemMap.containsKey(sel)) {
@@ -1525,14 +1657,18 @@ public class MonitoringPanel extends JPanel {
             updateInfo.run();
         }
 
-        // ── Quantity / Batch ID field ──
         int qtyRow = type == 2 ? 1 : 2;
-        gbc.gridx = 0; gbc.gridy = qtyRow; gbc.gridwidth = 1; gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridx = 0;
+        gbc.gridy = qtyRow;
+        gbc.gridwidth = 1;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
         JLabel qtyLbl = new JLabel(type == 2 ? "Batch ID:" : "Quantity Needed:");
         qtyLbl.setFont(BOLD_FONT);
         form.add(qtyLbl, gbc);
 
-        gbc.gridx = 1; gbc.gridy = qtyRow; gbc.weightx = 1;
+        gbc.gridx = 1;
+        gbc.gridy = qtyRow;
+        gbc.weightx = 1;
         JPanel qtyRowPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
         qtyRowPanel.setOpaque(false);
         JTextField qtyField = new JTextField(12);
@@ -1555,9 +1691,10 @@ public class MonitoringPanel extends JPanel {
         form.add(qtyRowPanel, gbc);
         gbc.weightx = 0;
 
-        // ── Send button ──
         int btnRow = (type == 2 ? 2 : 3);
-        gbc.gridx = 0; gbc.gridy = btnRow; gbc.gridwidth = 2;
+        gbc.gridx = 0;
+        gbc.gridy = btnRow;
+        gbc.gridwidth = 2;
         gbc.fill = GridBagConstraints.NONE;
         gbc.anchor = GridBagConstraints.CENTER;
         JButton sendBtn = new JButton("Send Report");
@@ -1569,7 +1706,8 @@ public class MonitoringPanel extends JPanel {
         sendBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         sendBtn.addActionListener(e -> {
             String selectedItem = (String) itemCombo.getSelectedItem();
-            if (selectedItem == null) return;
+            if (selectedItem == null)
+                return;
             String val = qtyField.getText().trim();
             if (val.isEmpty()) {
                 JOptionPane.showMessageDialog(dialog,
@@ -1577,23 +1715,20 @@ public class MonitoringPanel extends JPanel {
                         "Input Needed", JOptionPane.WARNING_MESSAGE);
                 return;
             }
-            // Save to DB
             try (Connection conn = persistence.AppDatabase.openConnection();
-                 PreparedStatement ps = conn.prepareStatement(
-                         "INSERT INTO staff_reports (type, item_name, value) VALUES (?, ?, ?)")) {
+                    PreparedStatement ps = conn.prepareStatement(
+                            "INSERT INTO staff_reports (type, item_name, value) VALUES (?, ?, ?)")) {
                 ps.setInt(1, type);
                 ps.setString(2, selectedItem);
                 ps.setString(3, val);
                 ps.executeUpdate();
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(dialog,
-                        "Failed to save report:\n" + ex.getMessage(),
+                JOptionPane.showMessageDialog(dialog, "Failed to save report:\n" + ex.getMessage(),
                         "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
             dialog.dispose();
-            JOptionPane.showMessageDialog(this,
-                    "Report sent to admin.", "Reported",
+            JOptionPane.showMessageDialog(this, "Report sent to admin.", "Reported",
                     JOptionPane.INFORMATION_MESSAGE);
         });
         form.add(sendBtn, gbc);
@@ -1606,10 +1741,11 @@ public class MonitoringPanel extends JPanel {
 
     public static int getPendingReportCount() {
         try (Connection conn = persistence.AppDatabase.openConnection();
-             PreparedStatement ps = conn.prepareStatement(
-                     "SELECT COUNT(*) FROM staff_reports WHERE status = 'pending'");
-             ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) return rs.getInt(1);
+                PreparedStatement ps = conn.prepareStatement(
+                        "SELECT COUNT(*) FROM staff_reports WHERE status = 'pending'");
+                ResultSet rs = ps.executeQuery()) {
+            if (rs.next())
+                return rs.getInt(1);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1619,20 +1755,16 @@ public class MonitoringPanel extends JPanel {
     public static void showNotificationsDialog(java.awt.Window parent) {
         List<String[]> reports = new ArrayList<>();
         try (Connection conn = persistence.AppDatabase.openConnection();
-             PreparedStatement ps = conn.prepareStatement(
-                     "SELECT sr.type, sr.item_name, sr.value, sr.created_at, ii.quantity, ii.alert_level "
-                     + "FROM staff_reports sr "
-                     + "LEFT JOIN inventory_items ii ON ii.name = sr.item_name "
-                     + "WHERE sr.status = 'pending' ORDER BY sr.created_at");
-             ResultSet rs = ps.executeQuery()) {
+                PreparedStatement ps = conn.prepareStatement(
+                        "SELECT sr.type, sr.item_name, sr.value, sr.created_at, ii.quantity, ii.alert_level "
+                                + "FROM staff_reports sr "
+                                + "LEFT JOIN inventory_items ii ON ii.name = sr.item_name "
+                                + "WHERE sr.status = 'pending' ORDER BY sr.created_at");
+                ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
-                reports.add(new String[]{
-                    String.valueOf(rs.getInt(1)),
-                    rs.getString(2),
-                    rs.getString(3),
-                    rs.getString(4),
-                    String.valueOf(rs.getDouble(5)),
-                    String.valueOf(rs.getDouble(6))
+                reports.add(new String[] {
+                        String.valueOf(rs.getInt(1)), rs.getString(2), rs.getString(3),
+                        rs.getString(4), String.valueOf(rs.getDouble(5)), String.valueOf(rs.getDouble(6))
                 });
             }
         } catch (Exception e) {
@@ -1650,22 +1782,21 @@ public class MonitoringPanel extends JPanel {
         panel.setBackground(AppTheme.BG_SURFACE);
         panel.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
 
-        String[] typeNames = {"", "Low Stock", "Expired", "Out of Stock"};
+        String[] typeNames = { "", "Low Stock", "Expired", "Out of Stock" };
         for (String[] r : reports) {
             int t = Integer.parseInt(r[0]);
-            String label = t >= 1 && t <= 3 ? typeNames[t] : "Report";
+            String lbl = t >= 1 && t <= 3 ? typeNames[t] : "Report";
             JPanel row = new JPanel(new BorderLayout(6, 0));
             row.setOpaque(false);
             row.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 0));
-            JLabel text = new JLabel("<html><b>" + r[1] + "</b> \u2014 " + label + " (" + r[3] + ")</html>");
+            JLabel text = new JLabel("<html><b>" + r[1] + "</b> \u2014 " + lbl + " (" + r[3] + ")</html>");
             text.setFont(BODY_FONT);
             row.add(text, BorderLayout.CENTER);
             panel.add(row);
             panel.add(new JSeparator());
         }
-
-        JOptionPane.showMessageDialog(parent, panel, "Pending Notifications (" + reports.size() + ")",
-                JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(parent, panel,
+                "Pending Notifications (" + reports.size() + ")", JOptionPane.INFORMATION_MESSAGE);
     }
 
     // ─── Recent Sales Table ───────────────────────────────────────────────────
@@ -1765,12 +1896,12 @@ public class MonitoringPanel extends JPanel {
                 PreparedStatement ps = conn.prepareStatement(
                         "SELECT st.id, st.transaction_ref, "
                                 + "COALESCE(st.customer_name,'Walk-in') AS customer_name, "
-                                + "COALESCE(st.subtotal,0)       AS subtotal, "
-                                + "COALESCE(st.tax,0)            AS tax, "
-                                + "COALESCE(st.total,0)          AS total, "
-                                + "COALESCE(st.cash,0)           AS cash, "
-                                + "COALESCE(st.change_amount,0)  AS change_amount, "
-                                + "COALESCE(st.created_at,'')    AS created_at "
+                                + "COALESCE(st.subtotal,0) AS subtotal, "
+                                + "COALESCE(st.tax,0) AS tax, "
+                                + "COALESCE(st.total,0) AS total, "
+                                + "COALESCE(st.cash,0) AS cash, "
+                                + "COALESCE(st.change_amount,0) AS change_amount, "
+                                + "COALESCE(st.created_at,'') AS created_at "
                                 + "FROM sales_transactions st "
                                 + whereClause
                                 + " ORDER BY st.id DESC LIMIT 50");
@@ -1779,9 +1910,9 @@ public class MonitoringPanel extends JPanel {
             while (rs.next()) {
                 long txId = rs.getLong("id");
                 String ref = rs.getString("transaction_ref");
-                String customerName = rs.getString("customer_name");
-                if (customerName.isEmpty())
-                    customerName = "Walk-in";
+                String customer = rs.getString("customer_name");
+                if (customer.isEmpty())
+                    customer = "Walk-in";
                 double subtotal = rs.getDouble("subtotal");
                 double tax = rs.getDouble("tax");
                 double total = rs.getDouble("total");
@@ -1796,17 +1927,14 @@ public class MonitoringPanel extends JPanel {
                     ps2.setLong(1, txId);
                     ResultSet rs2 = ps2.executeQuery();
                     while (rs2.next())
-                        items.add(new SalesItem(
-                                rs2.getString("product_name"),
-                                rs2.getInt("quantity"),
-                                rs2.getDouble("price"),
-                                rs2.getDouble("total")));
+                        items.add(new SalesItem(rs2.getString("product_name"),
+                                rs2.getInt("quantity"), rs2.getDouble("price"), rs2.getDouble("total")));
                 }
-                cachedTransactions.add(
-                        new TransactionRow(ref, customerName, subtotal, tax, total, cash, change, createdAt, items));
+                cachedTransactions
+                        .add(new TransactionRow(ref, customer, subtotal, tax, total, cash, change, createdAt, items));
                 salesTableModel.addRow(new Object[] {
                         "#" + ref.replace("TXN", ""),
-                        customerName,
+                        customer,
                         "\u25BC Details",
                         String.format("\u20B1%.2f", total),
                         "\uD83D\uDCC4"
@@ -1815,7 +1943,6 @@ public class MonitoringPanel extends JPanel {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
         if (cachedTransactions.isEmpty())
             salesTableModel.addRow(new Object[] { "No sales yet", "-", "-", "-", "-" });
     }

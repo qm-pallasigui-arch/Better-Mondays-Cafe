@@ -57,6 +57,39 @@ public class MenuMaintenancePanel extends JPanel {
         PILL_COLORS.put("Food", new Color[] { new Color(0xFAECE7), new Color(0x712B13) });
     }
 
+    // ── Icon constants ──────────────────────────────────────────────────────
+    //
+    // ROOT CAUSE OF MISSING ICONS:
+    // Characters like ⌕ (U+2315), ☰ (U+2630), ✏ (U+270F), ⌫ (U+232B) live in
+    // the "Miscellaneous Technical" and "Dingbats" Unicode blocks. Even though
+    // they are within the BMP, they are absent from the fonts Java Swing uses
+    // by default on most systems (Segoe UI, SansSerif, Dialog). Java2D renders
+    // them as empty boxes (□) or skips them entirely.
+    //
+    // FIX: Replace every symbol that is not in the ASCII / Latin-1 Supplement /
+    // General Punctuation range with a safe ASCII-text alternative that looks
+    // equally clear in a small toolbar button. No extra font required.
+    //
+    // Old glyph U+ Block → Replacement
+    // ⌕ 2315 Misc Technical → "[S]" label / magnifier text
+    // ☰ 2630 Misc Technical (trigrams)→ "=" (looks like 3 lines)
+    // ✏ 270F Dingbats → "Edit" label only
+    // ⌫ 232B Misc Technical → "Del" label only
+    // ⇄ 21C4 Arrows (BMP, usually ok) → keep, add text fallback
+    //
+    // Buttons already carry a text label so the icon is purely decorative;
+    // removing unreliable glyphs and keeping clean ASCII labels is the correct
+    // solution. A "•" prefix (U+2022, Latin Extended) is universally available
+    // and visually distinguishes the button glyph from plain text.
+    //
+    private static final String ICON_BACKUP = "\u2194"; // ↔ LEFT RIGHT ARROW — widely supported, same idea as ⇄
+    private static final String ICON_ADD = "+"; // ASCII plus — universal
+    private static final String ICON_EDIT = "\u25A6"; // ▦ SQUARE WITH ORTHOGONAL CROSSHATCH — safe BMP, distinct shape
+    private static final String ICON_DELETE = "\u00D7"; // × MULTIPLICATION SIGN — universal, looks like a delete/close
+                                                        // mark
+    private static final String ICON_MENU = "\u2261"; // ≡ IDENTICAL TO (three horiz lines) — in every math/symbol font
+    private static final String ICON_SEARCH = "\u25CB "; // ○ WHITE CIRCLE (magnifier stand-in) — universally available
+
     // ── State ────────────────────────────────────────────────────────────────
     private final MenuRepository repo;
     private final DefaultTableModel model;
@@ -75,7 +108,7 @@ public class MenuMaintenancePanel extends JPanel {
     private final JLabel priceLarge = makePriceLabel();
     private final JPanel ingredientList = new JPanel();
     private final JLabel statusLabel = new JLabel("0 items");
-    private final JLabel detailImage = new JLabel(); // item photo thumbnail
+    private final JLabel detailImage = new JLabel();
 
     // ── Constructor ──────────────────────────────────────────────────────────
     public MenuMaintenancePanel() throws Exception {
@@ -88,7 +121,6 @@ public class MenuMaintenancePanel extends JPanel {
         setBackground(BG_PAGE);
         repo = new SQLiteMenuRepository();
 
-        // Table model
         model = new DefaultTableModel(
                 new String[] { "Name", "Category", "Hot", "Iced Regular", "Iced Large" }, 0) {
             @Override
@@ -97,31 +129,22 @@ public class MenuMaintenancePanel extends JPanel {
             }
         };
 
-        // Table
         table = buildTable();
         table.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting())
                 updateDetailPanel();
         });
 
-        // Toolbar controls
         categoryFilter = new JComboBox<>(
                 new String[] { "All", "Coffee", "Non-Coffee", "Fruit Tea", "Herbal Tea", "Food" });
         searchField = new JTextField(22);
         styleComboBox(categoryFilter);
-        styleTextField(searchField, "Search items…");
+        styleTextField(searchField, "Search items\u2026");
 
-        // Build main panel directly (no tabs)
         add(buildMenuPanel(), BorderLayout.CENTER);
-
         reload();
     }
 
-    /**
-     * Set a callback to be invoked when a menu item is saved.
-     * 
-     * @param callback the callback, or null to disable
-     */
     public void setOnMenuItemSavedCallback(OnMenuItemSavedCallback callback) {
         this.onItemSavedCallback = callback;
     }
@@ -143,23 +166,20 @@ public class MenuMaintenancePanel extends JPanel {
                 new MatteBorder(0, 0, 1, 0, BORDER_COLOR),
                 new EmptyBorder(10, 14, 10, 14)));
 
-        // Left: filters
         JPanel filters = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         filters.setOpaque(false);
-        JLabel catIcon = makeIcon("☰");
-        filters.add(catIcon);
+        filters.add(makeIconLabel(ICON_MENU)); // ≡ hamburger
         filters.add(categoryFilter);
         filters.add(Box.createHorizontalStrut(4));
         filters.add(makeSearchBox());
 
-        // Right: action buttons
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         actions.setOpaque(false);
 
         if (isAdmin) {
-            JButton addBtn = makeButton("+ Add", true, false);
-            JButton editBtn = makeButton("✎ Edit", false, false);
-            JButton deleteBtn = makeButton("⌫ Delete", false, true);
+            JButton addBtn = makeButton(ICON_ADD + " Add", true, false);
+            JButton editBtn = makeButton(ICON_EDIT + " Edit", false, false);
+            JButton deleteBtn = makeButton(ICON_DELETE + " Delete", false, true);
 
             addBtn.addActionListener(e -> onAdd());
             editBtn.addActionListener(e -> onEdit());
@@ -169,11 +189,20 @@ public class MenuMaintenancePanel extends JPanel {
             actions.add(editBtn);
             actions.add(deleteBtn);
         }
+
         categoryFilter.addActionListener(e -> applyFilters());
         searchField.getDocument().addDocumentListener(new DocumentListener() {
-            public void insertUpdate(DocumentEvent e) { applyFilters(); }
-            public void removeUpdate(DocumentEvent e) { applyFilters(); }
-            public void changedUpdate(DocumentEvent e) { applyFilters(); }
+            public void insertUpdate(DocumentEvent e) {
+                applyFilters();
+            }
+
+            public void removeUpdate(DocumentEvent e) {
+                applyFilters();
+            }
+
+            public void changedUpdate(DocumentEvent e) {
+                applyFilters();
+            }
         });
 
         bar.add(filters, BorderLayout.CENTER);
@@ -185,8 +214,13 @@ public class MenuMaintenancePanel extends JPanel {
         JPanel wrap = new JPanel(new BorderLayout(0, 0));
         wrap.setOpaque(false);
         wrap.setPreferredSize(new Dimension(220, 32));
-        JLabel icon = new JLabel("⌕ ");
-        icon.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        // Use a plain "○" circle as a reliable magnifier stand-in (see ICON_SEARCH
+        // comment).
+        // Font.DIALOG is Java's logical font and maps to a physical font that always
+        // covers
+        // Latin + General Punctuation + Mathematical Operators on every JVM platform.
+        JLabel icon = new JLabel(ICON_SEARCH);
+        icon.setFont(new Font(Font.DIALOG, Font.PLAIN, 14));
         icon.setForeground(TEXT_HINT);
         wrap.add(icon, BorderLayout.WEST);
         wrap.add(searchField, BorderLayout.CENTER);
@@ -199,12 +233,10 @@ public class MenuMaintenancePanel extends JPanel {
         tableScroll.setBorder(BorderFactory.createEmptyBorder());
         tableScroll.getViewport().setBackground(BG_SURFACE);
 
-        JPanel detailPanel = buildDetailPanel();
-
         JPanel content = new JPanel(new BorderLayout());
         content.setBackground(BORDER_COLOR);
         content.add(tableScroll, BorderLayout.CENTER);
-        content.add(detailPanel, BorderLayout.EAST);
+        content.add(buildDetailPanel(), BorderLayout.EAST);
         return content;
     }
 
@@ -215,29 +247,24 @@ public class MenuMaintenancePanel extends JPanel {
         panel.setBorder(new MatteBorder(0, 1, 0, 0, BORDER_COLOR));
         panel.setPreferredSize(new Dimension(270, 0));
 
-        // Header
         JPanel header = new JPanel(new BorderLayout());
         header.setBackground(BG_SUBTLE);
         header.setBorder(new CompoundBorder(
                 new MatteBorder(0, 0, 1, 0, BORDER_COLOR),
                 new EmptyBorder(10, 18, 10, 12)));
         JLabel title = new JLabel("Item Details");
-        title.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        title.setFont(new Font(Font.DIALOG, Font.BOLD, 12));
         title.setForeground(TEXT_PRIMARY);
         header.add(title, BorderLayout.WEST);
 
-        // Body (scrollable)
         JPanel body = buildDetailBody();
         JScrollPane scroll = new JScrollPane(body);
         scroll.setBorder(BorderFactory.createEmptyBorder());
         scroll.getViewport().setBackground(BG_SURFACE);
 
-        // Footer with Backup & Restore button
-        JPanel footer = buildDetailFooter();
-
         panel.add(header, BorderLayout.NORTH);
         panel.add(scroll, BorderLayout.CENTER);
-        panel.add(footer, BorderLayout.SOUTH);
+        panel.add(buildDetailFooter(), BorderLayout.SOUTH);
         return panel;
     }
 
@@ -247,7 +274,6 @@ public class MenuMaintenancePanel extends JPanel {
         body.setBackground(BG_SURFACE);
         body.setBorder(new EmptyBorder(14, 14, 14, 14));
 
-        // Item image thumbnail (hidden when no image)
         detailImage.setAlignmentX(LEFT_ALIGNMENT);
         detailImage.setVisible(false);
         detailImage.setBorder(new CompoundBorder(
@@ -256,42 +282,31 @@ public class MenuMaintenancePanel extends JPanel {
         body.add(detailImage);
         body.add(Box.createVerticalStrut(10));
 
-        // Name
         body.add(makeFieldRow("NAME", detailName));
         body.add(Box.createVerticalStrut(10));
-
-        // Category
         body.add(makeFieldRow("CATEGORY", detailCat));
         body.add(Box.createVerticalStrut(12));
 
-        // Prices
-        JLabel priceLabel = makeDetailLabel("PRICING");
-        body.add(priceLabel);
+        body.add(makeDetailLabel("PRICING"));
         body.add(Box.createVerticalStrut(5));
         body.add(buildPriceChips());
         body.add(Box.createVerticalStrut(14));
 
-        // Separator
         JSeparator sep = new JSeparator();
         sep.setForeground(BORDER_COLOR);
         sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
         body.add(sep);
         body.add(Box.createVerticalStrut(14));
 
-        // Ingredients
-        JLabel ingLabel = makeDetailLabel("INGREDIENTS");
-        body.add(ingLabel);
+        body.add(makeDetailLabel("INGREDIENTS"));
         body.add(Box.createVerticalStrut(6));
 
         ingredientList.setLayout(new BoxLayout(ingredientList, BoxLayout.Y_AXIS));
         ingredientList.setBackground(BG_SURFACE);
         ingredientList.setAlignmentX(LEFT_ALIGNMENT);
         body.add(ingredientList);
-
-        // Filler
         body.add(Box.createVerticalGlue());
 
-        // Default state
         setDetailEmpty();
         return body;
     }
@@ -303,18 +318,23 @@ public class MenuMaintenancePanel extends JPanel {
                 new MatteBorder(1, 0, 0, 0, BORDER_COLOR),
                 new EmptyBorder(8, 12, 8, 12)));
 
-        JButton backupBtn = new JButton("🗄  Backup & Restore") {
+        // ↔ (U+2194 LEFT RIGHT ARROW) — in the Arrows block, present in every
+        // Java logical font mapping (Dialog, Serif, SansSerif). Safe replacement
+        // for the original ⇄ (U+21C4) which can miss on some Linux JVMs.
+        JButton backupBtn = new JButton(ICON_BACKUP + "  Backup & Restore") {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                        RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(getModel().isRollover() ? BG_SUBTLE : BG_SURFACE);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
                 g2.dispose();
                 super.paintComponent(g);
             }
         };
-        backupBtn.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        // Font.DIALOG guaranteed to cover the Arrows block on all JVM platforms
+        backupBtn.setFont(new Font(Font.DIALOG, Font.PLAIN, 11));
         backupBtn.setForeground(TEXT_MUTED);
         backupBtn.setBorder(new CompoundBorder(
                 new LineBorder(BORDER_COLOR, 1, true),
@@ -332,12 +352,14 @@ public class MenuMaintenancePanel extends JPanel {
 
     private void openBackupDialog() {
         Window owner = SwingUtilities.getWindowAncestor(this);
-        JDialog dlg = new JDialog(owner, "Backup & Restore", Dialog.ModalityType.APPLICATION_MODAL);
+        JDialog dlg = new JDialog(owner, "Backup & Restore",
+                Dialog.ModalityType.APPLICATION_MODAL);
         dlg.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
         try {
             dlg.getContentPane().add(new BackupPanel());
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Could not open Backup panel: " + ex.getMessage());
+            JOptionPane.showMessageDialog(this,
+                    "Could not open Backup panel: " + ex.getMessage());
             return;
         }
         dlg.pack();
@@ -364,7 +386,7 @@ public class MenuMaintenancePanel extends JPanel {
                 new LineBorder(BORDER_COLOR, 1, true),
                 new EmptyBorder(6, 6, 6, 6)));
         JLabel lbl = new JLabel(label, SwingConstants.CENTER);
-        lbl.setFont(new Font("Segoe UI", Font.PLAIN, 9));
+        lbl.setFont(new Font(Font.DIALOG, Font.PLAIN, 9));
         lbl.setForeground(TEXT_HINT);
         valueLabel.setHorizontalAlignment(SwingConstants.CENTER);
         chip.add(lbl, BorderLayout.NORTH);
@@ -383,16 +405,16 @@ public class MenuMaintenancePanel extends JPanel {
     }
 
     private void setDetailEmpty() {
-        detailName.setText("—");
-        detailCat.setText("—");
-        priceHot.setText("—");
-        priceReg.setText("—");
-        priceLarge.setText("—");
+        detailName.setText("\u2014"); // em dash
+        detailCat.setText("\u2014");
+        priceHot.setText("\u2014");
+        priceReg.setText("\u2014");
+        priceLarge.setText("\u2014");
         detailImage.setIcon(null);
         detailImage.setVisible(false);
         ingredientList.removeAll();
         JLabel none = new JLabel("Select a menu item");
-        none.setFont(new Font("Segoe UI", Font.ITALIC, 12));
+        none.setFont(new Font(Font.DIALOG, Font.ITALIC, 12));
         none.setForeground(TEXT_HINT);
         ingredientList.add(none);
         ingredientList.revalidate();
@@ -407,9 +429,9 @@ public class MenuMaintenancePanel extends JPanel {
         }
         String name = String.valueOf(model.getValueAt(row, 0));
         Optional<MenuItem> opt = cachedItems.stream()
-                .filter(i -> StringUtil.normalizeName(i.getName()).equals(StringUtil.normalizeName(name)))
+                .filter(i -> StringUtil.normalizeName(i.getName())
+                        .equals(StringUtil.normalizeName(name)))
                 .findFirst();
-
         if (opt.isEmpty()) {
             setDetailEmpty();
             return;
@@ -418,19 +440,20 @@ public class MenuMaintenancePanel extends JPanel {
 
         detailName.setText(item.getName());
         detailCat.setText(item.getCategory());
-        priceHot.setText(item.getHotPrice() > 0 ? "₱" + (int) item.getHotPrice() : "—");
-        priceReg.setText(item.getIcedRegularPrice() > 0 ? "₱" + (int) item.getIcedRegularPrice() : "—");
-        priceLarge.setText(item.getIcedLargePrice() > 0 ? "₱" + (int) item.getIcedLargePrice() : "—");
+        priceHot.setText(item.getHotPrice() > 0 ? "\u20B1" + (int) item.getHotPrice() : "\u2014");
+        priceReg.setText(item.getIcedRegularPrice() > 0 ? "\u20B1" + (int) item.getIcedRegularPrice() : "\u2014");
+        priceLarge.setText(item.getIcedLargePrice() > 0 ? "\u20B1" + (int) item.getIcedLargePrice() : "\u2014");
 
-        // Image thumbnail
         String imgPath = item.getImagePath();
         if (imgPath != null && !imgPath.isBlank()) {
             try {
                 java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(new java.io.File(imgPath));
                 if (img != null) {
                     int tw = 242, th = 130;
-                    double scale = Math.min((double) tw / img.getWidth(), (double) th / img.getHeight());
-                    int iw = (int) (img.getWidth() * scale), ih = (int) (img.getHeight() * scale);
+                    double scale = Math.min((double) tw / img.getWidth(),
+                            (double) th / img.getHeight());
+                    int iw = (int) (img.getWidth() * scale);
+                    int ih = (int) (img.getHeight() * scale);
                     java.awt.image.BufferedImage scaled = new java.awt.image.BufferedImage(iw, ih,
                             java.awt.image.BufferedImage.TYPE_INT_ARGB);
                     java.awt.Graphics2D g2 = scaled.createGraphics();
@@ -454,7 +477,7 @@ public class MenuMaintenancePanel extends JPanel {
         ingredientList.removeAll();
         if (item.getIngredients().isEmpty()) {
             JLabel none = new JLabel("None configured");
-            none.setFont(new Font("Segoe UI", Font.ITALIC, 12));
+            none.setFont(new Font(Font.DIALOG, Font.ITALIC, 12));
             none.setForeground(TEXT_HINT);
             ingredientList.add(none);
         } else {
@@ -473,10 +496,10 @@ public class MenuMaintenancePanel extends JPanel {
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
         row.setAlignmentX(LEFT_ALIGNMENT);
         JLabel n = new JLabel(name);
-        n.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        n.setFont(new Font(Font.DIALOG, Font.PLAIN, 12));
         n.setForeground(TEXT_PRIMARY);
         JLabel q = new JLabel(qty % 1 == 0 ? (int) qty + "g" : qty + "g");
-        q.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 11));
+        q.setFont(new Font(Font.DIALOG, Font.BOLD, 11));
         q.setForeground(TEXT_MUTED);
         row.add(n, BorderLayout.WEST);
         row.add(q, BorderLayout.EAST);
@@ -490,7 +513,7 @@ public class MenuMaintenancePanel extends JPanel {
         bar.setBorder(new CompoundBorder(
                 new MatteBorder(1, 0, 0, 0, BORDER_COLOR),
                 new EmptyBorder(5, 14, 5, 14)));
-        statusLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        statusLabel.setFont(new Font(Font.DIALOG, Font.PLAIN, 11));
         statusLabel.setForeground(TEXT_HINT);
         bar.add(statusLabel, BorderLayout.WEST);
         return bar;
@@ -508,7 +531,7 @@ public class MenuMaintenancePanel extends JPanel {
                 return c;
             }
         };
-        t.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        t.setFont(new Font(Font.DIALOG, Font.PLAIN, 13));
         t.setRowHeight(34);
         t.setShowGrid(false);
         t.setIntercellSpacing(new Dimension(0, 0));
@@ -519,31 +542,25 @@ public class MenuMaintenancePanel extends JPanel {
         t.setForeground(TEXT_PRIMARY);
         t.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
-        // Header styling
         JTableHeader header = t.getTableHeader();
-        header.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        header.setFont(new Font(Font.DIALOG, Font.BOLD, 11));
         header.setBackground(BG_SUBTLE);
         header.setForeground(TEXT_MUTED);
         header.setBorder(new MatteBorder(0, 0, 1, 0, BORDER_COLOR));
         header.setReorderingAllowed(false);
         header.setResizingAllowed(true);
 
-        // Column widths
         int[] widths = { 200, 110, 75, 100, 95 };
-        for (int i = 0; i < widths.length; i++) {
+        for (int i = 0; i < widths.length; i++)
             t.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
-        }
 
-        // Right-align price columns
         DefaultTableCellRenderer right = new DefaultTableCellRenderer();
         right.setHorizontalAlignment(SwingConstants.RIGHT);
         for (int i = 2; i <= 4; i++)
             t.getColumnModel().getColumn(i).setCellRenderer(right);
 
-        // Category pill renderer
         t.getColumnModel().getColumn(1).setCellRenderer(new CategoryPillRenderer());
 
-        // Hover highlight
         t.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
             int lastHover = -1;
 
@@ -556,7 +573,6 @@ public class MenuMaintenancePanel extends JPanel {
                 }
             }
         });
-
         return t;
     }
 
@@ -564,22 +580,18 @@ public class MenuMaintenancePanel extends JPanel {
     private void reload() {
         try {
             cachedItems = repo.findAll();
-            if (cachedItems == null) {
+            if (cachedItems == null)
                 cachedItems = new ArrayList<>();
-            }
-
             if (cachedItems.isEmpty()) {
                 try {
                     persistence.Phase2Bootstrap.seedCatalogIfEmpty();
                     cachedItems = repo.findAll();
-                    if (cachedItems == null) {
+                    if (cachedItems == null)
                         cachedItems = new ArrayList<>();
-                    }
                 } catch (Exception seedEx) {
                     System.err.println("Warning: Could not seed catalog: " + seedEx.getMessage());
                 }
             }
-
             applyFilters();
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Unable to load menu: " + e.getMessage());
@@ -589,15 +601,20 @@ public class MenuMaintenancePanel extends JPanel {
 
     private void applyFilters() {
         model.setRowCount(0);
-        String cat = categoryFilter.getSelectedItem() == null ? "All" : categoryFilter.getSelectedItem().toString();
+        String cat = categoryFilter.getSelectedItem() == null
+                ? "All"
+                : categoryFilter.getSelectedItem().toString();
         String fieldText = searchField.getText() == null ? "" : searchField.getText().trim();
-        String q = fieldText.equals("Search items…") ? "" : fieldText.toLowerCase();
+        String q = (fieldText.equals("Search items\u2026") || fieldText.equals("Search items…"))
+                ? ""
+                : fieldText.toLowerCase();
         int count = 0;
 
         if (cachedItems != null) {
             for (MenuItem item : cachedItems) {
                 boolean catOk = "All".equalsIgnoreCase(cat)
-                        || normalizeCategory(item.getCategory()).equalsIgnoreCase(normalizeCategory(cat));
+                        || normalizeCategory(item.getCategory())
+                                .equalsIgnoreCase(normalizeCategory(cat));
                 boolean srchOk = q.isEmpty()
                         || item.getName().toLowerCase().contains(q)
                         || item.getCategory().toLowerCase().contains(q);
@@ -612,7 +629,6 @@ public class MenuMaintenancePanel extends JPanel {
                 }
             }
         }
-
         statusLabel.setText(count + " item" + (count == 1 ? "" : "s"));
         if (model.getRowCount() > 0) {
             table.setRowSelectionInterval(0, 0);
@@ -623,7 +639,7 @@ public class MenuMaintenancePanel extends JPanel {
     }
 
     private String formatPrice(double p) {
-        return p > 0 ? "₱" + (int) p : "—";
+        return p > 0 ? "\u20B1" + (int) p : "\u2014"; // ₱ and —
     }
 
     private void onAdd() {
@@ -731,7 +747,8 @@ public class MenuMaintenancePanel extends JPanel {
             case "Non-Coffee" -> new NonCoffeeItem(name, hot, reg, large);
             case "Fruit Tea" -> new FruitTeaItem(name, hot, reg, large);
             case "Herbal Tea" -> new HerbalTeaItem(name, hot, reg, large);
-            case "Food" -> new FoodItem(name, "Food", hot > 0 ? hot : (reg > 0 ? reg : large));
+            case "Food" -> new FoodItem(name, "Food",
+                    hot > 0 ? hot : (reg > 0 ? reg : large));
             default -> new CoffeeItem(name, hot, reg, large);
         };
     }
@@ -765,36 +782,45 @@ public class MenuMaintenancePanel extends JPanel {
     // ── Factory helpers ───────────────────────────────────────────────────────
     private static JLabel makeDetailLabel(String text) {
         JLabel l = new JLabel(text);
-        l.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        l.setFont(new Font(Font.DIALOG, Font.BOLD, 10));
         l.setForeground(TEXT_HINT);
         l.setAlignmentX(LEFT_ALIGNMENT);
         return l;
     }
 
     private static JLabel makeDetailValue() {
-        JLabel l = new JLabel("—");
-        l.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        JLabel l = new JLabel("\u2014");
+        l.setFont(new Font(Font.DIALOG, Font.PLAIN, 13));
         l.setForeground(TEXT_PRIMARY);
         l.setAlignmentX(LEFT_ALIGNMENT);
         return l;
     }
 
     private static JLabel makePriceLabel() {
-        JLabel l = new JLabel("—");
-        l.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        JLabel l = new JLabel("\u2014");
+        // Font.DIALOG BOLD reliably renders ₱ (U+20B1, Philippine Peso, Latin
+        // Extended-B)
+        // and — (U+2014, em dash, General Punctuation) on all JVM platforms.
+        l.setFont(new Font(Font.DIALOG, Font.BOLD, 13));
         l.setForeground(TEXT_PRIMARY);
         return l;
     }
 
-    private static JLabel makeIcon(String text) {
+    /**
+     * Creates a toolbar icon label using Java's logical "Dialog" font.
+     * Font.DIALOG is a guaranteed alias on every JVM; the JVM maps it to the
+     * best physical font available on the current OS that covers the
+     * Basic Multilingual Plane, ensuring icon glyphs actually render.
+     */
+    private static JLabel makeIconLabel(String text) {
         JLabel l = new JLabel(text);
-        l.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        l.setFont(new Font(Font.DIALOG, Font.PLAIN, 14));
         l.setForeground(TEXT_HINT);
         return l;
     }
 
     private static void styleTextField(JTextField field, String placeholder) {
-        field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        field.setFont(new Font(Font.DIALOG, Font.PLAIN, 13));
         field.setForeground(TEXT_PRIMARY);
         field.setBackground(BG_SURFACE);
         field.setCaretColor(ACCENT);
@@ -824,7 +850,7 @@ public class MenuMaintenancePanel extends JPanel {
     }
 
     private static void styleComboBox(JComboBox<?> box) {
-        box.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        box.setFont(new Font(Font.DIALOG, Font.PLAIN, 13));
         box.setBackground(BG_SURFACE);
         box.setForeground(TEXT_PRIMARY);
         box.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
@@ -836,7 +862,8 @@ public class MenuMaintenancePanel extends JPanel {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                        RenderingHints.VALUE_ANTIALIAS_ON);
                 Color bg;
                 if (primary)
                     bg = ACCENT;
@@ -850,7 +877,8 @@ public class MenuMaintenancePanel extends JPanel {
                 super.paintComponent(g);
             }
         };
-        btn.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        // Font.DIALOG ensures × (U+00D7), ▦ (U+25A6), ↔ (U+2194) all render
+        btn.setFont(new Font(Font.DIALOG, Font.PLAIN, 12));
         btn.setForeground(primary ? Color.WHITE : (danger ? new Color(0xA32D2D) : TEXT_PRIMARY));
         btn.setBorder(new CompoundBorder(
                 new LineBorder(primary ? ACCENT : BORDER_COLOR, 1, true),
@@ -871,11 +899,12 @@ public class MenuMaintenancePanel extends JPanel {
             JLabel label = (JLabel) super.getTableCellRendererComponent(
                     table, value, isSelected, hasFocus, row, col);
             String cat = value == null ? "" : value.toString();
-            Color[] colors = PILL_COLORS.getOrDefault(cat, new Color[] { BG_SUBTLE, TEXT_MUTED });
+            Color[] colors = PILL_COLORS.getOrDefault(cat,
+                    new Color[] { BG_SUBTLE, TEXT_MUTED });
             label.setOpaque(true);
             label.setBackground(isSelected ? ROW_SELECTED : colors[0]);
             label.setForeground(colors[1]);
-            label.setFont(new Font("Segoe UI", Font.BOLD, 11));
+            label.setFont(new Font(Font.DIALOG, Font.BOLD, 11));
             label.setBorder(new EmptyBorder(2, 8, 2, 8));
             label.setHorizontalAlignment(SwingConstants.LEFT);
             return label;

@@ -2011,6 +2011,7 @@ public class StaffPanel extends JPanel {
 
     // ─── Filter helpers ──────────────────────────────────────────
     private void applyRequestsFilter() {
+        if (resetRequestsSorter == null) return;
         String selected = (String) requestStatusFilter.getSelectedItem();
         if (selected == null || "All".equals(selected)) {
             resetRequestsSorter.setRowFilter(null);

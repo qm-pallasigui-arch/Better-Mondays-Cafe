@@ -49,7 +49,16 @@ public class StaffProfileDialog extends JDialog {
 
         setResizable(true);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
-        setContentPane(fittedContent(view.root()));
+        try {
+            setContentPane(fittedContent(view.root()));
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(owner,
+                    "Failed to build profile dialog:\n" + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+            dispose();
+            return;
+        }
         pack();
         setSize(new Dimension(650, 600));
         setMinimumSize(new Dimension(650, 400));
@@ -360,13 +369,14 @@ public class StaffProfileDialog extends JDialog {
                 dayLabel.setForeground(new Color(0x475569));
                 dayLabel.setPreferredSize(new Dimension(50, 28));
 
-                String[] opts = { "", "Rest Day", "Afternoon", "Night" };
+                String[] opts = { "", "Morning", "Afternoon", "Night", "Rest Day" };
                 JComboBox<String> combo = new JComboBox<>(opts);
                 combo.setFont(new Font("Segoe UI", Font.PLAIN, 12));
                 combo.setBackground(Color.WHITE);
                 combo.setBorder(BorderFactory.createLineBorder(new Color(0xE2E8F0)));
                 if (!shift.isEmpty()) {
                     String display = shift.equals("rest") ? "Rest Day"
+                            : shift.equals("morning") ? "Morning"
                             : shift.equals("afternoon") ? "Afternoon"
                             : shift.equals("night") ? "Night" : "";
                     combo.setSelectedItem(display);
@@ -375,12 +385,14 @@ public class StaffProfileDialog extends JDialog {
                     String selected = (String) combo.getSelectedItem();
                     if (selected == null || selected.isEmpty()) {
                         editSchedule.put(day, "");
-                    } else if (selected.equals("Rest Day")) {
-                        editSchedule.put(day, "rest");
+                    } else if (selected.equals("Morning")) {
+                        editSchedule.put(day, "morning");
                     } else if (selected.equals("Afternoon")) {
                         editSchedule.put(day, "afternoon");
                     } else if (selected.equals("Night")) {
                         editSchedule.put(day, "night");
+                    } else if (selected.equals("Rest Day")) {
+                        editSchedule.put(day, "rest");
                     }
                 });
 
@@ -411,20 +423,28 @@ public class StaffProfileDialog extends JDialog {
         }
 
         private void toggleEditMode() {
-            editing = !editing;
-            setFieldsEditable(editing);
-            scheduleCard.setVisible(editing);
-            actionBtn.setText(editing ? "Save Changes" : "Edit Profile");
-            setResizable(true);
-            setSize(new Dimension(650, editing ? Math.min(760, 600) : 600));
-            setMinimumSize(new Dimension(650, 400));
-            revalidate();
-            repaint();
-            if (editing) {
-                SwingUtilities.invokeLater(() -> {
-                    JScrollPane sp = (JScrollPane) getContentPane();
-                    sp.getVerticalScrollBar().setValue(0);
-                });
+            try {
+                editing = !editing;
+                setFieldsEditable(editing);
+                if (scheduleCard != null) scheduleCard.setVisible(editing);
+                actionBtn.setText(editing ? "Save Changes" : "Edit Profile");
+                setResizable(true);
+                setSize(new Dimension(650, editing ? 760 : 600));
+                setMinimumSize(new Dimension(650, 400));
+                revalidate();
+                repaint();
+                if (editing) {
+                    SwingUtilities.invokeLater(() -> {
+                        if (getContentPane() instanceof JScrollPane sp) {
+                            sp.getVerticalScrollBar().setValue(0);
+                        }
+                    });
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(StaffProfileDialog.this,
+                        "Error toggling edit mode:\n" + ex.getMessage(),
+                        "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
 
@@ -1227,17 +1247,11 @@ public class StaffProfileDialog extends JDialog {
             int drawX = (targetWidth - drawWidth) / 2;
             int drawY = (targetHeight - drawHeight) / 2;
 
-            Object oldInterpolation = g2.getRenderingHint(RenderingHints.KEY_INTERPOLATION);
-            Object oldRender = g2.getRenderingHint(RenderingHints.KEY_RENDERING);
-            Object oldAlpha = g2.getRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION);
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
             g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
             g2.setRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION,
                     RenderingHints.VALUE_ALPHA_INTERPOLATION_QUALITY);
             g2.drawImage(image, drawX, drawY, drawWidth, drawHeight, null);
-            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, oldInterpolation);
-            g2.setRenderingHint(RenderingHints.KEY_RENDERING, oldRender);
-            g2.setRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION, oldAlpha);
         }
     }
 }

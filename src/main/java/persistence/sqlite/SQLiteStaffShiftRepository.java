@@ -56,11 +56,32 @@ public class SQLiteStaffShiftRepository implements StaffShiftRepository {
 
     @Override
     public void markAsLate(String username) throws Exception {
-        try (Connection connection = AppDatabase.openConnection();
-                PreparedStatement stmt = connection.prepareStatement(
-                        "UPDATE staff_shifts SET status = 'late' WHERE username = ? AND ended_at IS NULL ORDER BY id DESC LIMIT 1")) {
-            stmt.setString(1, username);
-            stmt.executeUpdate();
+        try (Connection connection = AppDatabase.openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                long shiftId = -1;
+                try (PreparedStatement find = connection.prepareStatement(
+                        "SELECT id FROM staff_shifts WHERE username = ? AND ended_at IS NULL ORDER BY id DESC LIMIT 1")) {
+                    find.setString(1, username);
+                    try (ResultSet rs = find.executeQuery()) {
+                        if (rs.next())
+                            shiftId = rs.getLong("id");
+                    }
+                }
+                if (shiftId == -1)
+                    return;
+                try (PreparedStatement upd = connection.prepareStatement(
+                        "UPDATE staff_shifts SET status = 'late' WHERE id = ?")) {
+                    upd.setLong(1, shiftId);
+                    upd.executeUpdate();
+                }
+                connection.commit();
+            } catch (Exception e) {
+                connection.rollback();
+                throw e;
+            } finally {
+                connection.setAutoCommit(true);
+            }
         }
     }
 

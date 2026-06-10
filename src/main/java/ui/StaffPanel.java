@@ -8,7 +8,9 @@ import persistence.AppDatabase;
 import persistence.ProfilePictureRepository;
 import persistence.StaffShiftRepository;
 import persistence.StaffScheduleRepository;
+import persistence.sqlite.SQLiteLeaveRequestRepository;
 import persistence.sqlite.SQLiteStaffScheduleRepository;
+import staff.LeaveRequest;
 import staff.PasswordResetRequest;
 import staff.StaffShift;
 
@@ -69,6 +71,28 @@ public class StaffPanel extends JPanel {
     private final JComboBox<String> requestStatusFilter = new JComboBox<>(
             new String[] { "All", "Pending", "Approved", "Rejected" });
 
+    // Admin — Leave Request table
+    private final JTable leaveRequestsTable = new JTable();
+    private final DefaultTableModel leaveRequestsModel = new DefaultTableModel(
+            new String[] { "_id", "Staff ID", "Username", "Start Date", "End Date", "Status", "Requested At" }, 0) {
+        @Override
+        public boolean isCellEditable(int row, int col) { return false; }
+    };
+    private TableRowSorter<DefaultTableModel> leaveRequestsSorter;
+    private final JButton approveLeaveBtn  = new JButton("Approve");
+    private final JButton rejectLeaveBtn   = new JButton("Reject");
+    private final JButton refreshLeaveBtn  = new JButton("Refresh");
+    private final JComboBox<String> leaveStatusFilter = new JComboBox<>(
+            new String[] { "All", "Pending", "Approved", "Rejected" });
+
+    // Staff — My Requests table (own leave requests)
+    private final JTable myLeaveTable = new JTable();
+    private final DefaultTableModel myLeaveModel = new DefaultTableModel(
+            new String[] { "Type", "Start Date", "End Date", "Status", "Requested At" }, 0) {
+        @Override
+        public boolean isCellEditable(int row, int col) { return false; }
+    };
+
     // Card background colors
     private static final Color CARD_BG = Color.WHITE;
     private static final Color CARD_BORDER = new Color(0xE5E7EB);
@@ -120,7 +144,7 @@ public class StaffPanel extends JPanel {
         }
         cardsContainer.add(buildWeeklyScheduleView(), "Weekly Schedule");
         cardsContainer.add(buildAttendanceHistoryView(), "Attendance History");
-        cardsContainer.add(buildPasswordRequestView(), "Password Request");
+        cardsContainer.add(buildStaffRequestsView(), "Staff Requests");
         cardsContainer.add(buildAccountManagementView(), "Account Management");
         add(cardsContainer, BorderLayout.CENTER);
         cards.show(cardsContainer, isAdmin ? "Staff Shifts" : "Weekly Schedule");
@@ -184,7 +208,7 @@ public class StaffPanel extends JPanel {
         tabBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         tabBar.setOpaque(false);
 
-        String[] tabs = { "Staff Shifts", "Weekly Schedule", "Attendance History", "Password Request",
+        String[] tabs = { "Staff Shifts", "Weekly Schedule", "Attendance History", "Staff Requests",
                 "Account Management" };
         String defaultTab = currentRole == Role.ADMIN ? "Staff Shifts" : "Weekly Schedule";
         for (String tab : tabs) {
@@ -225,8 +249,8 @@ public class StaffPanel extends JPanel {
             showWeeklyScheduleView();
         } else if ("Attendance History".equals(tab)) {
             showAttendanceHistoryView();
-        } else if ("Password Request".equals(tab)) {
-            showPasswordRequestView();
+        } else if ("Staff Requests".equals(tab)) {
+            showStaffRequestsView();
         } else if ("Account Management".equals(tab)) {
             showAccountManagementView();
         }
@@ -249,15 +273,16 @@ public class StaffPanel extends JPanel {
         refreshStaffCards();
     }
 
-    private void showPasswordRequestView() {
-        cards.show(cardsContainer, "Password Request");
+    private void showStaffRequestsView() {
+        cards.show(cardsContainer, "Staff Requests");
         loadPasswordRequests();
+        loadLeaveRequests();
+        loadMyLeaveRequests();
     }
 
     private void showAccountManagementView() {
         cards.show(cardsContainer, "Account Management");
         loadUsers();
-        loadPasswordRequests();
     }
 
     // ─── Staff Request Dialog ────────────────────────────────
@@ -639,12 +664,162 @@ public class StaffPanel extends JPanel {
         return panel;
     }
 
-    // ─── Password Request View ───────────────────────────────
-    private JPanel buildPasswordRequestView() {
+    // ─── Staff Requests View ─────────────────────────────────
+    private JPanel buildStaffRequestsView() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setOpaque(false);
         panel.setBorder(new EmptyBorder(16, 24, 24, 24));
-        panel.add(createPasswordRequestsPanel(), BorderLayout.CENTER);
+
+        if (currentRole == Role.ADMIN) {
+            // Admin sees two inner tabs: Password Request + Leave Request
+            JTabbedPane innerTabs = new JTabbedPane();
+            innerTabs.addTab("Password Request", createPasswordRequestsPanel());
+            innerTabs.addTab("Leave Request", createAdminLeaveRequestsPanel());
+            panel.add(innerTabs, BorderLayout.CENTER);
+        } else {
+            // Staff sees two inner tabs: My Requests (leave + pw) + their shift context
+            JTabbedPane innerTabs = new JTabbedPane();
+            innerTabs.addTab("My Requests", createStaffMyRequestsPanel());
+            panel.add(innerTabs, BorderLayout.CENTER);
+        }
+
+        return panel;
+    }
+
+    // ─── Admin: Leave Request panel ──────────────────────────
+    private JPanel createAdminLeaveRequestsPanel() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(new EmptyBorder(8, 8, 8, 8));
+
+        FilterRow toolbar = new FilterRow();
+        toolbar.addLabeled("Status:", leaveStatusFilter);
+        toolbar.add(refreshLeaveBtn);
+
+        JPanel actionBar = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        approveLeaveBtn.setEnabled(false);
+        rejectLeaveBtn.setEnabled(false);
+        actionBar.add(approveLeaveBtn);
+        actionBar.add(rejectLeaveBtn);
+
+        JPanel topBar = new JPanel(new BorderLayout());
+        topBar.add(toolbar, BorderLayout.NORTH);
+        topBar.add(actionBar, BorderLayout.SOUTH);
+        panel.add(topBar, BorderLayout.NORTH);
+
+        leaveRequestsTable.setModel(leaveRequestsModel);
+        leaveRequestsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        leaveRequestsSorter = new TableRowSorter<>(leaveRequestsModel);
+        leaveRequestsTable.setRowSorter(leaveRequestsSorter);
+        hideColumn(leaveRequestsTable, 0);
+
+        // Colored status badge renderer on the Status column (index 5 in model, 4 visible)
+        leaveRequestsTable.getColumnModel().getColumn(5).setCellRenderer(new LeaveStatusRenderer());
+
+        leaveRequestsTable.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                int row = leaveRequestsTable.getSelectedRow();
+                if (row >= 0) {
+                    int modelRow = leaveRequestsTable.convertRowIndexToModel(row);
+                    String status = leaveRequestsModel.getValueAt(modelRow, 5).toString();
+                    boolean isPending = "pending".equalsIgnoreCase(status);
+                    approveLeaveBtn.setEnabled(isPending);
+                    rejectLeaveBtn.setEnabled(isPending);
+                } else {
+                    approveLeaveBtn.setEnabled(false);
+                    rejectLeaveBtn.setEnabled(false);
+                }
+            }
+        });
+
+        refreshLeaveBtn.addActionListener(e -> loadLeaveRequests());
+        leaveStatusFilter.addActionListener(e -> applyLeaveRequestsFilter());
+        approveLeaveBtn.addActionListener(e -> onApproveLeaveRequest());
+        rejectLeaveBtn.addActionListener(e -> onRejectLeaveRequest());
+
+        panel.add(new JScrollPane(leaveRequestsTable), BorderLayout.CENTER);
+        return panel;
+    }
+
+    // ─── Staff: My Requests panel ────────────────────────────
+    private JPanel createStaffMyRequestsPanel() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(new EmptyBorder(8, 8, 8, 8));
+
+        // ── Submit form ──
+        JTextField startDateField = new JTextField(12);
+        JTextField endDateField   = new JTextField(12);
+
+        JPanel form = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+        form.add(new JLabel("Leave: From"));
+        form.add(startDateField);
+        form.add(new JLabel("To"));
+        form.add(endDateField);
+
+        JButton submitLeaveBtn = new JButton("Submit Leave Request");
+        submitLeaveBtn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        submitLeaveBtn.setForeground(Color.WHITE);
+        submitLeaveBtn.setBackground(new Color(0x10B981));
+        submitLeaveBtn.setBorder(BorderFactory.createEmptyBorder(7, 16, 7, 16));
+        submitLeaveBtn.setFocusPainted(false);
+        submitLeaveBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        submitLeaveBtn.addActionListener(e -> {
+            String start = startDateField.getText().trim();
+            String end   = endDateField.getText().trim();
+            if (start.isEmpty() || end.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Please fill in both dates.", "Validation",
+                        JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            new SwingWorker<Void, Void>() {
+                private String errorMsg;
+                @Override protected Void doInBackground() {
+                    try {
+                        new SQLiteLeaveRequestRepository().createRequest(username, start, end);
+                    } catch (Exception ex) { errorMsg = ex.getMessage(); }
+                    return null;
+                }
+                @Override protected void done() {
+                    if (errorMsg != null) {
+                        JOptionPane.showMessageDialog(StaffPanel.this,
+                                "Failed to submit leave request:\n" + errorMsg, "Error",
+                                JOptionPane.ERROR_MESSAGE);
+                    } else {
+                        startDateField.setText("");
+                        endDateField.setText("");
+                        JOptionPane.showMessageDialog(StaffPanel.this,
+                                "Leave request submitted successfully.", "Success",
+                                JOptionPane.INFORMATION_MESSAGE);
+                        loadMyLeaveRequests();
+                    }
+                }
+            }.execute();
+        });
+
+        JButton submitPwBtn = new JButton("Submit Password Reset");
+        submitPwBtn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        submitPwBtn.setForeground(Color.WHITE);
+        submitPwBtn.setBackground(ACCENT_BLUE);
+        submitPwBtn.setBorder(BorderFactory.createEmptyBorder(7, 16, 7, 16));
+        submitPwBtn.setFocusPainted(false);
+        submitPwBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        submitPwBtn.addActionListener(e -> submitPasswordChangeRequest());
+
+        JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+        btnRow.add(submitLeaveBtn);
+        btnRow.add(submitPwBtn);
+
+        JPanel topSection = new JPanel(new BorderLayout());
+        topSection.add(form,   BorderLayout.NORTH);
+        topSection.add(btnRow, BorderLayout.SOUTH);
+        panel.add(topSection, BorderLayout.NORTH);
+
+        // ── My requests history table ──
+        myLeaveTable.setModel(myLeaveModel);
+        myLeaveTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        // Status column index 3 — colored badge
+        myLeaveTable.getColumnModel().getColumn(3).setCellRenderer(new LeaveStatusRenderer());
+
+        panel.add(new JScrollPane(myLeaveTable), BorderLayout.CENTER);
         return panel;
     }
 
@@ -1509,6 +1684,9 @@ public class StaffPanel extends JPanel {
     private void refreshAll() {
         if (currentRole == Role.ADMIN) {
             refreshStaffCards();
+            loadLeaveRequests();
+        } else {
+            loadMyLeaveRequests();
         }
         loadUsers();
         loadPasswordRequests();
@@ -1901,5 +2079,180 @@ public class StaffPanel extends JPanel {
         tc.setWidth(0);
         tc.setPreferredWidth(0);
         tc.setResizable(false);
+    }
+
+    // ─── Leave Request data loaders ──────────────────────────────
+
+    private void loadLeaveRequests() {
+        if (currentRole != Role.ADMIN) return;
+        leaveRequestsModel.setRowCount(0);
+        new SwingWorker<List<LeaveRequest>, Void>() {
+            private String errorMsg;
+            @Override protected List<LeaveRequest> doInBackground() {
+                try {
+                    return new SQLiteLeaveRequestRepository().listAllRequests();
+                } catch (Exception ex) {
+                    errorMsg = ex.getMessage();
+                    return List.of();
+                }
+            }
+            @Override protected void done() {
+                try {
+                    for (LeaveRequest r : get()) {
+                        leaveRequestsModel.addRow(new Object[] {
+                                r.getId(), r.getStaffId(), r.getUsername(),
+                                r.getStartDate(), r.getEndDate(),
+                                r.getStatus(),
+                                r.getCreatedAt()
+                        });
+                    }
+                    applyLeaveRequestsFilter();
+                    if (errorMsg != null)
+                        JOptionPane.showMessageDialog(StaffPanel.this,
+                                "Failed to load leave requests:\n" + errorMsg,
+                                "Error", JOptionPane.ERROR_MESSAGE);
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(StaffPanel.this,
+                            "Failed to load leave requests:\n" + ex.getMessage(),
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }.execute();
+    }
+
+    private void loadMyLeaveRequests() {
+        myLeaveModel.setRowCount(0);
+        new SwingWorker<List<LeaveRequest>, Void>() {
+            private String errorMsg;
+            @Override protected List<LeaveRequest> doInBackground() {
+                try {
+                    return new SQLiteLeaveRequestRepository().listRequestsForUser(username);
+                } catch (Exception ex) {
+                    errorMsg = ex.getMessage();
+                    return List.of();
+                }
+            }
+            @Override protected void done() {
+                try {
+                    for (LeaveRequest r : get()) {
+                        myLeaveModel.addRow(new Object[] {
+                                "Leave",
+                                r.getStartDate(),
+                                r.getEndDate(),
+                                r.getStatus(),
+                                r.getCreatedAt()
+                        });
+                    }
+                    if (errorMsg != null)
+                        JOptionPane.showMessageDialog(StaffPanel.this,
+                                "Failed to load your requests:\n" + errorMsg,
+                                "Error", JOptionPane.ERROR_MESSAGE);
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(StaffPanel.this,
+                            "Failed to load your requests:\n" + ex.getMessage(),
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }.execute();
+    }
+
+    private void applyLeaveRequestsFilter() {
+        if (leaveRequestsSorter == null) return;
+        String selected = (String) leaveStatusFilter.getSelectedItem();
+        if (selected == null || "All".equals(selected)) {
+            leaveRequestsSorter.setRowFilter(null);
+        } else {
+            leaveRequestsSorter.setRowFilter(
+                    RowFilter.regexFilter("(?i)^" + selected + "$", 5));
+        }
+    }
+
+    private void onApproveLeaveRequest() {
+        int viewRow = leaveRequestsTable.getSelectedRow();
+        if (viewRow < 0) return;
+        int modelRow = leaveRequestsTable.convertRowIndexToModel(viewRow);
+        int id       = (int) leaveRequestsModel.getValueAt(modelRow, 0);
+        String user  = leaveRequestsModel.getValueAt(modelRow, 2).toString();
+
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Approve leave request for \"" + user + "\"?",
+                "Confirm Approve", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+        if (confirm != JOptionPane.YES_OPTION) return;
+
+        new SwingWorker<Void, Void>() {
+            private String errorMsg;
+            @Override protected Void doInBackground() {
+                try { new SQLiteLeaveRequestRepository().approveRequest(id); }
+                catch (Exception ex) { errorMsg = ex.getMessage(); }
+                return null;
+            }
+            @Override protected void done() {
+                if (errorMsg != null) {
+                    JOptionPane.showMessageDialog(StaffPanel.this,
+                            "Failed to approve:\n" + errorMsg, "Error", JOptionPane.ERROR_MESSAGE);
+                } else {
+                    loadLeaveRequests();
+                    JOptionPane.showMessageDialog(StaffPanel.this,
+                            "Leave request approved for \"" + user + "\".",
+                            "Approved", JOptionPane.INFORMATION_MESSAGE);
+                }
+            }
+        }.execute();
+    }
+
+    private void onRejectLeaveRequest() {
+        int viewRow = leaveRequestsTable.getSelectedRow();
+        if (viewRow < 0) return;
+        int modelRow = leaveRequestsTable.convertRowIndexToModel(viewRow);
+        int id       = (int) leaveRequestsModel.getValueAt(modelRow, 0);
+        String user  = leaveRequestsModel.getValueAt(modelRow, 2).toString();
+
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Reject leave request for \"" + user + "\"?",
+                "Confirm Reject", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (confirm != JOptionPane.YES_OPTION) return;
+
+        new SwingWorker<Void, Void>() {
+            private String errorMsg;
+            @Override protected Void doInBackground() {
+                try { new SQLiteLeaveRequestRepository().rejectRequest(id); }
+                catch (Exception ex) { errorMsg = ex.getMessage(); }
+                return null;
+            }
+            @Override protected void done() {
+                if (errorMsg != null) {
+                    JOptionPane.showMessageDialog(StaffPanel.this,
+                            "Failed to reject:\n" + errorMsg, "Error", JOptionPane.ERROR_MESSAGE);
+                } else {
+                    loadLeaveRequests();
+                    JOptionPane.showMessageDialog(StaffPanel.this,
+                            "Leave request for \"" + user + "\" rejected.",
+                            "Rejected", JOptionPane.INFORMATION_MESSAGE);
+                }
+            }
+        }.execute();
+    }
+
+    // ─── Status badge renderer for leave requests ────────────────
+    private static class LeaveStatusRenderer extends javax.swing.table.DefaultTableCellRenderer {
+        @Override
+        public java.awt.Component getTableCellRendererComponent(
+                JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int col) {
+            super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, col);
+            setHorizontalAlignment(SwingConstants.CENTER);
+            if (!isSelected && value != null) {
+                String s = value.toString().toLowerCase();
+                switch (s) {
+                    case "approved" -> { setBackground(new Color(0xD1FAE5)); setForeground(new Color(0x065F46)); }
+                    case "rejected" -> { setBackground(new Color(0xFEE2E2)); setForeground(new Color(0x991B1B)); }
+                    default         -> { setBackground(new Color(0xFEF3C7)); setForeground(new Color(0x92400E)); }
+                }
+                setOpaque(true);
+            } else if (!isSelected) {
+                setBackground(table.getBackground());
+                setForeground(table.getForeground());
+            }
+            return this;
+        }
     }
 }

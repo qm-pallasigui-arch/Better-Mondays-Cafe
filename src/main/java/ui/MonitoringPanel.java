@@ -1740,38 +1740,68 @@ public class MonitoringPanel extends JPanel {
     }
 
     public static int getPendingReportCount() {
-        try (Connection conn = persistence.AppDatabase.openConnection();
-                PreparedStatement ps = conn.prepareStatement(
-                        "SELECT COUNT(*) FROM staff_reports WHERE status = 'pending'");
-                ResultSet rs = ps.executeQuery()) {
-            if (rs.next())
-                return rs.getInt(1);
+        int count = 0;
+        try (Connection conn = persistence.AppDatabase.openConnection()) {
+            for (String sql : new String[] {
+                    "SELECT COUNT(*) FROM staff_reports WHERE status = 'pending'",
+                    "SELECT COUNT(*) FROM password_reset_requests WHERE status = 'PENDING'",
+                    "SELECT COUNT(*) FROM staff_leave_requests WHERE status = 'pending'" }) {
+                try (PreparedStatement ps = conn.prepareStatement(sql);
+                        ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) count += rs.getInt(1);
+                }
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return 0;
+        return count;
     }
 
     public static void showNotificationsDialog(java.awt.Window parent) {
-        List<String[]> reports = new ArrayList<>();
-        try (Connection conn = persistence.AppDatabase.openConnection();
-                PreparedStatement ps = conn.prepareStatement(
-                        "SELECT sr.type, sr.item_name, sr.value, sr.created_at, ii.quantity, ii.alert_level "
-                                + "FROM staff_reports sr "
-                                + "LEFT JOIN inventory_items ii ON ii.name = sr.item_name "
-                                + "WHERE sr.status = 'pending' ORDER BY sr.created_at");
-                ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                reports.add(new String[] {
-                        String.valueOf(rs.getInt(1)), rs.getString(2), rs.getString(3),
-                        rs.getString(4), String.valueOf(rs.getDouble(5)), String.valueOf(rs.getDouble(6))
-                });
+        // Each entry: [category, label, timestamp]
+        // category: "inventory", "password", "leave"
+        List<String[]> rows = new ArrayList<>();
+
+        try (Connection conn = persistence.AppDatabase.openConnection()) {
+            // Inventory staff reports
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT sr.type, sr.item_name, sr.created_at "
+                            + "FROM staff_reports sr "
+                            + "WHERE sr.status = 'pending' ORDER BY sr.created_at");
+                    ResultSet rs = ps.executeQuery()) {
+                String[] typeNames = { "", "Low Stock", "Expired", "Out of Stock" };
+                while (rs.next()) {
+                    int t = rs.getInt(1);
+                    String typeLbl = t >= 1 && t <= 3 ? typeNames[t] : "Report";
+                    rows.add(new String[] { "inventory", rs.getString(2) + " \u2014 " + typeLbl, rs.getString(3) });
+                }
+            }
+            // Password reset requests
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT username, requested_at FROM password_reset_requests "
+                            + "WHERE status = 'PENDING' ORDER BY requested_at");
+                    ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    rows.add(new String[] { "password", rs.getString(1) + " \u2014 Password Reset Request",
+                            rs.getString(2) });
+                }
+            }
+            // Leave requests
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT username, start_date, end_date, created_at FROM staff_leave_requests "
+                            + "WHERE status = 'pending' ORDER BY created_at");
+                    ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    rows.add(new String[] { "leave",
+                            rs.getString(1) + " \u2014 Leave Request: " + rs.getString(2) + " to " + rs.getString(3),
+                            rs.getString(4) });
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        if (reports.isEmpty()) {
+        if (rows.isEmpty()) {
             JOptionPane.showMessageDialog(parent, "No pending notifications.",
                     "Notifications", JOptionPane.INFORMATION_MESSAGE);
             return;
@@ -1782,21 +1812,18 @@ public class MonitoringPanel extends JPanel {
         panel.setBackground(AppTheme.BG_SURFACE);
         panel.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
 
-        String[] typeNames = { "", "Low Stock", "Expired", "Out of Stock" };
-        for (String[] r : reports) {
-            int t = Integer.parseInt(r[0]);
-            String lbl = t >= 1 && t <= 3 ? typeNames[t] : "Report";
+        for (String[] r : rows) {
             JPanel row = new JPanel(new BorderLayout(6, 0));
             row.setOpaque(false);
             row.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 0));
-            JLabel text = new JLabel("<html><b>" + r[1] + "</b> \u2014 " + lbl + " (" + r[3] + ")</html>");
+            JLabel text = new JLabel("<html><b>" + r[1] + "</b> (" + r[2] + ")</html>");
             text.setFont(BODY_FONT);
             row.add(text, BorderLayout.CENTER);
             panel.add(row);
             panel.add(new JSeparator());
         }
         JOptionPane.showMessageDialog(parent, panel,
-                "Pending Notifications (" + reports.size() + ")", JOptionPane.INFORMATION_MESSAGE);
+                "Pending Notifications (" + rows.size() + ")", JOptionPane.INFORMATION_MESSAGE);
     }
 
     // ─── Recent Sales Table ───────────────────────────────────────────────────

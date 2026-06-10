@@ -47,20 +47,6 @@ public final class Phase2Bootstrap {
                     "Administrator", 0, "", "", "", "");
             userRepository.createUser("staff", "Staff@123", Role.STAFF,
                     "Staff User", 0, "", "", "", "");
-        } else {
-            // Ensure the default admin password is always correct regardless of
-            // which bootstrap method previously created it.
-            ensureDefaultPassword(userRepository, "admin", "Admin@123");
-            ensureDefaultPassword(userRepository, "staff", "Staff@123");
-        }
-    }
-
-    private static void ensureDefaultPassword(SQLiteUserRepository repo,
-            String username, String expected) throws Exception {
-        boolean exists = repo.listUsers().stream()
-                .anyMatch(u -> u.getUsername().equals(username));
-        if (exists && !repo.verifyCredentials(username, expected)) {
-            repo.resetPassword(username, expected);
         }
     }
 }

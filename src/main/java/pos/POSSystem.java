@@ -1,19 +1,12 @@
 package pos;
 
 import inventory.Inventory;
-import inventory.InventoryItem;
-import pos.Menu;
 import java.util.Map;
 import javax.swing.JButton;
 import javax.swing.JOptionPane;
-import javax.swing.table.DefaultTableModel;
-import javax.swing.table.DefaultTableCellRenderer;
-import javax.swing.border.LineBorder;
 import ui.MonitoringPanel;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.stream.Collectors;
 import monitoring.SalesRecord;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -23,7 +16,6 @@ import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.BorderLayout;
 import java.awt.Cursor;
-import java.awt.Component;
 import java.awt.GridLayout;
 import java.awt.FlowLayout;
 import java.awt.Dimension;
@@ -35,8 +27,6 @@ import java.awt.Insets;
 import java.awt.RenderingHints;
 import java.awt.BasicStroke;
 import java.awt.FontMetrics;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
 import java.awt.geom.RoundRectangle2D;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -44,15 +34,9 @@ import java.sql.ResultSet;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-import javax.swing.Icon;
 import javax.swing.JLabel;
-import javax.swing.JMenuItem;
 import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
-import javax.swing.JTable;
-import javax.swing.JTextArea;
-import javax.swing.JComboBox;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
@@ -72,7 +56,6 @@ import ui.InventoryRegistrationPanel;
 import ui.StaffPanel;
 import ui.InventoryGuidePanel;
 import ui.AppTheme;
-import ui.CardPanel;
 import ui.SidebarPanel;
 import ui.InventoryPanel;
 import persistence.sqlite.SQLiteInventoryRepository;
@@ -81,9 +64,7 @@ import persistence.sqlite.SQLiteSalesRepository;
 import persistence.sqlite.SQLiteUserRepository;
 import persistence.sqlite.SQLiteProfilePictureRepository;
 import controller.InventoryController;
-import controller.InventoryRowView;
 import controller.OrderController;
-import inventory.InventoryItem;
 
 public class POSSystem extends javax.swing.JFrame {
 
@@ -117,78 +98,6 @@ public class POSSystem extends javax.swing.JFrame {
     private static final Color AVATAR_TOP_STAFF = new Color(0x34, 0xD3, 0x99);
     private static final Color AVATAR_BOT_STAFF = new Color(0x05, 0x96, 0x69);
 
-    private static final List<String> ORDERING_CATEGORIES = List.of(
-            "Espresso & Coffee",
-            "Specialty Drinks",
-            "Tea Latte",
-            "Non-Coffee",
-            "House Favorites",
-            "Fruit Tea",
-            "Herbal Tea",
-            "Sandwiches",
-            "Pandesal Pairs",
-            "Pastries");
-
-    private final Map<String, List<String>> categoryItems;
-
-    private static final Map<String, Double> HOUSE_FAVORITES_PRICES = Map.of(
-            "Mango Latte", 210.0,
-            "Strawberry Latte", 200.0,
-            "Salted Cream Latte", 190.0,
-            "Spanish Latte", 180.0);
-
-    private static final List<String> SPECIALTY_DRINKS = List.of(
-            "Vietnamese Coffee",
-            "Ube Espresso",
-            "Manila Latte",
-            "Pumpkin Spice Latte",
-            "Spiced Cookie Latte");
-
-    private static final List<String> TEA_LATTE_ITEMS = List.of(
-            "Matcha Latte",
-            "Chocolate Matcha",
-            "Matcha Espresso",
-            "Hojicha Latte",
-            "Chai Latte");
-
-    private static final List<String> NON_COFFEE_ITEMS = List.of(
-            "Chocolate Latte",
-            "Strawberry Latte",
-            "Mango Latte",
-            "Dragon Fruit Coconut Latte",
-            "Ube Latte");
-
-    private static final List<String> FRUIT_TEA_ITEMS = List.of(
-            "Strawberry Green Tea",
-            "Mango Green Tea",
-            "Peach Green Tea",
-            "Passion Fruit Green Tea");
-
-    private static final List<String> HERBAL_TEA_ITEMS = List.of(
-            "Peppermint",
-            "Chamomile",
-            "Earl Grey",
-            "Cinnamon");
-
-    private static final List<String> SANDWICH_ITEMS = List.of(
-            "Signature Ham & Cheese",
-            "Classic Grilled Cheese",
-            "Homestyle Pesto & Cheese");
-
-    private static final List<String> PANDESAL_PAIR_ITEMS = List.of(
-            "Ham & Cheese",
-            "Cheesy Pesto",
-            "Spam & Cheese");
-
-    private static final List<String> PASTRY_ITEMS = List.of(
-            "Chocolate Crinkles",
-            "Chocolate Cookies",
-            "Brownies",
-            "Banana Bread",
-            "Chocolate Tiramisu",
-            "Matcha Tiramisu",
-            "Creamy Spinach",
-            "Blueberry Cheesecake");
 
     private static class OrderEntry {
         String name;
@@ -214,13 +123,7 @@ public class POSSystem extends javax.swing.JFrame {
 
     private final List<OrderEntry> orderEntries = new ArrayList<>();
     private int orderCount = 0;
-    private String activeCategory = "Espresso & Coffee";
-
     // Custom panels for ordering tab
-    private JPanel sidebarPanel;
-    private JPanel centerPanel;
-    private JPanel productGridPanel;
-    private JTextField searchField;
     private JPanel orderPanel;
     private JPanel receiptPanel;
 
@@ -236,7 +139,6 @@ public class POSSystem extends javax.swing.JFrame {
                     JOptionPane.WARNING_MESSAGE);
         }
 
-        categoryItems = buildCategoryItems();
         initComponents();
         setTitle("Better Mondays Coffee Cafe Management System - " + username);
         setResizable(true);
@@ -286,302 +188,8 @@ public class POSSystem extends javax.swing.JFrame {
         dispose();
     }
 
-    // ─── Category display (legacy, kept for compatibility) ──────
-    private void showCategory(String category) {
-        activeCategory = category;
-        if (sidebarPanel != null) {
-            for (java.awt.Component c : sidebarPanel.getComponents()) {
-                if (c instanceof JButton b) {
-                    boolean active = category.equals(b.getText());
-                    b.setBackground(active ? new Color(50, 157, 111) : new Color(36, 55, 83));
-                    b.setForeground(active ? Color.WHITE : new Color(245, 248, 252));
-                }
-            }
-        }
-    }
 
-    private void rebuildProductGrid(String category, String search) {
-        productGridPanel.removeAll();
-        List<String> itemNames = categoryItems.getOrDefault(category, List.of());
 
-        List<MenuItem> items = itemNames.stream()
-                .map(name -> Menu.getInstance().getMenuItem(name))
-                .filter(item -> item != null)
-                .collect(Collectors.toList());
-
-        String searchTerm = search.trim();
-        if ("Search a product".equals(searchTerm)) {
-            searchTerm = "";
-        }
-        if (!searchTerm.isEmpty()) {
-            String finalSearch = searchTerm.toLowerCase();
-            items = items.stream()
-                    .filter(item -> item.getName().toLowerCase().contains(finalSearch))
-                    .collect(Collectors.toList());
-        }
-
-        if (items.isEmpty()) {
-            JPanel emptyRow = new JPanel(new BorderLayout());
-            emptyRow.setOpaque(false);
-            emptyRow.setBorder(BorderFactory.createEmptyBorder(20, 0, 0, 0));
-            JLabel emptyLabel = new JLabel("No items found", SwingConstants.CENTER);
-            emptyLabel.setFont(new Font("Segoe UI", Font.PLAIN, 16));
-            emptyLabel.setForeground(new Color(197, 209, 224));
-            emptyRow.add(emptyLabel, BorderLayout.CENTER);
-            productGridPanel.add(emptyRow);
-        } else {
-            for (int index = 0; index < items.size(); index += 3) {
-                JPanel rowPanel = new JPanel(new GridLayout(1, 3, 14, 0));
-                rowPanel.setOpaque(false);
-                rowPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 14, 0));
-
-                int endIndex = Math.min(index + 3, items.size());
-                for (int itemIndex = index; itemIndex < endIndex; itemIndex++) {
-                    rowPanel.add(createProductCard(items.get(itemIndex), category));
-                }
-
-                for (int filler = endIndex - index; filler < 3; filler++) {
-                    JPanel emptyCell = new JPanel();
-                    emptyCell.setOpaque(false);
-                    rowPanel.add(emptyCell);
-                }
-
-                productGridPanel.add(rowPanel);
-            }
-        }
-
-        productGridPanel.revalidate();
-        productGridPanel.repaint();
-    }
-
-    private JPanel createProductCard(MenuItem item, String category) {
-        CardPanel card = new CardPanel(12, ui.AppTheme.BG_SURFACE);
-        card.setLayout(new BorderLayout(0, 6));
-        card.setFillColor(ui.AppTheme.BG_SURFACE);
-        card.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
-        card.setBorderColor(AppTheme.BORDER);
-        card.setPreferredSize(new Dimension(188, 184));
-        card.setMinimumSize(new Dimension(188, 184));
-        card.setMaximumSize(new Dimension(188, 184));
-
-        JLabel imgLabel = new JLabel("", SwingConstants.CENTER);
-        imgLabel.setPreferredSize(new Dimension(56, 46));
-        imgLabel.setOpaque(true);
-        imgLabel.setBackground(AppTheme.BG_SURFACE);
-        card.add(imgLabel, BorderLayout.NORTH);
-
-        double displayPrice = pickDisplayPrice(item, category);
-        JPanel textPanel = new JPanel(new BorderLayout());
-        textPanel.setOpaque(false);
-        textPanel.setPreferredSize(new Dimension(160, 66));
-        textPanel.setMinimumSize(new Dimension(160, 66));
-        textPanel.setMaximumSize(new Dimension(160, 66));
-
-        JLabel nameLabel = new JLabel(
-                "<html><div style='width:164px;text-align:center;line-height:1.15;'><b style='color:#F5F8FC;font-size:11px;'>"
-                        + item.getName()
-                        + "</b><br><span style='color:#32C075;font-size:10px;'>\u20B1"
-                        + String.format("%.2f", displayPrice) + "</span></div></html>",
-                SwingConstants.CENTER);
-        nameLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        nameLabel.setVerticalAlignment(SwingConstants.CENTER);
-        textPanel.add(nameLabel, BorderLayout.CENTER);
-        card.add(textPanel, BorderLayout.CENTER);
-
-        JPanel btnPanel = new JPanel(new GridLayout(3, 1, 0, 4));
-        btnPanel.setOpaque(false);
-        btnPanel.setBorder(BorderFactory.createEmptyBorder(0, 8, 6, 8));
-        btnPanel.setPreferredSize(new Dimension(160, 74));
-        btnPanel.setMinimumSize(new Dimension(160, 74));
-        btnPanel.setMaximumSize(new Dimension(160, 74));
-        addButtonsForCategory(btnPanel, item, category);
-        while (btnPanel.getComponentCount() < 3) {
-            JPanel filler = new JPanel();
-            filler.setOpaque(false);
-            filler.setPreferredSize(new Dimension(1, 24));
-            btnPanel.add(filler);
-        }
-        card.add(btnPanel, BorderLayout.SOUTH);
-        return card;
-    }
-
-    private double pickDisplayPrice(MenuItem item, String category) {
-        switch (category) {
-            case "Specialty Drinks":
-                return item.getIcedRegularPrice();
-            case "House Favorites":
-                return HOUSE_FAVORITES_PRICES.getOrDefault(item.getName(), 0.0);
-            default:
-                return item.getIcedRegularPrice() > 0 ? item.getIcedRegularPrice()
-                        : item.getHotPrice() > 0 ? item.getHotPrice()
-                                : item.getIcedLargePrice();
-        }
-    }
-
-    private Map<String, List<String>> buildCategoryItems() {
-        Map<String, List<String>> categories = new LinkedHashMap<>();
-        for (String category : ORDERING_CATEGORIES) {
-            categories.put(category, new ArrayList<>());
-        }
-
-        for (MenuItem item : Menu.getInstance().getAllItems().values()) {
-            String category = resolveOrderingCategory(item);
-            if (category == null) {
-                continue;
-            }
-            categories.computeIfAbsent(category, ignored -> new ArrayList<>()).add(item.getName());
-        }
-
-        return categories;
-    }
-
-    private String resolveOrderingCategory(MenuItem item) {
-        String itemName = item.getName();
-        if (itemName == null) {
-            return null;
-        }
-
-        if (SPECIALTY_DRINKS.contains(itemName))
-            return "Specialty Drinks";
-        if (TEA_LATTE_ITEMS.contains(itemName))
-            return "Tea Latte";
-        if (NON_COFFEE_ITEMS.contains(itemName))
-            return "Non-Coffee";
-        if (FRUIT_TEA_ITEMS.contains(itemName))
-            return "Fruit Tea";
-        if (HERBAL_TEA_ITEMS.contains(itemName))
-            return "Herbal Tea";
-        if (SANDWICH_ITEMS.contains(itemName))
-            return "Sandwiches";
-        if (PANDESAL_PAIR_ITEMS.contains(itemName))
-            return "Pandesal Pairs";
-        if (PASTRY_ITEMS.contains(itemName))
-            return "Pastries";
-        if (HOUSE_FAVORITES_PRICES.containsKey(itemName))
-            return "House Favorites";
-        if ("Coffee".equals(item.getCategory()))
-            return "Espresso & Coffee";
-
-        return null;
-    }
-
-    private void addButtonsForCategory(JPanel panel, MenuItem item, String category) {
-        switch (category) {
-            case "Espresso & Coffee":
-                addHotBtn(panel, item);
-                addIcedRegularBtn(panel, item);
-                addIcedLargeBtn(panel, item);
-                break;
-            case "Specialty Drinks":
-                addItemBtn(panel, "Regular Iced", item.getIcedRegularPrice(), "Regular Iced", item.getName());
-                break;
-            case "Tea Latte":
-                addHotBtn(panel, item);
-                addIcedRegularBtn(panel, item, "Iced Regular");
-                break;
-            case "Non-Coffee":
-                if ("Chocolate Latte".equals(item.getName())) {
-                    addHotBtn(panel, item);
-                }
-                addIcedRegularBtn(panel, item);
-                addIcedLargeBtn(panel, item);
-                break;
-            case "House Favorites":
-                double hfPrice = HOUSE_FAVORITES_PRICES.getOrDefault(item.getName(), 0.0);
-                addSingleBtn(panel, "Add to cart", hfPrice, item.getName());
-                break;
-            case "Fruit Tea":
-                addIcedRegularBtn(panel, item);
-                addIcedLargeBtn(panel, item);
-                break;
-            case "Herbal Tea":
-                addHotBtn(panel, item);
-                break;
-            default:
-                addSingleBtn(panel, "Add to cart", item.getHotPrice(), item.getName());
-                break;
-        }
-    }
-
-    private void addHotBtn(JPanel panel, MenuItem item) {
-        if (item.getHotPrice() > 0) {
-            JButton btn = new JButton("Hot");
-            styleProdBtn(btn);
-            btn.addActionListener(e -> addOrderItem(item.getName(), "Hot", item.getHotPrice()));
-            panel.add(btn);
-        }
-    }
-
-    private void addIcedRegularBtn(JPanel panel, MenuItem item) {
-        addIcedRegularBtn(panel, item, "Regular");
-    }
-
-    private void addIcedRegularBtn(JPanel panel, MenuItem item, String label) {
-        if (item.getIcedRegularPrice() > 0) {
-            JButton btn = new JButton(label);
-            styleProdBtn(btn);
-            btn.addActionListener(e -> addOrderItem(item.getName(), "Regular Iced", item.getIcedRegularPrice()));
-            panel.add(btn);
-        }
-    }
-
-    private void addIcedLargeBtn(JPanel panel, MenuItem item) {
-        if (item.getIcedLargePrice() > 0) {
-            JButton btn = new JButton("Large");
-            styleProdBtn(btn);
-            btn.addActionListener(e -> addOrderItem(item.getName(), "Large Iced", item.getIcedLargePrice()));
-            panel.add(btn);
-        }
-    }
-
-    private void addSingleBtn(JPanel panel, String text, double price, String itemName) {
-        if (price <= 0)
-            return;
-        JButton btn = new JButton(text);
-        styleProdBtn(btn);
-        btn.addActionListener(e -> addOrderItem(itemName, "", price));
-        panel.add(btn);
-    }
-
-    private void addItemBtn(JPanel panel, String text, double price, String variant, String itemName) {
-        if (price <= 0)
-            return;
-        JButton btn = new JButton(text);
-        styleProdBtn(btn);
-        btn.addActionListener(e -> addOrderItem(itemName, variant, price));
-        panel.add(btn);
-    }
-
-    private void styleProdBtn(JButton btn) {
-        btn.setFont(new Font("Segoe UI", Font.PLAIN, 9));
-        btn.setBackground(new Color(50, 157, 111));
-        btn.setForeground(Color.WHITE);
-        btn.setFocusPainted(false);
-        btn.setPreferredSize(new Dimension(144, 20));
-        btn.setMaximumSize(new Dimension(144, 20));
-        btn.setMinimumSize(new Dimension(144, 20));
-        btn.setMargin(new Insets(0, 6, 0, 6));
-        btn.setBorder(BorderFactory.createEmptyBorder(1, 4, 1, 4));
-        btn.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-    }
-
-    private void styleSearchField() {
-        AppTheme.styleSearchField(searchField);
-    }
-
-    private void addOrderItem(String name, String variant, double price) {
-        if (name == null || name.isEmpty())
-            return;
-        for (OrderEntry entry : orderEntries) {
-            if (entry.name.equals(name) && entry.variant.equals(variant)) {
-                entry.quantity++;
-                refreshOrderDisplay();
-                return;
-            }
-        }
-        orderEntries.add(new OrderEntry(name, variant, 1, price));
-        refreshOrderDisplay();
-    }
 
     private void refreshOrderDisplay() {
         orderPanel.removeAll();
@@ -933,13 +541,14 @@ public class POSSystem extends javax.swing.JFrame {
         if (isAdmin) {
             int notifCount = ui.MonitoringPanel.getPendingReportCount();
 
-            JPanel bellWrap = new JPanel(new GridBagLayout());
+            int wrapW = notifCount > 0 ? 34 : 28;
+            JPanel bellWrap = new JPanel(null);
             bellWrap.setOpaque(false);
-            bellWrap.setPreferredSize(new Dimension(notifCount > 0 ? 34 : 28, 34));
+            bellWrap.setPreferredSize(new Dimension(wrapW, 34));
 
-            // FIX 2: Bell default = admin blue (#93C5FD); hover = soft grey
-            Color bellDefaultColor = ADMIN_PILL_FG; // #93C5FD
-            Color bellHoverColor = new Color(0xC0, 0xCC, 0xD6); // light grey
+            // Bell default = admin blue (#93C5FD); hover = soft grey
+            Color bellDefaultColor = ADMIN_PILL_FG;
+            Color bellHoverColor = new Color(0xC0, 0xCC, 0xD6);
 
             boolean[] bellHovered = { false };
             JLabel bellIcon = new JLabel() {
@@ -960,7 +569,7 @@ public class POSSystem extends javax.swing.JFrame {
                     g2.dispose();
                 }
             };
-            bellIcon.setPreferredSize(new Dimension(22, 22));
+            bellIcon.setBounds(0, 6, 22, 22);
             bellIcon.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             bellIcon.setToolTipText("Notifications");
             bellIcon.addMouseListener(new java.awt.event.MouseAdapter() {
@@ -999,13 +608,24 @@ public class POSSystem extends javax.swing.JFrame {
                 badge.setFont(new Font("Segoe UI", Font.BOLD, 8));
                 badge.setForeground(Color.WHITE);
                 badge.setOpaque(false);
-                badge.setPreferredSize(new Dimension(15, 15));
-                GridBagConstraints bc = new GridBagConstraints();
-                bc.gridx = 1;
-                bc.gridy = 0;
-                bc.anchor = GridBagConstraints.NORTHEAST;
-                bellWrap.add(badge, bc);
+                badge.setBounds(wrapW - 15, 0, 15, 15);
+                badge.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                badge.addMouseListener(new java.awt.event.MouseAdapter() {
+                    @Override
+                    public void mouseClicked(java.awt.event.MouseEvent e) {
+                        ui.MonitoringPanel.showNotificationsDialog(SwingUtilities.windowForComponent(bellWrap));
+                    }
+                });
+                bellWrap.add(badge);
             }
+
+            bellWrap.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            bellWrap.addMouseListener(new java.awt.event.MouseAdapter() {
+                @Override
+                public void mouseClicked(java.awt.event.MouseEvent e) {
+                    ui.MonitoringPanel.showNotificationsDialog(SwingUtilities.windowForComponent(bellWrap));
+                }
+            });
 
             right.add(bellWrap);
             right.add(Box.createRigidArea(new Dimension(12, 0)));
@@ -1318,9 +938,6 @@ public class POSSystem extends javax.swing.JFrame {
 
     // ─── initComponents ─────────────────────────────────────────
     private void initComponents() {
-        jPanelPOS = new javax.swing.JPanel();
-        jLabel1 = new javax.swing.JLabel();
-
         sidebar = new SidebarPanel(currentUsername, currentUserRole, page -> {
             cardLayout.show(contentPanel, page);
         });
@@ -1448,87 +1065,7 @@ public class POSSystem extends javax.swing.JFrame {
         }
     }
 
-    private void addItem(String productName, double price) {
-        DefaultTableModel model = (DefaultTableModel) jTable1.getModel();
-        boolean found = false;
-        for (int i = 0; i < model.getRowCount(); i++) {
-            if (model.getValueAt(i, 0).toString().equals(productName)) {
-                int qty = Integer.parseInt(model.getValueAt(i, 1).toString());
-                qty++;
-                model.setValueAt(qty, i, 1);
-                model.setValueAt(price * qty, i, 2);
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            model.addRow(new Object[] { productName, 1, price });
-        }
-        ItemCost();
-    }
 
-    private void chooseHotOrIced(String rawProductName) {
-        Object[] options = { "Hot", "Regular Iced", "Large Iced" };
-        int choice = JOptionPane.showOptionDialog(this,
-                "Choose variant for " + rawProductName + ":", "Choose Variant",
-                JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
-                null, options, options[0]);
-        if (choice == JOptionPane.CLOSED_OPTION || choice < 0)
-            return;
-        String variant = options[choice].toString();
-        String displayName = rawProductName + " (" + variant + ")";
-        double price = Menu.getInstance().getPrice(rawProductName, variant);
-        if (price > 0)
-            addItem(displayName, price);
-    }
-
-    // ─── Event handlers (legacy POS table) ──────────────────────
-    private void removeitemActionPerformed(java.awt.event.ActionEvent evt) {
-        DefaultTableModel model = (DefaultTableModel) jTable1.getModel();
-        int selectedRow = jTable1.getSelectedRow();
-        if (selectedRow >= 0) {
-            int qty = Integer.parseInt(model.getValueAt(selectedRow, 1).toString());
-            if (qty > 1) {
-                qty--;
-                model.setValueAt(qty, selectedRow, 1);
-                double pricePerItem = Double.parseDouble(model.getValueAt(selectedRow, 2).toString()) / (qty + 1);
-                model.setValueAt(pricePerItem * qty, selectedRow, 2);
-            } else {
-                model.removeRow(selectedRow);
-            }
-            ItemCost();
-        } else {
-            JOptionPane.showMessageDialog(this, "Please select a row to remove.", "Error", JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    private void cashpaymentActionPerformed(java.awt.event.ActionEvent evt) {
-        String EnterNumber = cashpayment.getText();
-        if (EnterNumber == "") {
-            cashpayment.setText(cashpayment.getText());
-        } else {
-            EnterNumber = cashpayment.getText() + cashpayment.getText();
-            cashpayment.setText(EnterNumber);
-        }
-    }
-
-    private void resetorderActionPerformed(java.awt.event.ActionEvent evt) {
-        DefaultTableModel model = (DefaultTableModel) jTable1.getModel();
-        model.setRowCount(0);
-        jTextFieldChange.setText("");
-        jTextFieldTax.setText("");
-        jTextFieldTotal.setText("");
-        jTextFieldSubTotal.setText("");
-        cashpayment.setText("");
-    }
-
-    private void exitActionPerformed(java.awt.event.ActionEvent evt) {
-        int option = JOptionPane.showConfirmDialog(this, "Do you want to exit?",
-                "Better Mondays Coffee Cafe Management System",
-                JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
-        if (option == JOptionPane.YES_OPTION)
-            System.exit(0);
-    }
 
     private static int transactionCounter = loadTransactionCounter();
 
@@ -1536,85 +1073,6 @@ public class POSSystem extends javax.swing.JFrame {
         return s.length() > len ? s.substring(0, len - 3) + "..." : s;
     }
 
-    private void payActionPerformed(java.awt.event.ActionEvent evt) {
-        boolean paymentSuccess = Change();
-        if (!paymentSuccess)
-            return;
-
-        DefaultTableModel orderModel = (DefaultTableModel) jTable1.getModel();
-        Inventory inv = Inventory.getInstance();
-        Menu menu = Menu.getInstance();
-
-        for (int i = 0; i < orderModel.getRowCount(); i++) {
-            String itemName = orderModel.getValueAt(i, 0).toString();
-            String baseName = itemName.split(" \\(")[0].trim();
-            MenuItem menuItem = menu.getMenuItem(baseName);
-            if (menuItem != null) {
-                int qty = Integer.parseInt(orderModel.getValueAt(i, 1).toString());
-                for (Map.Entry<String, Double> e : menuItem.getIngredients().entrySet()) {
-                    inv.deductIngredient(e.getKey(), e.getValue() * qty);
-                }
-            }
-        }
-
-        List<SalesRecord> salesList = new ArrayList<>();
-        double subTotal = 0.0;
-        for (int i = 0; i < orderModel.getRowCount(); i++) {
-            String name = orderModel.getValueAt(i, 0).toString();
-            int qty = Integer.parseInt(orderModel.getValueAt(i, 1).toString());
-            double lineTotal = Double.parseDouble(orderModel.getValueAt(i, 2).toString());
-            subTotal += lineTotal;
-            salesList.add(new SalesRecord(name, qty, lineTotal / qty, lineTotal));
-        }
-        double cash = Double.parseDouble(cashpayment.getText().replace("\u20B1", "").replace("P", "").trim());
-        double change = Double.parseDouble(jTextFieldChange.getText().replace("\u20B1", "").replace("P", "").trim());
-
-        String transactionRef = nextTransactionRef();
-        try {
-            if (orderController == null)
-                orderController = new OrderController(new SQLiteSalesRepository());
-            orderController.persistCompletedTransaction(transactionRef, salesList, subTotal, cash, change, "Walk-in");
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this,
-                    "Unable to save sales to database: " + e.getMessage(),
-                    "Database", JOptionPane.WARNING_MESSAGE);
-        }
-
-        String lineSep = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
-        String receiptStr = " ☕ Better Mondays Cafe ☕\n 123 Main St., Manila\n VAT REG TIN: 123-456-789\n"
-                + lineSep
-                + "Date: " + new SimpleDateFormat("MM/dd/yyyy HH:mm").format(new Date()) + "\n"
-                + "Txn #: " + transactionRef + "\n" + lineSep
-                + String.format("%-15s %3s %8s\n", "ITEM", "QTY", "AMOUNT")
-                + "───────────────────────────────\n";
-        for (SalesRecord s : salesList) {
-            receiptStr += String.format("%-15s %3d %8.2f\n",
-                    truncate(s.getProductName(), 15), s.getQuantity(), s.getTotal());
-        }
-        receiptStr += "───────────────────────────────\n"
-                + String.format("%-23s %8.2f\n", "Subtotal (excl VAT):", subTotal / 1.12)
-                + String.format("%-23s %8.2f\n", "VAT (12%):", subTotal * 0.12 / 1.12)
-                + String.format("%-23s %8.2f\n", "TOTAL (incl VAT):", subTotal)
-                + String.format("%-23s %8.2f\n", "Cash:", cash)
-                + String.format("%-23s %8.2f\n", "Change:", change)
-                + lineSep
-                + " Thank you! Come again!\n *** Have a nice day ***\n";
-
-        JOptionPane.showMessageDialog(this, receiptStr,
-                "✅ RECEIPT - " + transactionRef, JOptionPane.INFORMATION_MESSAGE);
-
-        orderModel.setRowCount(0);
-        jTextFieldChange.setText("");
-        jTextFieldTax.setText("");
-        jTextFieldTotal.setText("");
-        jTextFieldSubTotal.setText("");
-        cashpayment.setText("");
-
-        if (inventoryPanel != null)
-            inventoryPanel.refresh();
-        if (monitoringPanel != null)
-            monitoringPanel.refreshData();
-    }
 
     private static int loadTransactionCounter() {
         try (Connection conn = persistence.AppDatabase.openConnection();
@@ -1642,63 +1100,15 @@ public class POSSystem extends javax.swing.JFrame {
         }
     }
 
-    private static String nextTransactionRef() {
-        transactionCounter = Math.max(transactionCounter, loadTransactionCounter()) + 1;
-        return "TXN" + String.format("%06d", transactionCounter);
-    }
 
-    // ═════════════════════════════════════════════════════════════
-    // Variables declaration
-    // ═════════════════════════════════════════════════════════════
-    private javax.swing.JButton InventoryAdd;
-    private javax.swing.JButton InventoryEdit;
-    private javax.swing.JButton InventoryRemove;
-    private javax.swing.JLabel JLabelTax;
-    private javax.swing.JButton backbtn;
     private javax.swing.JTextField cashpayment;
-    private javax.swing.JButton coffeemenu;
-    private javax.swing.JButton exit;
-    private javax.swing.JButton fruitteamenu;
-    private javax.swing.JButton herbalteamenu;
-    private javax.swing.JLabel jLabel1;
-    private javax.swing.JLabel jLabel6;
-    private javax.swing.JLabel jLabelSubTotal;
-    private javax.swing.JLabel jLabelTotal;
-    private javax.swing.JLabel jLabelTotal1;
-    private javax.swing.JLabel jLabelTotal2;
-    private javax.swing.JPanel jPanel4;
-    private javax.swing.JPanel jPanelMonitoring;
-    private javax.swing.JPanel jPanelPOS;
-    private javax.swing.JPanel jPanelSummary;
-    private javax.swing.JScrollPane jScrollPane1;
-    private javax.swing.JScrollPane jScrollPane2;
-    private javax.swing.JScrollPane jScrollPane4;
-    private javax.swing.JScrollPane jScrollPane5;
     private CardLayout cardLayout;
     private JPanel contentPanel;
     private SidebarPanel sidebar;
     private OrderingPanel orderingPanel;
     private javax.swing.JTable jTable1;
-    private javax.swing.JTable jTableMonitoring;
-    private javax.swing.JTable jTableSales;
     private javax.swing.JTextField jTextFieldChange;
     private javax.swing.JTextField jTextFieldSubTotal;
     private javax.swing.JTextField jTextFieldTax;
     private javax.swing.JTextField jTextFieldTotal;
-    private javax.swing.JButton menu1;
-    private javax.swing.JButton menu10;
-    private javax.swing.JButton menu11;
-    private javax.swing.JButton menu12;
-    private javax.swing.JButton menu2;
-    private javax.swing.JButton menu3;
-    private javax.swing.JButton menu4;
-    private javax.swing.JButton menu5;
-    private javax.swing.JButton menu6;
-    private javax.swing.JButton menu7;
-    private javax.swing.JButton menu8;
-    private javax.swing.JButton menu9;
-    private javax.swing.JButton noncoffeemenu;
-    private javax.swing.JButton pay;
-    private javax.swing.JButton removeitem;
-    private javax.swing.JButton resetorder;
 }

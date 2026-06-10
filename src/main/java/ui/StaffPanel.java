@@ -48,12 +48,12 @@ public class StaffPanel extends JPanel {
             return false;
         }
     };
-    private final JButton makeAdminBtn = new JButton("Make Admin");
-    private final JButton makeStaffBtn = new JButton("Make Staff");
-    private final JButton refreshUsersBtn = new JButton("Refresh Users");
-    private final JButton createAccountBtn = new JButton("Create Account");
-    private final JButton viewDetailsBtn = new JButton("View Details");
-    private final JButton resetPasswordBtn = new JButton("Reset Password");
+    private final JButton makeAdminBtn    = styledBtn("Make Admin",    BtnVariant.WARNING);
+    private final JButton makeStaffBtn    = styledBtn("Make Staff",    BtnVariant.SECONDARY);
+    private final JButton refreshUsersBtn = styledBtn("Refresh",       BtnVariant.SECONDARY);
+    private final JButton createAccountBtn= styledBtn("Create Account",BtnVariant.PRIMARY);
+    private final JButton viewDetailsBtn  = styledBtn("View Details",  BtnVariant.SECONDARY);
+    private final JButton resetPasswordBtn= styledBtn("Reset Password",BtnVariant.DANGER);
 
     // Account Management — Password Requests
     private final JTable resetRequestsTable = new JTable();
@@ -65,9 +65,9 @@ public class StaffPanel extends JPanel {
         }
     };
     private TableRowSorter<DefaultTableModel> resetRequestsSorter;
-    private final JButton approveRequestBtn = new JButton("Approve");
-    private final JButton rejectRequestBtn = new JButton("Reject");
-    private final JButton refreshRequestsBtn = new JButton("Refresh");
+    private final JButton approveRequestBtn  = styledBtn("Approve", BtnVariant.SUCCESS);
+    private final JButton rejectRequestBtn   = styledBtn("Reject",  BtnVariant.DANGER);
+    private final JButton refreshRequestsBtn = styledBtn("Refresh", BtnVariant.SECONDARY);
     private final JComboBox<String> requestStatusFilter = new JComboBox<>(
             new String[] { "All", "Pending", "Approved", "Rejected" });
 
@@ -79,9 +79,9 @@ public class StaffPanel extends JPanel {
         public boolean isCellEditable(int row, int col) { return false; }
     };
     private TableRowSorter<DefaultTableModel> leaveRequestsSorter;
-    private final JButton approveLeaveBtn  = new JButton("Approve");
-    private final JButton rejectLeaveBtn   = new JButton("Reject");
-    private final JButton refreshLeaveBtn  = new JButton("Refresh");
+    private final JButton approveLeaveBtn  = styledBtn("Approve", BtnVariant.SUCCESS);
+    private final JButton rejectLeaveBtn   = styledBtn("Reject",  BtnVariant.DANGER);
+    private final JButton refreshLeaveBtn  = styledBtn("Refresh", BtnVariant.SECONDARY);
     private final JComboBox<String> leaveStatusFilter = new JComboBox<>(
             new String[] { "All", "Pending", "Approved", "Rejected" });
 
@@ -153,6 +153,32 @@ public class StaffPanel extends JPanel {
         refreshAll();
     }
 
+    // ─── Shared button factory ───────────────────────────────────
+    private enum BtnVariant { PRIMARY, SECONDARY, SUCCESS, DANGER, WARNING }
+
+    private static JButton styledBtn(String label, BtnVariant variant) {
+        JButton btn = new JButton(label);
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        btn.setFocusPainted(false);
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setBorder(BorderFactory.createEmptyBorder(7, 16, 7, 16));
+        btn.setOpaque(true);
+        btn.setContentAreaFilled(true);
+        btn.setBorderPainted(false);
+        switch (variant) {
+            case PRIMARY  -> { btn.setBackground(new Color(0x2563EB)); btn.setForeground(Color.WHITE); }
+            case SECONDARY-> { btn.setBackground(new Color(0xF1F5F9)); btn.setForeground(new Color(0x0F172A));
+                               btn.setBorderPainted(true);
+                               btn.setBorder(BorderFactory.createCompoundBorder(
+                                   BorderFactory.createLineBorder(new Color(0xE5E7EB)),
+                                   BorderFactory.createEmptyBorder(6, 15, 6, 15))); }
+            case SUCCESS  -> { btn.setBackground(new Color(0x10B981)); btn.setForeground(Color.WHITE); }
+            case DANGER   -> { btn.setBackground(new Color(0xEF4444)); btn.setForeground(Color.WHITE); }
+            case WARNING  -> { btn.setBackground(new Color(0xF59E0B)); btn.setForeground(Color.WHITE); }
+        }
+        return btn;
+    }
+
     // ─── Page Header ─────────────────────────────────────────────
     private JPanel buildHeader() {
         JPanel header = new JPanel(new BorderLayout());
@@ -173,23 +199,11 @@ public class StaffPanel extends JPanel {
         titleStack.add(title);
         titleStack.add(subtitle);
 
-        JButton addStaffBtn = new JButton("+ Add Staff");
-        addStaffBtn.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        addStaffBtn.setForeground(Color.WHITE);
-        addStaffBtn.setBackground(ACCENT_BLUE);
-        addStaffBtn.setBorder(BorderFactory.createEmptyBorder(8, 18, 8, 18));
-        addStaffBtn.setFocusPainted(false);
-        addStaffBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        JButton addStaffBtn = styledBtn("+ Add Staff", BtnVariant.PRIMARY);
         addStaffBtn.addActionListener(e -> onCreateAccount());
         addStaffBtn.setVisible(currentRole == Role.ADMIN);
 
-        JButton staffRequestBtn = new JButton("Staff Request");
-        staffRequestBtn.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        staffRequestBtn.setForeground(Color.WHITE);
-        staffRequestBtn.setBackground(new Color(0x10B981));
-        staffRequestBtn.setBorder(BorderFactory.createEmptyBorder(8, 18, 8, 18));
-        staffRequestBtn.setFocusPainted(false);
-        staffRequestBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        JButton staffRequestBtn = styledBtn("Staff Request", BtnVariant.SUCCESS);
         staffRequestBtn.addActionListener(e -> showStaffRequestDialog());
         staffRequestBtn.setVisible(currentRole == Role.STAFF);
 
@@ -755,13 +769,7 @@ public class StaffPanel extends JPanel {
         form.add(new JLabel("To"));
         form.add(endDateField);
 
-        JButton submitLeaveBtn = new JButton("Submit Leave Request");
-        submitLeaveBtn.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        submitLeaveBtn.setForeground(Color.WHITE);
-        submitLeaveBtn.setBackground(new Color(0x10B981));
-        submitLeaveBtn.setBorder(BorderFactory.createEmptyBorder(7, 16, 7, 16));
-        submitLeaveBtn.setFocusPainted(false);
-        submitLeaveBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        JButton submitLeaveBtn = styledBtn("Submit Leave Request", BtnVariant.SUCCESS);
         submitLeaveBtn.addActionListener(e -> {
             String start = startDateField.getText().trim();
             String end   = endDateField.getText().trim();
@@ -795,13 +803,7 @@ public class StaffPanel extends JPanel {
             }.execute();
         });
 
-        JButton submitPwBtn = new JButton("Submit Password Reset");
-        submitPwBtn.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        submitPwBtn.setForeground(Color.WHITE);
-        submitPwBtn.setBackground(ACCENT_BLUE);
-        submitPwBtn.setBorder(BorderFactory.createEmptyBorder(7, 16, 7, 16));
-        submitPwBtn.setFocusPainted(false);
-        submitPwBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        JButton submitPwBtn = styledBtn("Submit Password Reset", BtnVariant.PRIMARY);
         submitPwBtn.addActionListener(e -> submitPasswordChangeRequest());
 
         JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));

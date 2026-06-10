@@ -147,7 +147,10 @@ public final class AppTheme {
         }
         if (c instanceof JLabel label) {
             label.setForeground(FG_PRIMARY);
-            label.setFont(TITLE);
+            java.awt.Font laf = javax.swing.UIManager.getFont("Label.font");
+            if (label.getFont() == laf || label.getFont() == null) {
+                label.setFont(TITLE);
+            }
         }
         if (c instanceof JButton button) {
             Object variant = button.getClientProperty("appTheme.variant");

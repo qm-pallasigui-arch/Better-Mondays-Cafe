@@ -1,4 +1,4 @@
-﻿package ui;
+package ui;
 
 import java.awt.BasicStroke;
 import java.awt.BorderLayout;
@@ -2098,7 +2098,7 @@ public class MonitoringPanel extends JPanel {
         CardPanel lineCard = new CardPanel(16, AppTheme.BG_SURFACE);
         lineCard.setLayout(new BorderLayout(0, 8));
         lineCard.setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
-        JLabel lineTitle = new JLabel("Sales per Day");
+        JLabel lineTitle = new JLabel("Sales per Week");
         lineTitle.setFont(new Font("Segoe UI", Font.BOLD, 16));
         lineTitle.setForeground(AppTheme.FG_PRIMARY);
         lineCard.add(lineTitle, BorderLayout.NORTH);

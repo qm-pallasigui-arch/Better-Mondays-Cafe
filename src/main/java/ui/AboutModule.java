@@ -234,21 +234,21 @@ public class AboutModule extends JPanel {
 
         Object[][] members = {
                 {
-                        "Aleck Constantinopla", "Main Programmer",
+                        "Aleck Constantinopla", "Front-end Developer",
                         "/images/Profiles/aleck.jpg",
                         "Born: November 12, 2003", "Technicalogical Institute of the Philippines",
                         "Aleck leads backend architecture and core logic. He designed the POS engine, "
                                 + "inventory analytics, and the FEFO batch tracking system."
                 },
                 {
-                        "Rafael Bisnar", "UI Designer",
+                        "Rafael Bisnar", "Back-end Developer",
                         "/images/Profiles/rafael.jpg",
                         "Born: July 5, 2003", "Technicalogical Institute of the Philippines",
                         "Rafael crafted the visual language of Better Mondays — from the color palette "
                                 + "to every pixel of the dashboard layout."
                 },
                 {
-                        "Miguel Pallasigui", "Database Administrator",
+                        "Miguel Pallasigui", "Main Programmer/Software Architect",
                         "/images/Profiles/miguel.jpg",
                         "Born: November 20, 2002", "Technicalogical Institute of the Philippines",
                         "Miguel architected the SQLite schema, query optimization strategy, "

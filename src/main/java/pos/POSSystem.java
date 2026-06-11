@@ -44,20 +44,11 @@ import javax.swing.Timer;
 import loginregister.Login;
 import loginregister.UserDataManager;
 import loginregister.UserDataManager.Role;
-import javax.swing.JPasswordField;
-import javax.swing.JDialog;
-import javax.swing.border.EmptyBorder;
-import persistence.Phase2Bootstrap;
-import ui.MenuMaintenancePanel;
-import ui.SearchModule;
-import ui.AboutModule;
-import ui.HelpModule;
-import ui.InventoryRegistrationPanel;
-import ui.StaffPanel;
-import ui.InventoryGuidePanel;
 import ui.AppTheme;
 import ui.SidebarPanel;
 import ui.InventoryPanel;
+import ui.NotificationsDialog;
+import ui.UserSettingsDialog;
 import persistence.sqlite.SQLiteInventoryRepository;
 import persistence.sqlite.SQLiteStaffShiftRepository;
 import persistence.sqlite.SQLiteSalesRepository;
@@ -65,6 +56,13 @@ import persistence.sqlite.SQLiteUserRepository;
 import persistence.sqlite.SQLiteProfilePictureRepository;
 import controller.InventoryController;
 import controller.OrderController;
+import ui.MenuMaintenancePanel;
+import ui.SearchModule;
+import ui.AboutModule;
+import ui.HelpModule;
+import ui.InventoryRegistrationPanel;
+import ui.StaffPanel;
+import ui.InventoryGuidePanel;
 
 public class POSSystem extends javax.swing.JFrame {
 
@@ -98,7 +96,6 @@ public class POSSystem extends javax.swing.JFrame {
     private static final Color AVATAR_TOP_STAFF = new Color(0x34, 0xD3, 0x99);
     private static final Color AVATAR_BOT_STAFF = new Color(0x05, 0x96, 0x69);
 
-
     private static class OrderEntry {
         String name;
         String variant;
@@ -123,7 +120,6 @@ public class POSSystem extends javax.swing.JFrame {
 
     private final List<OrderEntry> orderEntries = new ArrayList<>();
     private int orderCount = 0;
-    // Custom panels for ordering tab
     private JPanel orderPanel;
     private JPanel receiptPanel;
 
@@ -131,7 +127,7 @@ public class POSSystem extends javax.swing.JFrame {
         this.currentUserRole = role;
         this.currentUsername = username;
         try {
-            Phase2Bootstrap.seedCatalogIfEmpty();
+            persistence.Phase2Bootstrap.seedCatalogIfEmpty();
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this,
                     "Database initialization warning: " + e.getMessage(),
@@ -162,15 +158,17 @@ public class POSSystem extends javax.swing.JFrame {
         this("unknown", UserDataManager.Role.STAFF);
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // Logout
+    // ─────────────────────────────────────────────────────────────
     private void logoutAndReturnToLogin() {
         int confirm = JOptionPane.showConfirmDialog(this,
                 "Log out of the current session?",
                 "Logout",
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.QUESTION_MESSAGE);
-        if (confirm != JOptionPane.YES_OPTION) {
+        if (confirm != JOptionPane.YES_OPTION)
             return;
-        }
 
         try {
             persistence.StaffShiftRepository shiftRepo = new persistence.sqlite.SQLiteStaffShiftRepository();
@@ -188,9 +186,9 @@ public class POSSystem extends javax.swing.JFrame {
         dispose();
     }
 
-
-
-
+    // ─────────────────────────────────────────────────────────────
+    // Order display helpers
+    // ─────────────────────────────────────────────────────────────
     private void refreshOrderDisplay() {
         orderPanel.removeAll();
         JPanel itemsPanel = new JPanel();
@@ -229,11 +227,10 @@ public class POSSystem extends javax.swing.JFrame {
         minusBtn.setFocusPainted(false);
         minusBtn.setMargin(new Insets(0, 4, 0, 4));
         minusBtn.addActionListener(e -> {
-            if (entry.quantity > 1) {
+            if (entry.quantity > 1)
                 entry.quantity--;
-            } else {
+            else
                 orderEntries.remove(entry);
-            }
             refreshOrderDisplay();
         });
         rightPanel.add(minusBtn);
@@ -269,9 +266,8 @@ public class POSSystem extends javax.swing.JFrame {
                 BorderFactory.createEmptyBorder(6, 8, 6, 8)));
 
         double totalInclusive = 0;
-        for (OrderEntry entry : orderEntries) {
+        for (OrderEntry entry : orderEntries)
             totalInclusive += entry.lineTotal();
-        }
         double subTotalExVat = totalInclusive / 1.12;
         double vat = totalInclusive - subTotalExVat;
 
@@ -294,7 +290,8 @@ public class POSSystem extends javax.swing.JFrame {
         receiptPanel.add(clearBtn);
         receiptPanel.add(Box.createVerticalStrut(4));
 
-        receiptPanel.add(new JScrollPane(orderPanel, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+        receiptPanel.add(new JScrollPane(orderPanel,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
                 JScrollPane.HORIZONTAL_SCROLLBAR_NEVER));
         receiptPanel.add(Box.createVerticalStrut(4));
 
@@ -319,7 +316,6 @@ public class POSSystem extends javax.swing.JFrame {
 
         receiptPanel.add(Box.createVerticalStrut(1));
         receiptPanel.add(makeReceiptRow("Change:", "\u20B10.00"));
-
         receiptPanel.add(Box.createVerticalStrut(4));
 
         final double fSubTotalExVat = subTotalExVat;
@@ -403,7 +399,6 @@ public class POSSystem extends javax.swing.JFrame {
                 "✅ RECEIPT - TXN" + String.format("%06d", transactionCounter),
                 JOptionPane.INFORMATION_MESSAGE);
 
-        // Deduct ingredients
         Inventory inv = Inventory.getInstance();
         Menu menu = Menu.getInstance();
         for (OrderEntry entry : orderEntries) {
@@ -449,7 +444,6 @@ public class POSSystem extends javax.swing.JFrame {
     private JPanel buildTopNavBar() {
         boolean isAdmin = currentUserRole == Role.ADMIN;
 
-        // ── Root bar ──────────────────────────────────────────────────────────
         JPanel bar = new JPanel(new BorderLayout(0, 0)) {
             @Override
             protected void paintComponent(Graphics g) {
@@ -462,8 +456,7 @@ public class POSSystem extends javax.swing.JFrame {
         bar.setBorder(BorderFactory.createEmptyBorder(0, 28, 0, 20));
         bar.setPreferredSize(new Dimension(0, 60));
 
-        // ── LEFT: two-line live clock ─────────────────────────────────────────
-        // FIX 1: time label is now PLAIN (not bold)
+        // ── LEFT: live clock ──────────────────────────────────────
         JLabel timeLabel = new JLabel();
         timeLabel.setFont(new Font("Segoe UI", Font.PLAIN, 16));
         timeLabel.setForeground(CLOCK_TIME_FG);
@@ -489,11 +482,11 @@ public class POSSystem extends javax.swing.JFrame {
         clockPanel.add(dateLabel);
         bar.add(clockPanel, BorderLayout.WEST);
 
-        // ── RIGHT: all status + profile elements ──────────────────────────────
+        // ── RIGHT ─────────────────────────────────────────────────
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
         right.setOpaque(false);
 
-        // --- Animated online pill ---
+        // Animated online pill
         int[] dotAlpha = { 255 };
         int[] dotDir = { -4 };
         JPanel dotIcon = new JPanel() {
@@ -537,20 +530,19 @@ public class POSSystem extends javax.swing.JFrame {
         right.add(onlinePanel);
         right.add(Box.createRigidArea(new Dimension(12, 0)));
 
-        // --- Bell icon (admin only) ---
+        // Bell icon (admin only)
         if (isAdmin) {
-            int notifCount = ui.MonitoringPanel.getPendingReportCount();
-
+            int notifCount = NotificationsDialog.getPendingCount();
             int wrapW = notifCount > 0 ? 34 : 28;
+
             JPanel bellWrap = new JPanel(null);
             bellWrap.setOpaque(false);
             bellWrap.setPreferredSize(new Dimension(wrapW, 34));
 
-            // Bell default = admin blue (#93C5FD); hover = soft grey
             Color bellDefaultColor = ADMIN_PILL_FG;
             Color bellHoverColor = new Color(0xC0, 0xCC, 0xD6);
-
             boolean[] bellHovered = { false };
+
             JLabel bellIcon = new JLabel() {
                 @Override
                 protected void paintComponent(Graphics g) {
@@ -587,7 +579,7 @@ public class POSSystem extends javax.swing.JFrame {
 
                 @Override
                 public void mouseClicked(java.awt.event.MouseEvent e) {
-                    ui.MonitoringPanel.showNotificationsDialog(SwingUtilities.windowForComponent(bellWrap));
+                    NotificationsDialog.show(SwingUtilities.windowForComponent(bellWrap));
                 }
             });
             bellWrap.add(bellIcon);
@@ -613,7 +605,7 @@ public class POSSystem extends javax.swing.JFrame {
                 badge.addMouseListener(new java.awt.event.MouseAdapter() {
                     @Override
                     public void mouseClicked(java.awt.event.MouseEvent e) {
-                        ui.MonitoringPanel.showNotificationsDialog(SwingUtilities.windowForComponent(bellWrap));
+                        NotificationsDialog.show(SwingUtilities.windowForComponent(bellWrap));
                     }
                 });
                 bellWrap.add(badge);
@@ -623,7 +615,7 @@ public class POSSystem extends javax.swing.JFrame {
             bellWrap.addMouseListener(new java.awt.event.MouseAdapter() {
                 @Override
                 public void mouseClicked(java.awt.event.MouseEvent e) {
-                    ui.MonitoringPanel.showNotificationsDialog(SwingUtilities.windowForComponent(bellWrap));
+                    NotificationsDialog.show(SwingUtilities.windowForComponent(bellWrap));
                 }
             });
 
@@ -631,7 +623,7 @@ public class POSSystem extends javax.swing.JFrame {
             right.add(Box.createRigidArea(new Dimension(12, 0)));
         }
 
-        // --- Thin vertical divider ---
+        // Thin divider
         JPanel divider = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -644,7 +636,7 @@ public class POSSystem extends javax.swing.JFrame {
         right.add(divider);
         right.add(Box.createRigidArea(new Dimension(14, 0)));
 
-        // --- Gradient rounded-rect avatar ---
+        // Gradient avatar
         Color avatarTop = isAdmin ? AVATAR_TOP_ADMIN : AVATAR_TOP_STAFF;
         Color avatarBot = isAdmin ? AVATAR_BOT_ADMIN : AVATAR_BOT_STAFF;
         String initLetter = currentUsername.isEmpty() ? "?"
@@ -680,7 +672,7 @@ public class POSSystem extends javax.swing.JFrame {
         right.add(topNavUserIcon);
         right.add(Box.createRigidArea(new Dimension(10, 0)));
 
-        // --- Name + pill-shaped role badge stack ---
+        // Name + role pill
         Color pillBg = isAdmin ? ADMIN_PILL_BG : STAFF_PILL_BG;
         Color pillFg = isAdmin ? ADMIN_PILL_FG : STAFF_PILL_FG;
         Color pillBd = isAdmin ? ADMIN_PILL_BD : STAFF_PILL_BD;
@@ -689,7 +681,6 @@ public class POSSystem extends javax.swing.JFrame {
         topNavUserName.setFont(new Font("Segoe UI", Font.BOLD, 13));
         topNavUserName.setForeground(CLOCK_TIME_FG);
 
-        // FIX 3: preferred width 50 → 68 so "Admin" text is never clipped
         topNavUserRole = new JLabel(isAdmin ? "Admin" : "Staff", SwingConstants.CENTER) {
             @Override
             protected void paintComponent(Graphics g) {
@@ -709,7 +700,7 @@ public class POSSystem extends javax.swing.JFrame {
         topNavUserRole.setForeground(pillFg);
         topNavUserRole.setOpaque(false);
         topNavUserRole.setBorder(BorderFactory.createEmptyBorder(2, 8, 2, 8));
-        topNavUserRole.setPreferredSize(new Dimension(68, 18)); // was 50
+        topNavUserRole.setPreferredSize(new Dimension(68, 18));
 
         JPanel nameStack = new JPanel();
         nameStack.setLayout(new BoxLayout(nameStack, BoxLayout.Y_AXIS));
@@ -721,7 +712,7 @@ public class POSSystem extends javax.swing.JFrame {
         right.add(nameStack);
         right.add(Box.createRigidArea(new Dimension(10, 0)));
 
-        // --- Settings ⋮ button ---
+        // Settings ⋮ button
         boolean[] btnHovered = { false };
         JButton settingsBtn = new JButton() {
             @Override
@@ -760,183 +751,47 @@ public class POSSystem extends javax.swing.JFrame {
         settingsBtn.setBorderPainted(false);
         settingsBtn.setFocusPainted(false);
         settingsBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        settingsBtn.setToolTipText("Settings");
+        settingsBtn.setToolTipText("User Settings");
+        // ── UPDATED: open UserSettingsDialog ────────────────────────────────
         settingsBtn.addActionListener(e -> showProfileSettingsDialog());
 
         right.add(settingsBtn);
-
         bar.add(right, BorderLayout.EAST);
         return bar;
     }
 
-    // ─── Profile settings dialog ─────────────────────────────────
+    // ─────────────────────────────────────────────────────────────
+    // UPDATED: delegate entirely to UserSettingsDialog
+    // ─────────────────────────────────────────────────────────────
     private void showProfileSettingsDialog() {
-        JDialog dialog = new JDialog(this, "User Settings", JDialog.ModalityType.APPLICATION_MODAL);
-        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        UserSettingsDialog dialog = new UserSettingsDialog(
+                this,
+                currentUsername,
+                currentUserRole,
+                newUsername -> {
+                    // Callback: update nav bar labels when username changes
+                    currentUsername = newUsername;
+                    topNavUserName.setText(newUsername);
+                    topNavUserIcon.setText(
+                            String.valueOf(Character.toUpperCase(newUsername.charAt(0))));
+                    topNavUserIcon.repaint();
+                    setTitle("Better Mondays Coffee Cafe Management System - " + newUsername);
+                });
 
-        JPanel content = new JPanel();
-        content.setLayout(new BorderLayout(0, 14));
-        content.setBorder(new EmptyBorder(16, 16, 16, 16));
-        content.setBackground(AppTheme.BG_SURFACE);
+        // Listen for the logout signal fired from the "Sign Out" action row
+        dialog.addPropertyChangeListener("logout", evt -> {
+            if (Boolean.TRUE.equals(evt.getNewValue())) {
+                dialog.dispose();
+                logoutAndReturnToLogin();
+            }
+        });
 
-        JPanel summary = new JPanel(new GridLayout(0, 1, 0, 4));
-        summary.setOpaque(false);
-        JLabel title = new JLabel("User Settings");
-        title.setFont(new Font("Segoe UI", Font.BOLD, 16));
-        JLabel current = new JLabel("Current username: " + currentUsername);
-        current.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        current.setForeground(AppTheme.FG_MUTED);
-        summary.add(title);
-        summary.add(current);
-
-        JPanel actions = new JPanel(new GridLayout(0, 1, 0, 10));
-        actions.setOpaque(false);
-
-        JButton checkUsername = new JButton("Check Username");
-        JButton editUsername = new JButton("Edit Username");
-        JButton changePassword = new JButton("Change Password");
-        JButton close = new JButton("Close");
-
-        checkUsername.addActionListener(ae -> JOptionPane.showMessageDialog(
-                dialog, "Current username: " + currentUsername, "Username",
-                JOptionPane.INFORMATION_MESSAGE));
-        editUsername.addActionListener(ae -> showEditUsernameDialog());
-        changePassword.addActionListener(ae -> showChangePasswordDialog());
-        close.addActionListener(ae -> dialog.dispose());
-
-        styleSettingsButton(checkUsername);
-        styleSettingsButton(editUsername);
-        styleSettingsButton(changePassword);
-        styleSettingsButton(close);
-
-        actions.add(checkUsername);
-        actions.add(editUsername);
-        actions.add(changePassword);
-        actions.add(close);
-
-        content.add(summary, BorderLayout.NORTH);
-        content.add(actions, BorderLayout.CENTER);
-        AppTheme.applyToComponent(content);
-
-        dialog.setContentPane(content);
-        dialog.pack();
-        dialog.setResizable(false);
-        dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
     }
 
-    private void styleSettingsButton(JButton button) {
-        if (button == null)
-            return;
-        button.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        button.setPreferredSize(new Dimension(220, 36));
-        button.setMinimumSize(new Dimension(220, 36));
-        button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
-        button.setFocusPainted(false);
-        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-    }
-
-    private void showEditUsernameDialog() {
-        JTextField usernameField = new JTextField(currentUsername, 18);
-        JPasswordField currentPasswordField = new JPasswordField(18);
-
-        JPanel panel = new JPanel(new GridLayout(0, 1, 6, 6));
-        panel.add(new JLabel("New username"));
-        panel.add(usernameField);
-        panel.add(new JLabel("Current password"));
-        panel.add(currentPasswordField);
-
-        int result = JOptionPane.showConfirmDialog(
-                this, panel, "Edit Username",
-                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-        if (result != JOptionPane.OK_OPTION)
-            return;
-
-        String newUsername = usernameField.getText().trim();
-        String currentPassword = new String(currentPasswordField.getPassword()).trim();
-        if (newUsername.isEmpty() || currentPassword.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Username and password are required.",
-                    "Edit Username", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
-        if (newUsername.equals(currentUsername)) {
-            JOptionPane.showMessageDialog(this, "New username must be different.",
-                    "Edit Username", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
-        if (UserDataManager.updateUsername(currentUsername, newUsername, currentPassword)) {
-            currentUsername = newUsername;
-            topNavUserName.setText(newUsername);
-            topNavUserIcon.setText(String.valueOf(Character.toUpperCase(newUsername.charAt(0))));
-            topNavUserIcon.repaint();
-            setTitle("Better Mondays Coffee Cafe Management System - " + newUsername);
-            JOptionPane.showMessageDialog(this, "Username updated.",
-                    "Edit Username", JOptionPane.INFORMATION_MESSAGE);
-        } else {
-            JOptionPane.showMessageDialog(this,
-                    "Unable to update username. Check your password or whether the username is already in use.",
-                    "Edit Username", JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    private void showChangePasswordDialog() {
-        JPasswordField currentPasswordField = new JPasswordField(18);
-        JPasswordField newPasswordField = new JPasswordField(18);
-        JPasswordField confirmPasswordField = new JPasswordField(18);
-
-        JPanel panel = new JPanel(new GridLayout(0, 1, 6, 6));
-        panel.add(new JLabel("Current password"));
-        panel.add(currentPasswordField);
-        panel.add(new JLabel("New password"));
-        panel.add(newPasswordField);
-        panel.add(new JLabel("Confirm new password"));
-        panel.add(confirmPasswordField);
-
-        int result = JOptionPane.showConfirmDialog(
-                this, panel, "Change Password",
-                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-        if (result != JOptionPane.OK_OPTION)
-            return;
-
-        String currentPassword = new String(currentPasswordField.getPassword()).trim();
-        String newPassword = new String(newPasswordField.getPassword()).trim();
-        String confirmPassword = new String(confirmPasswordField.getPassword()).trim();
-
-        if (currentPassword.isEmpty() || newPassword.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "All password fields are required.",
-                    "Change Password", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        if (!newPassword.equals(confirmPassword)) {
-            JOptionPane.showMessageDialog(this, "New passwords do not match.",
-                    "Change Password", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        if (!isStrongPassword(newPassword)) {
-            JOptionPane.showMessageDialog(this,
-                    "Password must be at least 8 characters and include a number and a special character.",
-                    "Change Password", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
-        if (UserDataManager.updatePassword(currentUsername, currentPassword, newPassword)) {
-            JOptionPane.showMessageDialog(this, "Password updated.",
-                    "Change Password", JOptionPane.INFORMATION_MESSAGE);
-        } else {
-            JOptionPane.showMessageDialog(this, "Unable to update password. Check your current password.",
-                    "Change Password", JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    private boolean isStrongPassword(String password) {
-        return password.length() >= 8
-                && password.matches(".*\\d.*")
-                && password.matches(".*[!@#$%^&*(),.?\":{}|<>].*");
-    }
-
-    // ─── initComponents ─────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────
+    // initComponents
+    // ─────────────────────────────────────────────────────────────
     private void initComponents() {
         sidebar = new SidebarPanel(currentUsername, currentUserRole, page -> {
             cardLayout.show(contentPanel, page);
@@ -949,7 +804,7 @@ public class POSSystem extends javax.swing.JFrame {
 
         boolean isAdmin = currentUserRole == Role.ADMIN;
 
-        // ── Ordering tab ────────────────────────────────────────
+        // Ordering
         orderingPanel = new OrderingPanel(() -> {
             if (inventoryPanel != null)
                 inventoryPanel.refresh();
@@ -967,7 +822,7 @@ public class POSSystem extends javax.swing.JFrame {
             }
         }));
 
-        // ── Inventory tab ───────────────────────────────────────
+        // Inventory
         inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
         inventoryPanel = new InventoryPanel(isAdmin, inventoryController, () -> {
             if (monitoringPanel != null)
@@ -975,17 +830,18 @@ public class POSSystem extends javax.swing.JFrame {
         });
         contentPanel.add(inventoryPanel, "Inventory");
 
-        // ── Monitoring tab ──────────────────────────────────────
+        // Monitoring
         monitoringPanel = new MonitoringPanel(isAdmin);
         monitoringPanel.setBackground(AppTheme.BG_PRIMARY);
         contentPanel.add(monitoringPanel, "Monitoring");
 
-        // ── Other tabs ──────────────────────────────────────────
+        // Other tabs
         try {
             contentPanel.add(new MenuMaintenancePanel(isAdmin), "Menu Maintenance");
         } catch (Exception e) {
             System.err.println("MenuMaintenancePanel init failed: " + e.getMessage());
         }
+
         try {
             inventoryRegistrationPanel = new InventoryRegistrationPanel(
                     new SQLiteInventoryRepository(),
@@ -1001,6 +857,7 @@ public class POSSystem extends javax.swing.JFrame {
         } catch (Exception e) {
             System.err.println("InventoryRegistrationPanel init failed: " + e.getMessage());
         }
+
         try {
             contentPanel.add(new StaffPanel(
                     new SQLiteStaffShiftRepository(),
@@ -1010,6 +867,7 @@ public class POSSystem extends javax.swing.JFrame {
         } catch (Exception e) {
             System.err.println("StaffPanel init failed: " + e.getMessage());
         }
+
         contentPanel.add(new InventoryGuidePanel(), "Inventory Guide");
         contentPanel.add(new AboutModule(), "About");
         contentPanel.add(new HelpModule(), "Help");
@@ -1027,7 +885,9 @@ public class POSSystem extends javax.swing.JFrame {
         setLocationRelativeTo(null);
     }
 
-    // ─── Legacy handler stubs (old POS table) ───────────────────
+    // ─────────────────────────────────────────────────────────────
+    // Legacy handler stubs (old POS table)
+    // ─────────────────────────────────────────────────────────────
     public void ItemCost() {
         double preTaxTotal = 0.0;
         for (int i = 0; i < jTable1.getRowCount(); i++) {
@@ -1065,23 +925,19 @@ public class POSSystem extends javax.swing.JFrame {
         }
     }
 
-
-
     private static int transactionCounter = loadTransactionCounter();
 
     private String truncate(String s, int len) {
         return s.length() > len ? s.substring(0, len - 3) + "..." : s;
     }
 
-
     private static int loadTransactionCounter() {
         try (Connection conn = persistence.AppDatabase.openConnection();
                 PreparedStatement ps = conn.prepareStatement(
                         "SELECT transaction_ref FROM sales_transactions ORDER BY id DESC LIMIT 1");
                 ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) {
+            if (rs.next())
                 return parseTransactionNumber(rs.getString(1));
-            }
         } catch (Exception ignored) {
         }
         return 1000;
@@ -1099,7 +955,6 @@ public class POSSystem extends javax.swing.JFrame {
             return 1000;
         }
     }
-
 
     private javax.swing.JTextField cashpayment;
     private CardLayout cardLayout;

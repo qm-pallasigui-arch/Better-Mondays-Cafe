@@ -48,12 +48,12 @@ public class StaffPanel extends JPanel {
             return false;
         }
     };
-    private final JButton makeAdminBtn    = styledBtn("Make Admin",    BtnVariant.WARNING);
-    private final JButton makeStaffBtn    = styledBtn("Make Staff",    BtnVariant.SECONDARY);
-    private final JButton refreshUsersBtn = styledBtn("Refresh",       BtnVariant.SECONDARY);
-    private final JButton createAccountBtn= styledBtn("Create Account",BtnVariant.PRIMARY);
-    private final JButton viewDetailsBtn  = styledBtn("View Details",  BtnVariant.SECONDARY);
-    private final JButton resetPasswordBtn= styledBtn("Reset Password",BtnVariant.DANGER);
+    private final JButton makeAdminBtn = styledBtn("Make Admin", BtnVariant.WARNING);
+    private final JButton makeStaffBtn = styledBtn("Make Staff", BtnVariant.SECONDARY);
+    private final JButton refreshUsersBtn = styledBtn("Refresh", BtnVariant.SECONDARY);
+    private final JButton createAccountBtn = styledBtn("Create Account", BtnVariant.PRIMARY);
+    private final JButton viewDetailsBtn = styledBtn("View Details", BtnVariant.SECONDARY);
+    private final JButton resetPasswordBtn = styledBtn("Reset Password", BtnVariant.DANGER);
 
     // Account Management — Password Requests
     private final JTable resetRequestsTable = new JTable();
@@ -65,8 +65,8 @@ public class StaffPanel extends JPanel {
         }
     };
     private TableRowSorter<DefaultTableModel> resetRequestsSorter;
-    private final JButton approveRequestBtn  = styledBtn("Approve", BtnVariant.SUCCESS);
-    private final JButton rejectRequestBtn   = styledBtn("Reject",  BtnVariant.DANGER);
+    private final JButton approveRequestBtn = styledBtn("Approve", BtnVariant.SUCCESS);
+    private final JButton rejectRequestBtn = styledBtn("Reject", BtnVariant.DANGER);
     private final JButton refreshRequestsBtn = styledBtn("Refresh", BtnVariant.SECONDARY);
     private final JComboBox<String> requestStatusFilter = new JComboBox<>(
             new String[] { "All", "Pending", "Approved", "Rejected" });
@@ -76,12 +76,14 @@ public class StaffPanel extends JPanel {
     private final DefaultTableModel leaveRequestsModel = new DefaultTableModel(
             new String[] { "_id", "Staff ID", "Username", "Start Date", "End Date", "Status", "Requested At" }, 0) {
         @Override
-        public boolean isCellEditable(int row, int col) { return false; }
+        public boolean isCellEditable(int row, int col) {
+            return false;
+        }
     };
     private TableRowSorter<DefaultTableModel> leaveRequestsSorter;
-    private final JButton approveLeaveBtn  = styledBtn("Approve", BtnVariant.SUCCESS);
-    private final JButton rejectLeaveBtn   = styledBtn("Reject",  BtnVariant.DANGER);
-    private final JButton refreshLeaveBtn  = styledBtn("Refresh", BtnVariant.SECONDARY);
+    private final JButton approveLeaveBtn = styledBtn("Approve", BtnVariant.SUCCESS);
+    private final JButton rejectLeaveBtn = styledBtn("Reject", BtnVariant.DANGER);
+    private final JButton refreshLeaveBtn = styledBtn("Refresh", BtnVariant.SECONDARY);
     private final JComboBox<String> leaveStatusFilter = new JComboBox<>(
             new String[] { "All", "Pending", "Approved", "Rejected" });
 
@@ -90,7 +92,9 @@ public class StaffPanel extends JPanel {
     private final DefaultTableModel myLeaveModel = new DefaultTableModel(
             new String[] { "Type", "Start Date", "End Date", "Status", "Requested At" }, 0) {
         @Override
-        public boolean isCellEditable(int row, int col) { return false; }
+        public boolean isCellEditable(int row, int col) {
+            return false;
+        }
     };
 
     // Card background colors
@@ -154,7 +158,9 @@ public class StaffPanel extends JPanel {
     }
 
     // ─── Shared button factory ───────────────────────────────────
-    private enum BtnVariant { PRIMARY, SECONDARY, SUCCESS, DANGER, WARNING }
+    private enum BtnVariant {
+        PRIMARY, SECONDARY, SUCCESS, DANGER, WARNING
+    }
 
     private static JButton styledBtn(String label, BtnVariant variant) {
         JButton btn = new JButton(label);
@@ -166,15 +172,30 @@ public class StaffPanel extends JPanel {
         btn.setContentAreaFilled(true);
         btn.setBorderPainted(false);
         switch (variant) {
-            case PRIMARY  -> { btn.setBackground(new Color(0x2563EB)); btn.setForeground(Color.WHITE); }
-            case SECONDARY-> { btn.setBackground(new Color(0xF1F5F9)); btn.setForeground(new Color(0x0F172A));
-                               btn.setBorderPainted(true);
-                               btn.setBorder(BorderFactory.createCompoundBorder(
-                                   BorderFactory.createLineBorder(new Color(0xE5E7EB)),
-                                   BorderFactory.createEmptyBorder(6, 15, 6, 15))); }
-            case SUCCESS  -> { btn.setBackground(new Color(0x10B981)); btn.setForeground(Color.WHITE); }
-            case DANGER   -> { btn.setBackground(new Color(0xEF4444)); btn.setForeground(Color.WHITE); }
-            case WARNING  -> { btn.setBackground(new Color(0xF59E0B)); btn.setForeground(Color.WHITE); }
+            case PRIMARY -> {
+                btn.setBackground(new Color(0x2563EB));
+                btn.setForeground(Color.WHITE);
+            }
+            case SECONDARY -> {
+                btn.setBackground(new Color(0xF1F5F9));
+                btn.setForeground(new Color(0x0F172A));
+                btn.setBorderPainted(true);
+                btn.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(new Color(0xE5E7EB)),
+                        BorderFactory.createEmptyBorder(6, 15, 6, 15)));
+            }
+            case SUCCESS -> {
+                btn.setBackground(new Color(0x10B981));
+                btn.setForeground(Color.WHITE);
+            }
+            case DANGER -> {
+                btn.setBackground(new Color(0xEF4444));
+                btn.setForeground(Color.WHITE);
+            }
+            case WARNING -> {
+                btn.setBackground(new Color(0xF59E0B));
+                btn.setForeground(Color.WHITE);
+            }
         }
         return btn;
     }
@@ -201,7 +222,7 @@ public class StaffPanel extends JPanel {
 
         JButton addStaffBtn = styledBtn("+ Add Staff", BtnVariant.PRIMARY);
         addStaffBtn.addActionListener(e -> onCreateAccount());
-        addStaffBtn.setVisible(false); // replaced by placeholder card in grid
+        addStaffBtn.setVisible(false);
 
         JButton staffRequestBtn = styledBtn("Staff Request", BtnVariant.SUCCESS);
         staffRequestBtn.addActionListener(e -> showStaffRequestDialog());
@@ -265,7 +286,6 @@ public class StaffPanel extends JPanel {
         } else if ("Account Management".equals(tab)) {
             showAccountManagementView();
         }
-        // Highlight active tab
         for (Component c : tabBar.getComponents()) {
             if (c instanceof JButton btn) {
                 boolean isActive = tab.equals(btn.getText());
@@ -352,7 +372,6 @@ public class StaffPanel extends JPanel {
                         "Please fill in both dates.", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            // Store leave request in background
             new SwingWorker<Void, Void>() {
                 private String errorMsg;
 
@@ -505,7 +524,6 @@ public class StaffPanel extends JPanel {
         c.fill = GridBagConstraints.BOTH;
         c.insets = new Insets(0, 0, 0, 0);
 
-        // Header row (gridy = 0)
         c.gridy = 0;
         c.gridx = 0;
         c.weightx = 1.2;
@@ -525,7 +543,6 @@ public class StaffPanel extends JPanel {
             weeklyScheduleTable.add(headerDay, c);
         }
 
-        // Staff rows (gridy = 1..N)
         int row = 1;
         for (UserAccount user : users) {
             boolean isCurrentUser = user.getUsername().equals(this.username);
@@ -552,7 +569,6 @@ public class StaffPanel extends JPanel {
             row++;
         }
 
-        // Filler row to push everything to top
         c.gridy = row;
         c.gridx = 0;
         c.gridwidth = 8;
@@ -667,7 +683,12 @@ public class StaffPanel extends JPanel {
         panel.setBorder(new EmptyBorder(16, 24, 24, 24));
 
         staffCardsPanel.setBackground(new Color(0xF9FAFB));
-        JScrollPane scroll = new JScrollPane(staffCardsPanel);
+
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.setOpaque(false);
+        wrapper.add(staffCardsPanel, BorderLayout.NORTH);
+
+        JScrollPane scroll = new JScrollPane(wrapper);
         scroll.setBorder(null);
         scroll.setBackground(new Color(0xF9FAFB));
         scroll.getViewport().setBackground(new Color(0xF9FAFB));
@@ -682,13 +703,11 @@ public class StaffPanel extends JPanel {
         panel.setBorder(new EmptyBorder(16, 24, 24, 24));
 
         if (currentRole == Role.ADMIN) {
-            // Admin sees two inner tabs: Password Request + Leave Request
             JTabbedPane innerTabs = new JTabbedPane();
             innerTabs.addTab("Password Request", createPasswordRequestsPanel());
             innerTabs.addTab("Leave Request", createAdminLeaveRequestsPanel());
             panel.add(innerTabs, BorderLayout.CENTER);
         } else {
-            // Staff sees two inner tabs: My Requests (leave + pw) + their shift context
             JTabbedPane innerTabs = new JTabbedPane();
             innerTabs.addTab("My Requests", createStaffMyRequestsPanel());
             panel.add(innerTabs, BorderLayout.CENTER);
@@ -723,7 +742,6 @@ public class StaffPanel extends JPanel {
         leaveRequestsTable.setRowSorter(leaveRequestsSorter);
         hideColumn(leaveRequestsTable, 0);
 
-        // Colored status badge renderer on the Status column (index 5 in model, 4 visible)
         leaveRequestsTable.getColumnModel().getColumn(5).setCellRenderer(new LeaveStatusRenderer());
 
         leaveRequestsTable.getSelectionModel().addListSelectionListener(e -> {
@@ -756,9 +774,8 @@ public class StaffPanel extends JPanel {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(new EmptyBorder(12, 16, 12, 16));
 
-        // ── Submit form ──
         JTextField startDateField = new JTextField(12);
-        JTextField endDateField   = new JTextField(12);
+        JTextField endDateField = new JTextField(12);
 
         JPanel form = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
         form.add(new JLabel("Leave: From"));
@@ -769,7 +786,7 @@ public class StaffPanel extends JPanel {
         JButton submitLeaveBtn = styledBtn("Submit Leave Request", BtnVariant.SUCCESS);
         submitLeaveBtn.addActionListener(e -> {
             String start = startDateField.getText().trim();
-            String end   = endDateField.getText().trim();
+            String end = endDateField.getText().trim();
             if (start.isEmpty() || end.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "Please fill in both dates.", "Validation",
                         JOptionPane.WARNING_MESSAGE);
@@ -777,13 +794,19 @@ public class StaffPanel extends JPanel {
             }
             new SwingWorker<Void, Void>() {
                 private String errorMsg;
-                @Override protected Void doInBackground() {
+
+                @Override
+                protected Void doInBackground() {
                     try {
                         new SQLiteLeaveRequestRepository().createRequest(username, start, end);
-                    } catch (Exception ex) { errorMsg = ex.getMessage(); }
+                    } catch (Exception ex) {
+                        errorMsg = ex.getMessage();
+                    }
                     return null;
                 }
-                @Override protected void done() {
+
+                @Override
+                protected void done() {
                     if (errorMsg != null) {
                         JOptionPane.showMessageDialog(StaffPanel.this,
                                 "Failed to submit leave request:\n" + errorMsg, "Error",
@@ -808,14 +831,12 @@ public class StaffPanel extends JPanel {
         btnRow.add(submitPwBtn);
 
         JPanel topSection = new JPanel(new BorderLayout());
-        topSection.add(form,   BorderLayout.NORTH);
+        topSection.add(form, BorderLayout.NORTH);
         topSection.add(btnRow, BorderLayout.SOUTH);
         panel.add(topSection, BorderLayout.NORTH);
 
-        // ── My requests history table ──
         myLeaveTable.setModel(myLeaveModel);
         myLeaveTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        // Status column index 3 — colored badge
         myLeaveTable.getColumnModel().getColumn(3).setCellRenderer(new LeaveStatusRenderer());
 
         panel.add(new JScrollPane(myLeaveTable), BorderLayout.CENTER);
@@ -836,29 +857,45 @@ public class StaffPanel extends JPanel {
                 try {
                     List<UserAccount> users = accountRoleRepository.listUsers();
                     List<StaffShift> todayShifts = new java.util.ArrayList<>();
-                    try { todayShifts.addAll(shiftRepo.findTodayActiveShifts()); } catch (Exception ignored) {}
+                    try {
+                        todayShifts.addAll(shiftRepo.findTodayActiveShifts());
+                    } catch (Exception ignored) {
+                    }
 
                     for (UserAccount user : users) {
                         StaffShift latest = null;
-                        try { latest = shiftRepo.findLatestShift(user.getUsername()); } catch (Exception ignored) {}
+                        try {
+                            latest = shiftRepo.findLatestShift(user.getUsername());
+                        } catch (Exception ignored) {
+                        }
 
                         StaffShift todayShift = null;
                         for (StaffShift s : todayShifts) {
-                            if (s.getUsername().equals(user.getUsername())) { todayShift = s; break; }
+                            if (s.getUsername().equals(user.getUsername())) {
+                                todayShift = s;
+                                break;
+                            }
                         }
                         if (todayShift == null) {
                             try {
                                 for (StaffShift s : shiftRepo.findShifts(user.getUsername())) {
                                     if (s.getStartedAt() != null && s.getStartedAt().startsWith(
-                                            java.time.LocalDate.now().toString())) { todayShift = s; break; }
+                                            java.time.LocalDate.now().toString())) {
+                                        todayShift = s;
+                                        break;
+                                    }
                                 }
-                            } catch (Exception ignored) {}
+                            } catch (Exception ignored) {
+                            }
                         }
 
                         java.util.Map<Integer, String> schedule = new java.util.HashMap<>();
-                        try { schedule = scheduleRepo.loadSchedule(user.getUsername()); } catch (Exception ignored) {}
+                        try {
+                            schedule = scheduleRepo.loadSchedule(user.getUsername());
+                        } catch (Exception ignored) {
+                        }
 
-                        rows.add(new Object[]{ user, latest, todayShift, schedule });
+                        rows.add(new Object[] { user, latest, todayShift, schedule });
                     }
                 } catch (Exception ex) {
                     errorMsg = ex.getMessage();
@@ -871,18 +908,18 @@ public class StaffPanel extends JPanel {
                 try {
                     java.util.List<Object[]> rows = get();
                     for (Object[] row : rows) {
-                        UserAccount user     = (UserAccount) row[0];
-                        StaffShift latest    = (StaffShift)  row[1];
-                        StaffShift todayShift= (StaffShift)  row[2];
+                        UserAccount user = (UserAccount) row[0];
+                        StaffShift latest = (StaffShift) row[1];
+                        StaffShift todayShift = (StaffShift) row[2];
                         @SuppressWarnings("unchecked")
-                        java.util.Map<Integer, String> schedule =
-                                (java.util.Map<Integer, String>) row[3];
+                        java.util.Map<Integer, String> schedule = (java.util.Map<Integer, String>) row[3];
                         staffCardsPanel.add(buildStaffCard(user, latest, todayShift, schedule));
                     }
                     if (currentRole == Role.ADMIN) {
                         staffCardsPanel.add(buildAddStaffCard());
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
                 staffCardsPanel.revalidate();
                 staffCardsPanel.repaint();
                 if (errorMsg != null) {
@@ -894,15 +931,16 @@ public class StaffPanel extends JPanel {
         }.execute();
     }
 
+    // ─── Staff Card ──────────────────────────────────────────────
     private JPanel buildStaffCard(UserAccount user, StaffShift latestShift,
             StaffShift todayShift, java.util.Map<Integer, String> schedule) {
+
         boolean isActive = latestShift != null && latestShift.getEndedAt() == null
                 && !"absent".equals(latestShift.getStatus()) && !"late".equals(latestShift.getStatus());
-        boolean isLate   = latestShift != null && "late".equals(latestShift.getStatus());
+        boolean isLate = latestShift != null && "late".equals(latestShift.getStatus());
         boolean isAbsent = latestShift != null && "absent".equals(latestShift.getStatus());
         Color accentLeft = isActive ? STATUS_GREEN : isLate ? STATUS_ORANGE : isAbsent ? STATUS_RED : STATUS_GRAY;
 
-        // ── Rounded card panel with custom paint ──────────────────
         JPanel card = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -920,38 +958,11 @@ public class StaffPanel extends JPanel {
                 g2.dispose();
             }
         };
-        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setLayout(new BorderLayout(0, 0));
         card.setOpaque(false);
-        card.setBorder(new EmptyBorder(14, 16, 12, 12));
+        card.setBorder(new EmptyBorder(12, 16, 12, 12));
 
-        // ── Top row: avatar + name/role-badge + edit/delete (top-right) ──
-        JPanel topRow = new JPanel(new BorderLayout(10, 0));
-        topRow.setOpaque(false);
-
-        // Avatar — first letter of full name or username
-        String displayName = (user.getFullName() != null && !user.getFullName().isEmpty())
-                ? user.getFullName() : user.getUsername();
-        Color avatarColor = user.getRole() == Role.ADMIN ? ACCENT_BLUE : STATUS_GREEN;
-        JLabel avatar = createAvatarLabel(user, 48, avatarColor);
-
-        // Name + role pill
-        JPanel nameStack = new JPanel();
-        nameStack.setLayout(new BoxLayout(nameStack, BoxLayout.Y_AXIS));
-        nameStack.setOpaque(false);
-
-        JLabel nameLabel = new JLabel(displayName);
-        nameLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        nameLabel.setForeground(TEXT_PRIMARY);
-
-        JLabel rolePill = buildRolePill(user.getRole());
-
-        nameStack.add(nameLabel);
-        nameStack.add(Box.createVerticalStrut(3));
-        nameStack.add(rolePill);
-
-        // Edit + Delete icon buttons — top-right corner
-        JPanel iconRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
-        iconRow.setOpaque(false);
+        JLabel statusBadge = buildStatusBadge(latestShift);
 
         JButton editBtn = buildIconBtn(pencilIcon(), new Color(0xCA8A04), new Color(0xFEF9C3));
         editBtn.setToolTipText("Edit profile");
@@ -961,32 +972,49 @@ public class StaffPanel extends JPanel {
         deleteBtn.setToolTipText("Delete staff");
         deleteBtn.addActionListener(e -> onDeleteUser(user.getUsername()));
 
+        JPanel iconRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
+        iconRow.setOpaque(false);
         iconRow.add(editBtn);
         iconRow.add(deleteBtn);
 
-        // Right column: status badge on top, icons below
-        JPanel rightCol = new JPanel();
-        rightCol.setLayout(new BoxLayout(rightCol, BoxLayout.Y_AXIS));
+        JPanel rightCol = new JPanel(new BorderLayout());
         rightCol.setOpaque(false);
+        rightCol.add(statusBadge, BorderLayout.NORTH);
+        rightCol.add(iconRow, BorderLayout.SOUTH);
 
-        JLabel statusBadge = buildStatusBadge(latestShift);
-        statusBadge.setAlignmentX(Component.RIGHT_ALIGNMENT);
-        iconRow.setAlignmentX(Component.RIGHT_ALIGNMENT);
-        rightCol.add(statusBadge);
-        rightCol.add(Box.createVerticalGlue());
-        rightCol.add(iconRow);
+        String displayName = (user.getFullName() != null && !user.getFullName().isEmpty())
+                ? user.getFullName()
+                : user.getUsername();
+        Color avatarColor = user.getRole() == Role.ADMIN ? ACCENT_BLUE : STATUS_GREEN;
+        JLabel avatar = createAvatarLabel(user, 46, avatarColor);
 
+        JPanel nameStack = new JPanel();
+        nameStack.setLayout(new BoxLayout(nameStack, BoxLayout.Y_AXIS));
+        nameStack.setOpaque(false);
+
+        JLabel nameLabel = new JLabel(displayName);
+        nameLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        nameLabel.setForeground(TEXT_PRIMARY);
+        nameLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel rolePill = buildRolePill(user.getRole());
+        rolePill.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        nameStack.add(nameLabel);
+        nameStack.add(Box.createVerticalStrut(4));
+        nameStack.add(rolePill);
+
+        JPanel topRow = new JPanel(new BorderLayout(10, 0));
+        topRow.setOpaque(false);
         topRow.add(avatar, BorderLayout.WEST);
         topRow.add(nameStack, BorderLayout.CENTER);
         topRow.add(rightCol, BorderLayout.EAST);
 
-        // ── Today's shift time ────────────────────────────────────
         String shiftText = buildTodayShiftText(todayShift);
         JLabel shiftLabel = new JLabel(shiftText);
         shiftLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         shiftLabel.setForeground(todayShift != null ? TEXT_PRIMARY : TEXT_SECONDARY);
 
-        // ── Weekly schedule summary ───────────────────────────────
         String schedSummary = buildScheduleSummary(schedule);
         JLabel schedLabel = new JLabel(schedSummary);
         schedLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
@@ -999,12 +1027,11 @@ public class StaffPanel extends JPanel {
         infoBlock.add(Box.createVerticalStrut(2));
         infoBlock.add(schedLabel);
 
-        // ── Action buttons (rounded, filled) ─────────────────────
         boolean hasActiveShift = latestShift != null && latestShift.getEndedAt() == null
                 && !"absent".equals(latestShift.getStatus()) && !"late".equals(latestShift.getStatus());
-        boolean hasLateShift   = latestShift != null && "late".equals(latestShift.getStatus());
+        boolean hasLateShift = latestShift != null && "late".equals(latestShift.getStatus());
 
-        JButton lateBtn   = buildRoundedActionBtn("Mark As Late",
+        JButton lateBtn = buildRoundedActionBtn("Mark As Late",
                 new Color(0xF59E0B), new Color(0xD97706), Color.WHITE);
         JButton absentBtn = buildRoundedActionBtn("Absent",
                 new Color(0xEF4444), new Color(0xDC2626), Color.WHITE);
@@ -1019,13 +1046,20 @@ public class StaffPanel extends JPanel {
         actionRow.add(lateBtn);
         actionRow.add(absentBtn);
 
-        // ── Assemble card ─────────────────────────────────────────
-        card.add(topRow);
-        card.add(Box.createVerticalStrut(10));
-        card.add(infoBlock);
-        card.add(Box.createVerticalStrut(8));
-        card.add(actionRow);
-        card.add(Box.createVerticalGlue());
+        JPanel centerContent = new JPanel();
+        centerContent.setLayout(new BoxLayout(centerContent, BoxLayout.Y_AXIS));
+        centerContent.setOpaque(false);
+        centerContent.add(Box.createVerticalStrut(8));
+        centerContent.add(infoBlock);
+        centerContent.add(Box.createVerticalStrut(8));
+        centerContent.add(actionRow);
+
+        card.add(topRow, BorderLayout.NORTH);
+        card.add(centerContent, BorderLayout.CENTER);
+
+        card.setPreferredSize(new Dimension(0, 160));
+        card.setMinimumSize(new Dimension(220, 160));
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 160));
 
         return card;
     }
@@ -1050,6 +1084,9 @@ public class StaffPanel extends JPanel {
         };
         card.setOpaque(false);
         card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        card.setPreferredSize(new Dimension(0, 160));
+        card.setMinimumSize(new Dimension(220, 160));
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 160));
 
         JLabel lbl = new JLabel("+ Add Staff", SwingConstants.CENTER);
         lbl.setFont(new Font("Segoe UI", Font.BOLD, 13));
@@ -1057,12 +1094,21 @@ public class StaffPanel extends JPanel {
         card.add(lbl);
 
         card.addMouseListener(new MouseAdapter() {
-            @Override public void mouseClicked(MouseEvent e) { onCreateAccount(); }
-            @Override public void mouseEntered(MouseEvent e) {
-                lbl.setForeground(ACCENT_BLUE); card.repaint();
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                onCreateAccount();
             }
-            @Override public void mouseExited(MouseEvent e) {
-                lbl.setForeground(new Color(0x94A3B8)); card.repaint();
+
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                lbl.setForeground(ACCENT_BLUE);
+                card.repaint();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                lbl.setForeground(new Color(0x94A3B8));
+                card.repaint();
             }
         });
         return card;
@@ -1090,10 +1136,11 @@ public class StaffPanel extends JPanel {
         pill.setForeground(fg);
         pill.setOpaque(false);
         pill.setBorder(new EmptyBorder(2, 8, 2, 8));
+        pill.setMaximumSize(pill.getPreferredSize());
         return pill;
     }
 
-    /** Small icon button with hover tint — no permanent background fill. */
+    /** Small icon button with hover tint. */
     private JButton buildIconBtn(javax.swing.Icon icon, Color fg, Color hoverBg) {
         boolean[] hovered = { false };
         JButton btn = new JButton(icon) {
@@ -1118,8 +1165,17 @@ public class StaffPanel extends JPanel {
         btn.setBorder(new EmptyBorder(3, 6, 3, 6));
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         btn.addMouseListener(new MouseAdapter() {
-            @Override public void mouseEntered(MouseEvent e) { hovered[0] = true;  btn.repaint(); }
-            @Override public void mouseExited(MouseEvent e)  { hovered[0] = false; btn.repaint(); }
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                hovered[0] = true;
+                btn.repaint();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                hovered[0] = false;
+                btn.repaint();
+            }
         });
         return btn;
     }
@@ -1147,20 +1203,29 @@ public class StaffPanel extends JPanel {
         btn.setBorder(new EmptyBorder(5, 12, 5, 12));
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         btn.addMouseListener(new MouseAdapter() {
-            @Override public void mouseEntered(MouseEvent e) { hovered[0] = true;  btn.repaint(); }
-            @Override public void mouseExited(MouseEvent e)  { hovered[0] = false; btn.repaint(); }
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                hovered[0] = true;
+                btn.repaint();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                hovered[0] = false;
+                btn.repaint();
+            }
         });
         return btn;
     }
 
     /** Format today's shift start/end from a StaffShift, or "No Shift Today". */
     private String buildTodayShiftText(StaffShift shift) {
-        if (shift == null) return "No Shift Today";
+        if (shift == null)
+            return "No Shift Today";
         try {
-            java.time.format.DateTimeFormatter parser =
-                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-            java.time.format.DateTimeFormatter display =
-                    java.time.format.DateTimeFormatter.ofPattern("h:mm a");
+            java.time.format.DateTimeFormatter parser = java.time.format.DateTimeFormatter
+                    .ofPattern("yyyy-MM-dd HH:mm:ss");
+            java.time.format.DateTimeFormatter display = java.time.format.DateTimeFormatter.ofPattern("h:mm a");
             String start = java.time.LocalDateTime.parse(shift.getStartedAt(), parser).format(display);
             if (shift.getEndedAt() != null && !shift.getEndedAt().isEmpty()) {
                 String end = java.time.LocalDateTime.parse(shift.getEndedAt(), parser).format(display);
@@ -1172,14 +1237,15 @@ public class StaffPanel extends JPanel {
         }
     }
 
-    /** Summarize weekly schedule from day map, e.g. "Mon–Fri: Morning  |  2 days off". */
+    /** Summarize weekly schedule, e.g. "5 days/wk · Afternoon". */
     private String buildScheduleSummary(java.util.Map<Integer, String> schedule) {
-        if (schedule == null || schedule.isEmpty()) return "No schedule set";
+        if (schedule == null || schedule.isEmpty())
+            return "No schedule set";
         long working = schedule.values().stream()
                 .filter(v -> v != null && !"off".equalsIgnoreCase(v) && !"rest".equalsIgnoreCase(v))
                 .count();
-        if (working == 0) return "All days off";
-        // Dominant shift type
+        if (working == 0)
+            return "All days off";
         java.util.Map<String, Long> freq = schedule.values().stream()
                 .filter(v -> v != null && !"off".equalsIgnoreCase(v) && !"rest".equalsIgnoreCase(v))
                 .collect(java.util.stream.Collectors.groupingBy(
@@ -1191,45 +1257,107 @@ public class StaffPanel extends JPanel {
         return working + " day" + (working != 1 ? "s" : "") + "/wk · " + dominant;
     }
 
+    // ─── FIXED: Avatar with profile picture support ──────────────
     private JLabel createAvatarLabel(UserAccount user, int size, Color fallbackColor) {
+        // ── Try profile picture first ────────────────────────────
         try {
             if (profilePictureRepository != null) {
                 byte[] imageBytes = profilePictureRepository.loadPicture(user.getUsername());
                 if (imageBytes != null && imageBytes.length > 0) {
-                    Image image = new ImageIcon(imageBytes).getImage();
-                    Image scaled = image.getScaledInstance(size, size, Image.SCALE_SMOOTH);
-                    JLabel avatar = new JLabel(new ImageIcon(scaled));
+
+                    // Decode raw bytes → Image
+                    ImageIcon rawIcon = new ImageIcon(imageBytes);
+                    Image rawImage = rawIcon.getImage();
+
+                    // Pre-scale once at construction time (not per paint call)
+                    Image scaledImage = rawImage.getScaledInstance(size, size, Image.SCALE_SMOOTH);
+
+                    // Force MediaTracker to fully load before first paint
+                    new ImageIcon(scaledImage).getImage(); // triggers load
+
+                    JLabel avatar = new JLabel() {
+                        @Override
+                        protected void paintComponent(Graphics g) {
+                            Graphics2D g2 = (Graphics2D) g.create();
+                            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                                    RenderingHints.VALUE_ANTIALIAS_ON);
+                            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                                    RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                            g2.setRenderingHint(RenderingHints.KEY_RENDERING,
+                                    RenderingHints.VALUE_RENDER_QUALITY);
+
+                            int d = Math.min(getWidth(), getHeight());
+                            int ox = (getWidth() - d) / 2;
+                            int oy = (getHeight() - d) / 2;
+
+                            // Clip to circle then draw image
+                            java.awt.geom.Ellipse2D.Float clip = new java.awt.geom.Ellipse2D.Float(ox, oy, d, d);
+                            g2.setClip(clip);
+                            g2.drawImage(scaledImage, ox, oy, d, d, this);
+
+                            // Reset clip, draw border ring on top
+                            g2.setClip(null);
+                            g2.setColor(new Color(0xD1D5DB));
+                            g2.setStroke(new BasicStroke(1.5f));
+                            g2.drawOval(ox + 1, oy + 1, d - 2, d - 2);
+
+                            g2.dispose();
+                        }
+                    };
                     avatar.setPreferredSize(new Dimension(size, size));
                     avatar.setMinimumSize(new Dimension(size, size));
-                    avatar.setHorizontalAlignment(SwingConstants.CENTER);
-                    avatar.setVerticalAlignment(SwingConstants.CENTER);
+                    avatar.setMaximumSize(new Dimension(size, size));
+                    avatar.setOpaque(false);
                     return avatar;
                 }
             }
         } catch (Exception ignored) {
         }
 
-        String _initSrc = (user.getFullName() != null && !user.getFullName().isEmpty())
-                ? user.getFullName() : user.getUsername();
-        JLabel avatar = new JLabel(String.valueOf(Character.toUpperCase(_initSrc.charAt(0)))) {
+        // ── Fallback: coloured circle with initial ───────────────
+        String initSrc = user.getFullName();
+        if (initSrc == null || initSrc.trim().isEmpty()) {
+            initSrc = user.getUsername();
+        }
+        if (initSrc == null || initSrc.trim().isEmpty()) {
+            initSrc = "?";
+        }
+        final String initial = String.valueOf(Character.toUpperCase(initSrc.trim().charAt(0)));
+
+        JLabel avatar = new JLabel(initial) {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(fallbackColor);
+
                 int d = Math.min(getWidth(), getHeight());
-                g2.fillOval(0, 0, d - 1, d - 1);
+                int ox = (getWidth() - d) / 2;
+                int oy = (getHeight() - d) / 2;
+
+                // Background circle
+                g2.setColor(fallbackColor);
+                g2.fillOval(ox, oy, d - 1, d - 1);
+
+                // Initial letter, centred
                 g2.setColor(Color.WHITE);
                 g2.setFont(new Font("Segoe UI", Font.BOLD, size >= 42 ? 16 : 12));
                 FontMetrics fm = g2.getFontMetrics();
                 String text = getText();
-                g2.drawString(text, (getWidth() - fm.stringWidth(text)) / 2,
-                        (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
+                g2.drawString(text,
+                        ox + (d - fm.stringWidth(text)) / 2,
+                        oy + (d - fm.getHeight()) / 2 + fm.getAscent());
+
+                // Border ring
+                g2.setColor(new Color(0xD1D5DB));
+                g2.setStroke(new BasicStroke(1.5f));
+                g2.drawOval(ox + 1, oy + 1, d - 2, d - 2);
+
                 g2.dispose();
             }
         };
         avatar.setPreferredSize(new Dimension(size, size));
         avatar.setMinimumSize(new Dimension(size, size));
+        avatar.setMaximumSize(new Dimension(size, size));
         avatar.setOpaque(false);
         avatar.setHorizontalAlignment(SwingConstants.CENTER);
         avatar.setVerticalAlignment(SwingConstants.CENTER);
@@ -1275,7 +1403,7 @@ public class StaffPanel extends JPanel {
         badge.setForeground(fg);
         badge.setBackground(bg);
         badge.setOpaque(true);
-        badge.setBorder(BorderFactory.createEmptyBorder(2, 8, 2, 8));
+        badge.setBorder(BorderFactory.createEmptyBorder(3, 10, 3, 10));
         return badge;
     }
 
@@ -1391,15 +1519,14 @@ public class StaffPanel extends JPanel {
         usersTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         usersTable.setRowHeight(36);
         AppTheme.applyTableDefaults(usersTable);
-        // Staff ID(70), Username fills, Full Name fills, Role(80), Gender(70), Mobile(110), Created At(130)
         int[] usersCols = { 70, 0, 0, 80, 70, 110, 130 };
         for (int i = 0; i < usersCols.length; i++) {
-            if (usersCols[i] > 0) usersTable.getColumnModel().getColumn(i).setPreferredWidth(usersCols[i]);
+            if (usersCols[i] > 0)
+                usersTable.getColumnModel().getColumn(i).setPreferredWidth(usersCols[i]);
         }
         TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(usersModel);
         usersTable.setRowSorter(sorter);
 
-        // Events
         refreshUsersBtn.addActionListener(e -> loadUsers());
         makeAdminBtn.addActionListener(e -> updateSelectedUserRole(Role.ADMIN));
         makeStaffBtn.addActionListener(e -> updateSelectedUserRole(Role.STAFF));
@@ -1494,12 +1621,10 @@ public class StaffPanel extends JPanel {
         attendanceTable.setRowHeight(36);
         attendanceTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         AppTheme.applyTableDefaults(attendanceTable);
-        // Set preferred column widths: Staff Name fills, others fixed
-        int[] attendanceCols = { 0, 110, 90, 90, 90, 90 }; // 0 = fill
+        int[] attendanceCols = { 0, 110, 90, 90, 90, 90 };
         for (int i = 1; i < attendanceCols.length; i++) {
             attendanceTable.getColumnModel().getColumn(i).setPreferredWidth(attendanceCols[i]);
         }
-        // Colored status badge on the Status column (index 5)
         attendanceTable.getColumnModel().getColumn(5).setCellRenderer(new AttendanceStatusRenderer());
 
         JPanel panel = new JPanel(new BorderLayout(10, 10));
@@ -1517,7 +1642,6 @@ public class StaffPanel extends JPanel {
         bar.setOpaque(false);
         bar.setBorder(BorderFactory.createEmptyBorder(0, 0, 12, 0));
 
-        // Search field (left)
         attendanceSearchField = new JTextField(18);
         attendanceSearchField.putClientProperty("JTextField.placeholderText", "Search Barista");
         attendanceSearchField.setFont(new Font("Segoe UI", Font.PLAIN, 12));
@@ -1541,12 +1665,8 @@ public class StaffPanel extends JPanel {
         searchPanel.add(searchIcon);
         searchPanel.add(attendanceSearchField);
 
-        // Date range (right)
         attendanceDateFrom = buildDateField();
         attendanceDateTo = buildDateField();
-
-        JLabel dateLabel = new JLabel("\uD83D\uDCC5");
-        dateLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
 
         JPanel datePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         datePanel.setOpaque(false);
@@ -1554,7 +1674,6 @@ public class StaffPanel extends JPanel {
         datePanel.add(attendanceDateFrom);
         datePanel.add(new JLabel("To:"));
         datePanel.add(attendanceDateTo);
-        datePanel.add(dateLabel);
 
         JButton clearBtn = new JButton("Clear");
         clearBtn.setFont(new Font("Segoe UI", Font.BOLD, 11));
@@ -1617,7 +1736,6 @@ public class StaffPanel extends JPanel {
         root.setBackground(Color.WHITE);
         root.setBorder(BorderFactory.createEmptyBorder(16, 16, 12, 16));
 
-        // Header with nav
         JPanel header = new JPanel(new BorderLayout(8, 0));
         header.setBackground(Color.WHITE);
         header.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
@@ -1681,7 +1799,6 @@ public class StaffPanel extends JPanel {
         root.add(header, BorderLayout.NORTH);
         root.add(gridPanel, BorderLayout.CENTER);
 
-        // Footer
         JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         footer.setBackground(Color.WHITE);
         footer.setBorder(BorderFactory.createEmptyBorder(12, 0, 0, 0));
@@ -1709,7 +1826,6 @@ public class StaffPanel extends JPanel {
         apply.addActionListener(ev -> {
             if (picked[0] != null) {
                 target.setText(picked[0].format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")));
-                // Update the corresponding LocalDate reference
                 if (target == attendanceDateFrom)
                     attendanceFromDate = picked[0];
                 if (target == attendanceDateTo)
@@ -1723,7 +1839,6 @@ public class StaffPanel extends JPanel {
         footer.add(apply);
         root.add(footer, BorderLayout.SOUTH);
 
-        // Initial render
         renderDateGrid(gridPanel, monthLabel, currentMonth[0], target, dialog, picked);
 
         dialog.setContentPane(root);
@@ -1838,7 +1953,6 @@ public class StaffPanel extends JPanel {
                         : "";
 
                 for (StaffShift s : shifts) {
-                    // Apply search filter
                     if (!search.isEmpty() && !s.getUsername().toLowerCase().contains(search)) {
                         continue;
                     }
@@ -1850,7 +1964,6 @@ public class StaffPanel extends JPanel {
                         clockIn = parts.length > 1 ? parts[1] : "";
                     }
 
-                    // Apply date range filter
                     if (attendanceFromDate != null && !date.isEmpty()) {
                         try {
                             java.time.LocalDate rowDate = java.time.LocalDate.parse(date);
@@ -1986,7 +2099,7 @@ public class StaffPanel extends JPanel {
         }.execute();
     }
 
-    // ─── Account Management helpers (from old StaffPanel) ────────
+    // ─── Account Management helpers ──────────────────────────────
     private void updateSelectedUserRole(Role newRole) {
         int viewRow = usersTable.getSelectedRow();
         if (viewRow < 0) {
@@ -2238,7 +2351,8 @@ public class StaffPanel extends JPanel {
 
     // ─── Filter helpers ──────────────────────────────────────────
     private void applyRequestsFilter() {
-        if (resetRequestsSorter == null) return;
+        if (resetRequestsSorter == null)
+            return;
         String selected = (String) requestStatusFilter.getSelectedItem();
         if (selected == null || "All".equals(selected)) {
             resetRequestsSorter.setRowFilter(null);
@@ -2310,13 +2424,15 @@ public class StaffPanel extends JPanel {
     }
 
     // ─── Leave Request data loaders ──────────────────────────────
-
     private void loadLeaveRequests() {
-        if (currentRole != Role.ADMIN) return;
+        if (currentRole != Role.ADMIN)
+            return;
         leaveRequestsModel.setRowCount(0);
         new SwingWorker<List<LeaveRequest>, Void>() {
             private String errorMsg;
-            @Override protected List<LeaveRequest> doInBackground() {
+
+            @Override
+            protected List<LeaveRequest> doInBackground() {
                 try {
                     return new SQLiteLeaveRequestRepository().listAllRequests();
                 } catch (Exception ex) {
@@ -2324,7 +2440,9 @@ public class StaffPanel extends JPanel {
                     return List.of();
                 }
             }
-            @Override protected void done() {
+
+            @Override
+            protected void done() {
                 try {
                     for (LeaveRequest r : get()) {
                         leaveRequestsModel.addRow(new Object[] {
@@ -2352,7 +2470,9 @@ public class StaffPanel extends JPanel {
         myLeaveModel.setRowCount(0);
         new SwingWorker<List<LeaveRequest>, Void>() {
             private String errorMsg;
-            @Override protected List<LeaveRequest> doInBackground() {
+
+            @Override
+            protected List<LeaveRequest> doInBackground() {
                 try {
                     return new SQLiteLeaveRequestRepository().listRequestsForUser(username);
                 } catch (Exception ex) {
@@ -2360,7 +2480,9 @@ public class StaffPanel extends JPanel {
                     return List.of();
                 }
             }
-            @Override protected void done() {
+
+            @Override
+            protected void done() {
                 try {
                     for (LeaveRequest r : get()) {
                         myLeaveModel.addRow(new Object[] {
@@ -2385,7 +2507,8 @@ public class StaffPanel extends JPanel {
     }
 
     private void applyLeaveRequestsFilter() {
-        if (leaveRequestsSorter == null) return;
+        if (leaveRequestsSorter == null)
+            return;
         String selected = (String) leaveStatusFilter.getSelectedItem();
         if (selected == null || "All".equals(selected)) {
             leaveRequestsSorter.setRowFilter(null);
@@ -2397,24 +2520,33 @@ public class StaffPanel extends JPanel {
 
     private void onApproveLeaveRequest() {
         int viewRow = leaveRequestsTable.getSelectedRow();
-        if (viewRow < 0) return;
+        if (viewRow < 0)
+            return;
         int modelRow = leaveRequestsTable.convertRowIndexToModel(viewRow);
-        int id       = (int) leaveRequestsModel.getValueAt(modelRow, 0);
-        String user  = leaveRequestsModel.getValueAt(modelRow, 2).toString();
+        int id = (int) leaveRequestsModel.getValueAt(modelRow, 0);
+        String user = leaveRequestsModel.getValueAt(modelRow, 2).toString();
 
         int confirm = JOptionPane.showConfirmDialog(this,
                 "Approve leave request for \"" + user + "\"?",
                 "Confirm Approve", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (confirm != JOptionPane.YES_OPTION)
+            return;
 
         new SwingWorker<Void, Void>() {
             private String errorMsg;
-            @Override protected Void doInBackground() {
-                try { new SQLiteLeaveRequestRepository().approveRequest(id); }
-                catch (Exception ex) { errorMsg = ex.getMessage(); }
+
+            @Override
+            protected Void doInBackground() {
+                try {
+                    new SQLiteLeaveRequestRepository().approveRequest(id);
+                } catch (Exception ex) {
+                    errorMsg = ex.getMessage();
+                }
                 return null;
             }
-            @Override protected void done() {
+
+            @Override
+            protected void done() {
                 if (errorMsg != null) {
                     JOptionPane.showMessageDialog(StaffPanel.this,
                             "Failed to approve:\n" + errorMsg, "Error", JOptionPane.ERROR_MESSAGE);
@@ -2430,24 +2562,33 @@ public class StaffPanel extends JPanel {
 
     private void onRejectLeaveRequest() {
         int viewRow = leaveRequestsTable.getSelectedRow();
-        if (viewRow < 0) return;
+        if (viewRow < 0)
+            return;
         int modelRow = leaveRequestsTable.convertRowIndexToModel(viewRow);
-        int id       = (int) leaveRequestsModel.getValueAt(modelRow, 0);
-        String user  = leaveRequestsModel.getValueAt(modelRow, 2).toString();
+        int id = (int) leaveRequestsModel.getValueAt(modelRow, 0);
+        String user = leaveRequestsModel.getValueAt(modelRow, 2).toString();
 
         int confirm = JOptionPane.showConfirmDialog(this,
                 "Reject leave request for \"" + user + "\"?",
                 "Confirm Reject", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (confirm != JOptionPane.YES_OPTION)
+            return;
 
         new SwingWorker<Void, Void>() {
             private String errorMsg;
-            @Override protected Void doInBackground() {
-                try { new SQLiteLeaveRequestRepository().rejectRequest(id); }
-                catch (Exception ex) { errorMsg = ex.getMessage(); }
+
+            @Override
+            protected Void doInBackground() {
+                try {
+                    new SQLiteLeaveRequestRepository().rejectRequest(id);
+                } catch (Exception ex) {
+                    errorMsg = ex.getMessage();
+                }
                 return null;
             }
-            @Override protected void done() {
+
+            @Override
+            protected void done() {
                 if (errorMsg != null) {
                     JOptionPane.showMessageDialog(StaffPanel.this,
                             "Failed to reject:\n" + errorMsg, "Error", JOptionPane.ERROR_MESSAGE);
@@ -2471,11 +2612,26 @@ public class StaffPanel extends JPanel {
             if (!isSelected && value != null) {
                 String s = value.toString().toLowerCase();
                 switch (s) {
-                    case "active"    -> { setBackground(new Color(0xD1FAE5)); setForeground(new Color(0x065F46)); }
-                    case "completed" -> { setBackground(new Color(0xDBEAFE)); setForeground(new Color(0x1E40AF)); }
-                    case "late"      -> { setBackground(new Color(0xFEF3C7)); setForeground(new Color(0x92400E)); }
-                    case "absent"    -> { setBackground(new Color(0xFEE2E2)); setForeground(new Color(0x991B1B)); }
-                    default          -> { setBackground(new Color(0xF3F4F6)); setForeground(new Color(0x6B7280)); }
+                    case "active" -> {
+                        setBackground(new Color(0xD1FAE5));
+                        setForeground(new Color(0x065F46));
+                    }
+                    case "completed" -> {
+                        setBackground(new Color(0xDBEAFE));
+                        setForeground(new Color(0x1E40AF));
+                    }
+                    case "late" -> {
+                        setBackground(new Color(0xFEF3C7));
+                        setForeground(new Color(0x92400E));
+                    }
+                    case "absent" -> {
+                        setBackground(new Color(0xFEE2E2));
+                        setForeground(new Color(0x991B1B));
+                    }
+                    default -> {
+                        setBackground(new Color(0xF3F4F6));
+                        setForeground(new Color(0x6B7280));
+                    }
                 }
                 setOpaque(true);
             } else if (!isSelected) {
@@ -2496,9 +2652,18 @@ public class StaffPanel extends JPanel {
             if (!isSelected && value != null) {
                 String s = value.toString().toLowerCase();
                 switch (s) {
-                    case "approved" -> { setBackground(new Color(0xD1FAE5)); setForeground(new Color(0x065F46)); }
-                    case "rejected" -> { setBackground(new Color(0xFEE2E2)); setForeground(new Color(0x991B1B)); }
-                    default         -> { setBackground(new Color(0xFEF3C7)); setForeground(new Color(0x92400E)); }
+                    case "approved" -> {
+                        setBackground(new Color(0xD1FAE5));
+                        setForeground(new Color(0x065F46));
+                    }
+                    case "rejected" -> {
+                        setBackground(new Color(0xFEE2E2));
+                        setForeground(new Color(0x991B1B));
+                    }
+                    default -> {
+                        setBackground(new Color(0xFEF3C7));
+                        setForeground(new Color(0x92400E));
+                    }
                 }
                 setOpaque(true);
             } else if (!isSelected) {

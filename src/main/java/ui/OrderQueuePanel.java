@@ -30,10 +30,6 @@ import java.util.function.Consumer;
 public class OrderQueuePanel extends JPanel {
 
     // ─── Receipt Object ─────────────────────────────────────────
-    /**
-     * Complete receipt data from the POS system.
-     * Contains all order details needed for kitchen display and tracking.
-     */
     public static class Receipt {
         public final int orderId;
         public final String customerName;
@@ -44,7 +40,7 @@ public class OrderQueuePanel extends JPanel {
         public final double totalInclusive;
         public final double cash;
         public final double change;
-        public final String discountType; // NONE, PWD, SENIOR, etc.
+        public final String discountType;
 
         public Receipt(int orderId, String customerName, List<ReceiptItem> items,
                 String timestamp, double subtotal, double vat, double totalInclusive,
@@ -62,9 +58,6 @@ public class OrderQueuePanel extends JPanel {
         }
     }
 
-    /**
-     * Individual line item on a receipt.
-     */
     public static class ReceiptItem {
         public final String description;
         public final int quantity;
@@ -88,7 +81,7 @@ public class OrderQueuePanel extends JPanel {
     private static final Color BG = new Color(0xF5, 0xF6, 0xFA);
     private static final Color LANE_BG = Color.WHITE;
     private static final Color HEADER_BG = Color.WHITE;
-    private static final Color CARD_BG = new Color(0xF8, 0xF9, 0xFC);
+    private static final Color CARD_BG = new Color(0xFD, 0xFD, 0xFF);
     private static final Color CARD_BORDER = new Color(0xE3, 0xE6, 0xF0);
     private static final Color LANE_BORDER = new Color(0xE3, 0xE6, 0xF0);
     private static final Color TOPBAR_BG = new Color(0x25, 0x63, 0xEB);
@@ -119,15 +112,29 @@ public class OrderQueuePanel extends JPanel {
     private static final Color BTN_CANCEL_FG = new Color(0x99, 0x1B, 0x1B);
     private static final Color BTN_CANCEL_HOVER = new Color(0xFE, 0xCA, 0xCA);
 
+    // Priority (PWD / Senior) accent
+    private static final Color PRIORITY_ACCENT = new Color(0xBE, 0x18, 0x5D);
+    private static final Color PRIORITY_BG = new Color(0xFC, 0xE7, 0xF3);
+
+    // ─── Fixed receipt card dimensions ────────────────────────────
+    /** Fixed width of each order card (receipt slip width). */
+    private static final int CARD_FIXED_WIDTH = 240;
+    /** Fixed height of each order card (receipt slip height). */
+    private static final int CARD_FIXED_HEIGHT = 220;
+
     // ─── Order model ───────────────────────────────────────────────
     private static class OrderCard {
-        /** The order ID that ties this card back to the POS CompletedOrder. */
         public final int posOrderId;
         public final String customerName;
         public final List<String> items;
         public final LocalTime createdAt;
         public String status; // "PENDING" | "PROGRESS" | "READY" | "DONE"
-        public Receipt receipt; // Full receipt data (if available)
+        public Receipt receipt;
+        /**
+         * True when the customer has PWD or Senior Citizen discount — floats to top of
+         * queue.
+         */
+        public final boolean isPriority;
 
         public OrderCard(int posOrderId, String customerName, List<String> items) {
             this.posOrderId = posOrderId;
@@ -136,6 +143,7 @@ public class OrderQueuePanel extends JPanel {
             this.createdAt = LocalTime.now();
             this.status = "PENDING";
             this.receipt = null;
+            this.isPriority = false;
         }
 
         public OrderCard(Receipt receipt) {
@@ -148,6 +156,8 @@ public class OrderQueuePanel extends JPanel {
             this.createdAt = LocalTime.now();
             this.status = "PENDING";
             this.receipt = receipt;
+            String dt = receipt.discountType == null ? "" : receipt.discountType.toUpperCase();
+            this.isPriority = dt.contains("PWD") || dt.contains("SENIOR");
         }
     }
 
@@ -155,11 +165,8 @@ public class OrderQueuePanel extends JPanel {
     private final List<OrderCard> pendingOrders = new ArrayList<>();
     private final List<OrderCard> progressOrders = new ArrayList<>();
     private final List<OrderCard> readyOrders = new ArrayList<>();
+    private final List<OrderCard> completedOrders = new ArrayList<>(); // for history
 
-    /**
-     * All orders ever added, keyed by posOrderId, so we can find them quickly
-     * when the POS panel calls markOrderCompleted().
-     */
     private final Map<Integer, OrderCard> allOrdersById = new HashMap<>();
 
     private JPanel pendingCardsPanel;
@@ -177,12 +184,19 @@ public class OrderQueuePanel extends JPanel {
 
     private int completedCount = 0;
 
-    /**
-     * Optional callback fired when the kitchen marks an order "Complete" or
-     * "Cancelled". Receives the posOrderId so OrderingPanel can update its own
-     * strip. Set via {@link #setOnKitchenCompleted(Consumer)}.
-     */
     private Consumer<Integer> onKitchenCompleted;
+
+    /**
+     * Fired on EVERY lane transition. Delivers int[] { posOrderId, statusCode }.
+     * Use {@link #STATUS_PREPARING}, {@link #STATUS_READY},
+     * {@link #STATUS_COMPLETED}, {@link #STATUS_CANCELLED}.
+     */
+    private Consumer<int[]> onKitchenStatusChanged;
+
+    public static final int STATUS_PREPARING = 1;
+    public static final int STATUS_READY = 2;
+    public static final int STATUS_COMPLETED = 3;
+    public static final int STATUS_CANCELLED = 4;
 
     // ─── Constructor ───────────────────────────────────────────────
     public OrderQueuePanel() {
@@ -193,26 +207,63 @@ public class OrderQueuePanel extends JPanel {
 
     // ─── Public API ────────────────────────────────────────────────
 
-    /**
-     * Register a callback that fires when the kitchen marks an order "Complete"
-     * or cancels it. Use this to keep the POS order strip in sync:
-     *
-     * <pre>
-     * orderQueuePanel.setOnKitchenCompleted(
-     *         posOrderId -> SwingUtilities.invokeLater(
-     *                 () -> orderingPanel.markOrderCompletedFromKitchen(posOrderId)));
-     * </pre>
-     */
     public void setOnKitchenCompleted(Consumer<Integer> callback) {
         this.onKitchenCompleted = callback;
     }
 
     /**
-     * Called by OrderingPanel after a transaction is confirmed.
-     * Adds a new order card to the Pending lane with full receipt data.
+     * Register a callback that fires on every kitchen lane transition.
+     * The int[] payload is { posOrderId, statusCode } — see STATUS_* constants.
      *
-     * @param receipt the complete receipt object containing all order details
+     * <pre>
+     * orderQueuePanel.setOnKitchenStatusChanged(payload -> SwingUtilities
+     *         .invokeLater(() -> orderingPanel.markOrderStatusFromKitchen(payload[0], payload[1])));
+     * </pre>
      */
+    public void setOnKitchenStatusChanged(Consumer<int[]> callback) {
+        this.onKitchenStatusChanged = callback;
+    }
+
+    /**
+     * Apply a status change that originated remotely (from another instance).
+     * This updates the local lanes without re-emitting kitchen callbacks.
+     */
+    public void applyRemoteStatus(int posOrderId, int statusCode) {
+        SwingUtilities.invokeLater(() -> {
+            OrderCard card = allOrdersById.get(posOrderId);
+            if (card == null)
+                return;
+
+            // Remove from any current lane
+            pendingOrders.remove(card);
+            progressOrders.remove(card);
+            readyOrders.remove(card);
+
+            switch (statusCode) {
+                case STATUS_PREPARING -> {
+                    card.status = "PROGRESS";
+                    progressOrders.add(card);
+                }
+                case STATUS_READY -> {
+                    card.status = "READY";
+                    readyOrders.add(card);
+                }
+                case STATUS_COMPLETED, STATUS_CANCELLED -> {
+                    card.status = "DONE";
+                    completedOrders.add(card);
+                    completedCount++;
+                }
+                default -> {
+                    // unknown — treat as pending
+                    card.status = "PENDING";
+                    pendingOrders.add(card);
+                }
+            }
+
+            refreshAllLanes();
+        });
+    }
+
     public void addOrder(Receipt receipt) {
         OrderCard card = new OrderCard(receipt);
         allOrdersById.put(receipt.orderId, card);
@@ -220,16 +271,6 @@ public class OrderQueuePanel extends JPanel {
         SwingUtilities.invokeLater(this::refreshAllLanes);
     }
 
-    /**
-     * Called by OrderingPanel after a transaction is confirmed.
-     * Adds a new order card to the Pending lane, keyed by the POS order ID.
-     *
-     * @param posOrderId   the order ID from OrderingPanel (used for cross-panel
-     *                     sync)
-     * @param customerName the customer's name
-     * @param items        human-readable item strings, e.g. "Iced Latte (Regular
-     *                     Iced) x2"
-     */
     public void addOrder(int posOrderId, String customerName, List<String> items) {
         OrderCard card = new OrderCard(posOrderId, customerName, items);
         allOrdersById.put(posOrderId, card);
@@ -237,22 +278,10 @@ public class OrderQueuePanel extends JPanel {
         SwingUtilities.invokeLater(this::refreshAllLanes);
     }
 
-    /**
-     * Legacy overload kept for any existing callers that do not supply a
-     * posOrderId.
-     * Assigns a negative synthetic ID to avoid collisions with real POS IDs.
-     */
     public void addOrder(String customerName, List<String> items) {
         addOrder(-(allOrdersById.size() + 1), customerName, items);
     }
 
-    /**
-     * Called by OrderingPanel when staff mark an order as done from the POS side.
-     * If the kitchen card is still in any active lane it is removed and the
-     * completed count incremented, keeping both panels in sync.
-     *
-     * @param posOrderId the POS order ID to mark as completed
-     */
     public void markOrderCompleted(int posOrderId) {
         OrderCard card = allOrdersById.get(posOrderId);
         if (card == null || "DONE".equals(card.status))
@@ -264,6 +293,7 @@ public class OrderQueuePanel extends JPanel {
 
         if (removed) {
             card.status = "DONE";
+            completedOrders.add(card);
             completedCount++;
             SwingUtilities.invokeLater(this::refreshAllLanes);
         }
@@ -298,7 +328,186 @@ public class OrderQueuePanel extends JPanel {
         title.setForeground(Color.WHITE);
         bar.add(title, BorderLayout.WEST);
 
+        // ── Completed Orders button (top-left area, right side of title) ──
+        JButton completedBtn = makeRoundedButton("✓  Completed Orders", new Color(0xFF, 0xFF, 0xFF, 40),
+                new Color(0xFF, 0xFF, 0xFF, 70), Color.WHITE, 11);
+        completedBtn.setBorder(new EmptyBorder(6, 14, 6, 14));
+        completedBtn.addActionListener(e -> showCompletedOrdersDialog());
+
+        JPanel leftGroup = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        leftGroup.setOpaque(false);
+        leftGroup.add(title);
+        leftGroup.add(completedBtn);
+        bar.add(leftGroup, BorderLayout.WEST);
+
         return bar;
+    }
+
+    // ─── Completed Orders Dialog ────────────────────────────────────
+
+    private void showCompletedOrdersDialog() {
+        Window owner = SwingUtilities.windowForComponent(this);
+        JDialog dialog;
+        if (owner instanceof Frame) {
+            dialog = new JDialog((Frame) owner, "Completed Orders", true);
+        } else if (owner instanceof Dialog) {
+            dialog = new JDialog((Dialog) owner, "Completed Orders", true);
+        } else {
+            dialog = new JDialog();
+            dialog.setTitle("Completed Orders");
+            dialog.setModal(true);
+        }
+
+        dialog.setSize(520, 560);
+        dialog.setLocationRelativeTo(this);
+        dialog.setBackground(BG);
+
+        JPanel root = new JPanel(new BorderLayout(0, 0));
+        root.setBackground(BG);
+
+        // Header
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(TOPBAR_BG);
+        header.setBorder(new EmptyBorder(14, 20, 14, 20));
+        JLabel hTitle = new JLabel("Completed Orders  (" + completedCount + ")");
+        hTitle.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        hTitle.setForeground(Color.WHITE);
+        header.add(hTitle, BorderLayout.WEST);
+
+        JButton closeBtn = makeRoundedButton("✕ Close", new Color(0xFF, 0xFF, 0xFF, 40),
+                new Color(0xFF, 0xFF, 0xFF, 70), Color.WHITE, 11);
+        closeBtn.addActionListener(e -> dialog.dispose());
+        header.add(closeBtn, BorderLayout.EAST);
+        root.add(header, BorderLayout.NORTH);
+
+        // List
+        JPanel listPanel = new JPanel();
+        listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
+        listPanel.setBackground(BG);
+        listPanel.setBorder(new EmptyBorder(14, 14, 14, 14));
+
+        if (completedOrders.isEmpty()) {
+            listPanel.add(Box.createVerticalStrut(40));
+            JLabel empty = new JLabel("No completed orders yet", SwingConstants.CENTER);
+            empty.setFont(new Font("Segoe UI", Font.ITALIC, 13));
+            empty.setForeground(TEXT_EMPTY);
+            empty.setAlignmentX(CENTER_ALIGNMENT);
+            empty.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+            listPanel.add(empty);
+        } else {
+            for (OrderCard o : completedOrders) {
+                listPanel.add(buildCompletedCardWidget(o));
+                listPanel.add(Box.createVerticalStrut(8));
+            }
+        }
+
+        JScrollPane scroll = new JScrollPane(listPanel,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.getViewport().setBackground(BG);
+        scroll.getVerticalScrollBar().setUnitIncrement(14);
+        root.add(scroll, BorderLayout.CENTER);
+
+        dialog.setContentPane(root);
+        dialog.setVisible(true);
+    }
+
+    /** Compact read-only card used inside the Completed Orders dialog. */
+    private JPanel buildCompletedCardWidget(OrderCard order) {
+        JPanel card = new JPanel(new BorderLayout(0, 6)) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(CARD_BG);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                g2.setColor(CARD_BORDER);
+                g2.setStroke(new BasicStroke(1f));
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+                g2.dispose();
+            }
+        };
+        card.setOpaque(false);
+        card.setBorder(new EmptyBorder(10, 12, 10, 12));
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 9999));
+        card.setAlignmentX(LEFT_ALIGNMENT);
+
+        // Top row
+        JLabel orderNumLbl = new JLabel("#" + String.format("%05d", order.posOrderId));
+        orderNumLbl.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        orderNumLbl.setForeground(TEXT_PRIMARY);
+
+        JLabel doneBadge = new JLabel("Completed", SwingConstants.CENTER) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(BADGE_READY_BG);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), getHeight(), getHeight());
+                super.paintComponent(g);
+                g2.dispose();
+            }
+        };
+        doneBadge.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        doneBadge.setForeground(BADGE_READY_FG);
+        doneBadge.setOpaque(false);
+        doneBadge.setBorder(new EmptyBorder(2, 7, 2, 7));
+
+        JLabel timeLbl = new JLabel(order.createdAt.format(DateTimeFormatter.ofPattern("hh:mm a")));
+        timeLbl.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+        timeLbl.setForeground(TEXT_MUTED);
+
+        JPanel topLeft = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        topLeft.setOpaque(false);
+        topLeft.add(orderNumLbl);
+        topLeft.add(doneBadge);
+
+        JPanel topRow = new JPanel(new BorderLayout());
+        topRow.setOpaque(false);
+        topRow.add(topLeft, BorderLayout.WEST);
+        topRow.add(timeLbl, BorderLayout.EAST);
+        card.add(topRow, BorderLayout.NORTH);
+
+        // Items
+        JPanel itemsPanel = new JPanel();
+        itemsPanel.setLayout(new BoxLayout(itemsPanel, BoxLayout.Y_AXIS));
+        itemsPanel.setOpaque(false);
+
+        JLabel custLbl = new JLabel(order.customerName);
+        custLbl.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        custLbl.setForeground(TEXT_MUTED);
+        itemsPanel.add(custLbl);
+        itemsPanel.add(Box.createVerticalStrut(4));
+
+        for (String item : order.items) {
+            JPanel itemRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 1));
+            itemRow.setOpaque(false);
+
+            JPanel bullet = new JPanel() {
+                @Override
+                protected void paintComponent(Graphics g) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g2.setColor(ACCENT_READY);
+                    g2.fillOval(0, 3, 5, 5);
+                    g2.dispose();
+                }
+            };
+            bullet.setOpaque(false);
+            bullet.setPreferredSize(new Dimension(6, 11));
+
+            JLabel itemLbl = new JLabel(item);
+            itemLbl.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+            itemLbl.setForeground(TEXT_SECONDARY);
+
+            itemRow.add(bullet);
+            itemRow.add(itemLbl);
+            itemsPanel.add(itemRow);
+        }
+        card.add(itemsPanel, BorderLayout.CENTER);
+
+        return card;
     }
 
     // ─── Stats Strip ───────────────────────────────────────────────
@@ -413,7 +622,7 @@ public class OrderQueuePanel extends JPanel {
                 new RoundedLineBorder(LANE_BORDER, 1, 12),
                 new EmptyBorder(0, 0, 8, 0)));
 
-        // Accent stripe at the top
+        // Accent stripe
         JPanel stripe = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -460,6 +669,7 @@ public class OrderQueuePanel extends JPanel {
         laneHeader.setBorder(new EmptyBorder(8, 10, 6, 10));
         wrapper.add(laneHeader, BorderLayout.NORTH);
 
+        // ── Horizontal scroll area holding fixed-size receipt cards ──
         JPanel cardsPanel = new JPanel();
         cardsPanel.setLayout(new BoxLayout(cardsPanel, BoxLayout.Y_AXIS));
         cardsPanel.setBackground(LANE_BG);
@@ -481,26 +691,47 @@ public class OrderQueuePanel extends JPanel {
         return new JComponent[] { wrapper, scrollWrapper, badge };
     }
 
-    // ─── Order Card Widget ─────────────────────────────────────────
+    // ─── Order Card Widget (fixed receipt size) ────────────────────
 
     private JPanel buildCardWidget(OrderCard order) {
-        JPanel card = new JPanel(new BorderLayout(0, 8)) {
+        // Outer fixed-size wrapper — acts like a receipt slip holder
+        JPanel holder = new JPanel(new BorderLayout());
+        holder.setOpaque(false);
+        holder.setMaximumSize(new Dimension(Integer.MAX_VALUE, CARD_FIXED_HEIGHT));
+        holder.setMinimumSize(new Dimension(0, CARD_FIXED_HEIGHT));
+        holder.setPreferredSize(new Dimension(CARD_FIXED_WIDTH, CARD_FIXED_HEIGHT));
+        holder.setAlignmentX(LEFT_ALIGNMENT);
+        holder.setBorder(new EmptyBorder(0, 0, 0, 0));
+
+        // Inner card with dashed "receipt" top edge and subtle shadow feel
+        JPanel card = new JPanel(new BorderLayout(0, 0)) {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                // Card body
                 g2.setColor(CARD_BG);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+
+                // Border
                 g2.setColor(CARD_BORDER);
                 g2.setStroke(new BasicStroke(1f));
                 g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+
+                // Dashed "tear" line at the very top to evoke a receipt
+                g2.setColor(new Color(0xDD, 0xE1, 0xEE));
+                float[] dash = { 4f, 3f };
+                g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, dash, 0f));
+                g2.drawLine(12, 14, getWidth() - 12, 14);
+
                 g2.dispose();
             }
         };
         card.setOpaque(false);
-        card.setBorder(new EmptyBorder(10, 12, 10, 12));
-        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 9999));
-        card.setAlignmentX(LEFT_ALIGNMENT);
+        card.setBorder(new EmptyBorder(18, 12, 10, 12)); // top padding clears the dashed line
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, CARD_FIXED_HEIGHT));
+        card.setPreferredSize(new Dimension(CARD_FIXED_WIDTH, CARD_FIXED_HEIGHT));
 
         Color statusBadgeBg = switch (order.status) {
             case "PROGRESS" -> BADGE_PROGRESS_BG;
@@ -554,21 +785,21 @@ public class OrderQueuePanel extends JPanel {
         topRow.add(timeLbl, BorderLayout.EAST);
         card.add(topRow, BorderLayout.NORTH);
 
-        // ── Customer name + item list ──
+        // ── Customer name + item list (scrollable within the fixed card) ──
         JLabel custLbl = new JLabel(order.customerName);
         custLbl.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         custLbl.setForeground(TEXT_MUTED);
 
         JPanel itemsPanel = new JPanel();
         itemsPanel.setLayout(new BoxLayout(itemsPanel, BoxLayout.Y_AXIS));
-        itemsPanel.setOpaque(false);
-        itemsPanel.setBorder(new EmptyBorder(0, 0, 2, 0));
+        itemsPanel.setBackground(CARD_BG);
+        itemsPanel.setBorder(new EmptyBorder(2, 0, 2, 0));
         itemsPanel.add(custLbl);
         itemsPanel.add(Box.createVerticalStrut(4));
 
         for (String item : order.items) {
             JPanel itemRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 1));
-            itemRow.setOpaque(false);
+            itemRow.setBackground(CARD_BG);
 
             JPanel bullet = new JPanel() {
                 @Override
@@ -591,7 +822,16 @@ public class OrderQueuePanel extends JPanel {
             itemRow.add(itemLbl);
             itemsPanel.add(itemRow);
         }
-        card.add(itemsPanel, BorderLayout.CENTER);
+
+        // Scroll pane for items — stays within the fixed card height
+        JScrollPane itemsScroll = new JScrollPane(itemsPanel,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        itemsScroll.getViewport().setBackground(CARD_BG);
+        itemsScroll.setBorder(BorderFactory.createEmptyBorder());
+        itemsScroll.getVerticalScrollBar().setUnitIncrement(10);
+        itemsScroll.setBackground(CARD_BG);
+        card.add(itemsScroll, BorderLayout.CENTER);
 
         // ── Action buttons (vary by status) ──
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
@@ -606,6 +846,8 @@ public class OrderQueuePanel extends JPanel {
                     order.status = "PROGRESS";
                     progressOrders.add(order);
                     refreshAllLanes();
+                    if (onKitchenStatusChanged != null)
+                        onKitchenStatusChanged.accept(new int[] { order.posOrderId, STATUS_PREPARING });
                 });
 
                 JButton cancelBtn = makeRoundedButton("Cancel", BTN_CANCEL_BG, BTN_CANCEL_HOVER, BTN_CANCEL_FG, 10);
@@ -616,13 +858,14 @@ public class OrderQueuePanel extends JPanel {
                             "Cancel Order", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
                     if (confirm == JOptionPane.YES_OPTION) {
                         pendingOrders.remove(order);
-                        order.status = "DONE"; // treat cancellation as done for stat purposes
+                        order.status = "DONE";
+                        completedOrders.add(order);
                         completedCount++;
                         refreshAllLanes();
-                        // Notify POS so the strip card also reflects the cancellation
-                        if (onKitchenCompleted != null) {
+                        if (onKitchenStatusChanged != null)
+                            onKitchenStatusChanged.accept(new int[] { order.posOrderId, STATUS_CANCELLED });
+                        if (onKitchenCompleted != null)
                             onKitchenCompleted.accept(order.posOrderId);
-                        }
                     }
                 });
 
@@ -637,6 +880,8 @@ public class OrderQueuePanel extends JPanel {
                     order.status = "READY";
                     readyOrders.add(order);
                     refreshAllLanes();
+                    if (onKitchenStatusChanged != null)
+                        onKitchenStatusChanged.accept(new int[] { order.posOrderId, STATUS_READY });
                 });
                 actions.add(readyBtn);
             }
@@ -646,13 +891,14 @@ public class OrderQueuePanel extends JPanel {
                 doneBtn.addActionListener(e -> {
                     readyOrders.remove(order);
                     order.status = "DONE";
+                    completedOrders.add(order);
                     completedCount++;
                     refreshAllLanes();
 
-                    // ── Notify POS that this order is done ──
-                    if (onKitchenCompleted != null) {
+                    if (onKitchenStatusChanged != null)
+                        onKitchenStatusChanged.accept(new int[] { order.posOrderId, STATUS_COMPLETED });
+                    if (onKitchenCompleted != null)
                         onKitchenCompleted.accept(order.posOrderId);
-                    }
 
                     JOptionPane.showMessageDialog(
                             SwingUtilities.windowForComponent(card),
@@ -666,16 +912,22 @@ public class OrderQueuePanel extends JPanel {
 
         JPanel bottomRow = new JPanel(new BorderLayout(6, 0));
         bottomRow.setOpaque(false);
-        bottomRow.setBorder(new EmptyBorder(2, 0, 0, 0));
+        bottomRow.setBorder(new EmptyBorder(4, 0, 0, 0));
         bottomRow.add(actions, BorderLayout.EAST);
         card.add(bottomRow, BorderLayout.SOUTH);
 
-        return card;
+        holder.add(card, BorderLayout.CENTER);
+        return holder;
     }
 
     // ─── Lane Refresh ──────────────────────────────────────────────
 
     private void refreshAllLanes() {
+        // PWD / Senior cards always float to the top of every lane
+        pendingOrders.sort((a, b) -> Boolean.compare(!a.isPriority, !b.isPriority));
+        progressOrders.sort((a, b) -> Boolean.compare(!a.isPriority, !b.isPriority));
+        readyOrders.sort((a, b) -> Boolean.compare(!a.isPriority, !b.isPriority));
+
         rebuildLane(pendingCardsPanel, pendingOrders, pendingBadge, ACCENT_PENDING);
         rebuildLane(progressCardsPanel, progressOrders, progressBadge, ACCENT_PROGRESS);
         rebuildLane(readyCardsPanel, readyOrders, readyBadge, ACCENT_READY);

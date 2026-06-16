@@ -324,6 +324,8 @@ public class OrderingPanel extends JPanel {
 
     // ─── Kitchen Queue reference (injected after construction) ───
     private ui.OrderQueuePanel orderQueuePanel;
+    // Optional OrderSyncClient for publishing/receiving remote events
+    private persistence.OrderSyncClient orderSyncClient;
 
     /**
      * Inject the kitchen queue panel so that both panels stay in sync.
@@ -331,6 +333,11 @@ public class OrderingPanel extends JPanel {
      */
     public void setOrderQueuePanel(ui.OrderQueuePanel panel) {
         this.orderQueuePanel = panel;
+    }
+
+    /** Inject a shared OrderSyncClient so this panel can publish new orders. */
+    public void setOrderSyncClient(persistence.OrderSyncClient client) {
+        this.orderSyncClient = client;
     }
 
     /**
@@ -1721,6 +1728,9 @@ public class OrderingPanel extends JPanel {
                     ts, subtotal, vat, totalInclusive,
                     cash, change, discountTypeStr);
             orderQueuePanel.addOrder(receipt);
+            if (orderSyncClient != null) {
+                orderSyncClient.publishNewOrder(receipt);
+            }
         }
 
         // Show receipt (pass snapshot of entries before clearing)

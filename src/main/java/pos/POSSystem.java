@@ -11,6 +11,7 @@ import monitoring.SalesRecord;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.text.SimpleDateFormat;
 import java.awt.CardLayout;
 import java.awt.Color;
@@ -55,6 +56,7 @@ import persistence.sqlite.SQLiteStaffShiftRepository;
 import persistence.sqlite.SQLiteSalesRepository;
 import persistence.sqlite.SQLiteUserRepository;
 import persistence.sqlite.SQLiteProfilePictureRepository;
+import persistence.OrderSyncClient;
 import controller.InventoryController;
 import controller.OrderController;
 import ui.MenuMaintenancePanel;
@@ -108,13 +110,13 @@ public class POSSystem extends javax.swing.JFrame {
 
         OrderEntry(String name, String variant, int quantity, double unitPrice) {
             this.name = name;
-            this.variant = variant;
+            this.variant = variant == null ? "" : variant;
             this.quantity = quantity;
             this.unitPrice = unitPrice;
         }
 
         String displayName() {
-            return variant.isEmpty() ? name : name + " (" + variant + ")";
+            return variant == null || variant.isEmpty() ? name : name + " (" + variant + ")";
         }
 
         double lineTotal() {
@@ -844,10 +846,104 @@ public class POSSystem extends javax.swing.JFrame {
         orderQueuePanel = new OrderQueuePanel();
         contentPanel.add(orderQueuePanel, "Order Queue");
 
+        // ── Wire OrderSyncClient (shared) ─────────────────────────
+        OrderSyncClient orderSyncClient = new OrderSyncClient();
+        orderSyncClient.setOnNewOrder(receipt -> SwingUtilities.invokeLater(() -> orderQueuePanel.addOrder(receipt)));
+        orderSyncClient.setOnStatusChange(payload -> SwingUtilities
+                .invokeLater(() -> orderQueuePanel.applyRemoteStatus(payload[0], payload[1])));
+
+        // When other instances update menu/inventory, reload repository and refresh UI
+        orderSyncClient.setOnMenuUpdate(ent -> SwingUtilities.invokeLater(() -> {
+            try {
+                Menu.getInstance().reloadFromRepository();
+                if (orderingPanel != null) {
+                    orderingPanel.rebuildProducts();
+                }
+            } catch (Exception ignored) {
+            }
+        }));
+
+        // Suppression flag to avoid re-broadcasting changes we load from remote
+        final AtomicBoolean suppressPublish = new AtomicBoolean(false);
+
+        orderSyncClient.setOnInventoryUpdate(ent -> SwingUtilities.invokeLater(() -> {
+            try {
+                suppressPublish.set(true);
+                inventory.Inventory.getInstance().reloadFromRepository();
+                if (inventoryPanel != null)
+                    inventoryPanel.refresh();
+                if (orderingPanel != null) {
+                    orderingPanel.rebuildProducts();
+                    orderingPanel.refreshCategoryPills();
+                }
+                if (monitoringPanel != null)
+                    monitoringPanel.refreshData();
+            } finally {
+                suppressPublish.set(false);
+            }
+        }));
+
         // ── Wire OrderingPanel → OrderQueuePanel ──────────────────
         orderingPanel.setOrderQueuePanel(orderQueuePanel);
         orderQueuePanel.setOnKitchenCompleted(posOrderId -> SwingUtilities
                 .invokeLater(() -> orderingPanel.markOrderCompletedFromKitchen(posOrderId)));
+
+        // Publish local kitchen status changes to server
+        orderQueuePanel.setOnKitchenStatusChanged(payload -> {
+            orderSyncClient.publishStatusChange(payload[0], payload[1]);
+        });
+
+        // Publish menu changes to other instances (send lightweight snapshot)
+        Menu.getInstance().addChangeListener(() -> {
+            if (suppressPublish.get())
+                return; // avoid loops
+            try {
+                StringBuilder sb = new StringBuilder();
+                sb.append("[");
+                boolean first = true;
+                for (var e : Menu.getInstance().getAllItems().values()) {
+                    if (!first)
+                        sb.append(',');
+                    first = false;
+                    sb.append('{');
+                    sb.append("\"name\":").append(q(e.getName())).append(',');
+                    sb.append("\"hotPrice\":").append(e.getHotPrice()).append(',');
+                    sb.append("\"icedRegularPrice\":").append(e.getIcedRegularPrice()).append(',');
+                    sb.append("\"icedLargePrice\":").append(e.getIcedLargePrice());
+                    sb.append('}');
+                }
+                sb.append("]");
+                orderSyncClient.publishMenuUpdate(sb.toString());
+            } catch (Exception ignored) {
+            }
+        });
+
+        // Publish inventory changes to other instances
+        inventory.Inventory.getInstance().addChangeListener(() -> {
+            try {
+                StringBuilder sb = new StringBuilder();
+                sb.append("[");
+                boolean first = true;
+                for (var it : inventory.Inventory.getInstance().getAllItems().values()) {
+                    if (!first)
+                        sb.append(',');
+                    first = false;
+                    sb.append('{');
+                    sb.append("\"name\":").append(q(it.getName())).append(',');
+                    sb.append("\"quantity\":").append(it.getQuantity()).append(',');
+                    sb.append("\"unit\":").append(q(it.getUnit())).append(',');
+                    sb.append("\"alertLevel\":").append(it.getAlertLevel());
+                    sb.append('}');
+                }
+                sb.append("]");
+                orderSyncClient.publishInventoryUpdate(sb.toString());
+            } catch (Exception ignored) {
+            }
+        });
+
+        // Let OrderingPanel publish new orders via the shared client
+        orderingPanel.setOrderSyncClient(orderSyncClient);
+        orderSyncClient.connect();
 
         // ── Inventory ────────────────────────────────────────────
         inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
@@ -972,6 +1068,13 @@ public class POSSystem extends javax.swing.JFrame {
         } catch (Exception ignored) {
         }
         return 1000;
+    }
+
+    // Small helper to produce JSON string literals
+    private static String q(String s) {
+        if (s == null)
+            return "\"\"";
+        return '"' + s.replace("\\", "\\\\").replace("\"", "\\\"") + '"';
     }
 
     private static int parseTransactionNumber(String ref) {

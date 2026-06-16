@@ -244,6 +244,21 @@ public class Menu {
         return new LinkedHashMap<>(menuItems);
     }
 
+    /** Reload the menu items from the repository and notify listeners. */
+    public void reloadFromRepository() {
+        try {
+            menuItems.clear();
+            for (MenuItem item : repository.findAll()) {
+                menuItems.put(StringUtil.normalizeName(item.getName()), item);
+            }
+            notifyChangeListeners();
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(null,
+                    "Unable to reload menu from database: " + e.getMessage(),
+                    "Database", JOptionPane.WARNING_MESSAGE);
+        }
+    }
+
     public void saveItem(MenuItem item) {
         String name = StringUtil.normalizeName(item.getName());
         item.name = name;

@@ -49,6 +49,7 @@ import ui.SidebarPanel;
 import ui.InventoryPanel;
 import ui.NotificationsDialog;
 import ui.UserSettingsDialog;
+import ui.OrderQueuePanel; // ← NEW
 import persistence.sqlite.SQLiteInventoryRepository;
 import persistence.sqlite.SQLiteStaffShiftRepository;
 import persistence.sqlite.SQLiteSalesRepository;
@@ -73,6 +74,9 @@ public class POSSystem extends javax.swing.JFrame {
     private String currentUsername;
     private InventoryController inventoryController;
     private OrderController orderController;
+
+    // ── NEW: Order Queue panel reference ────────────────────────
+    private OrderQueuePanel orderQueuePanel;
 
     // ── Top-nav label references (updated on username change) ────
     private JLabel topNavUserIcon;
@@ -123,6 +127,9 @@ public class POSSystem extends javax.swing.JFrame {
     private JPanel orderPanel;
     private JPanel receiptPanel;
 
+    // ─────────────────────────────────────────────────────────────
+    // Constructor
+    // ─────────────────────────────────────────────────────────────
     public POSSystem(String username, UserDataManager.Role role) {
         this.currentUserRole = role;
         this.currentUsername = username;
@@ -368,6 +375,9 @@ public class POSSystem extends javax.swing.JFrame {
         return row;
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // showReceipt – now also pushes the order to the Order Queue
+    // ─────────────────────────────────────────────────────────────
     private void showReceipt(double subTotal, double vat, double total, double cash, double change) {
         String lineSep = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
         String receipt = " ☕ Better Mondays Cafe ☕\n"
@@ -399,6 +409,7 @@ public class POSSystem extends javax.swing.JFrame {
                 "✅ RECEIPT - TXN" + String.format("%06d", transactionCounter),
                 JOptionPane.INFORMATION_MESSAGE);
 
+        // Deduct inventory
         Inventory inv = Inventory.getInstance();
         Menu menu = Menu.getInstance();
         for (OrderEntry entry : orderEntries) {
@@ -410,6 +421,7 @@ public class POSSystem extends javax.swing.JFrame {
             }
         }
 
+        // Persist sales
         List<SalesRecord> salesList = new ArrayList<>();
         for (OrderEntry entry : orderEntries) {
             salesList.add(new SalesRecord(entry.displayName(), entry.quantity, entry.unitPrice, entry.lineTotal()));
@@ -426,6 +438,15 @@ public class POSSystem extends javax.swing.JFrame {
             JOptionPane.showMessageDialog(this,
                     "Unable to save sales to database: " + e.getMessage(),
                     "Database", JOptionPane.WARNING_MESSAGE);
+        }
+
+        // ── NEW: Push order to Order Queue panel ─────────────────
+        if (orderQueuePanel != null) {
+            List<String> queueItems = new ArrayList<>();
+            for (OrderEntry entry : orderEntries) {
+                queueItems.add(entry.displayName() + " x" + entry.quantity);
+            }
+            orderQueuePanel.addOrder(transactionRef, queueItems);
         }
 
         if (monitoringPanel != null)
@@ -752,7 +773,6 @@ public class POSSystem extends javax.swing.JFrame {
         settingsBtn.setFocusPainted(false);
         settingsBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         settingsBtn.setToolTipText("User Settings");
-        // ── UPDATED: open UserSettingsDialog ────────────────────────────────
         settingsBtn.addActionListener(e -> showProfileSettingsDialog());
 
         right.add(settingsBtn);
@@ -761,7 +781,7 @@ public class POSSystem extends javax.swing.JFrame {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // UPDATED: delegate entirely to UserSettingsDialog
+    // Profile settings dialog
     // ─────────────────────────────────────────────────────────────
     private void showProfileSettingsDialog() {
         UserSettingsDialog dialog = new UserSettingsDialog(
@@ -769,7 +789,6 @@ public class POSSystem extends javax.swing.JFrame {
                 currentUsername,
                 currentUserRole,
                 newUsername -> {
-                    // Callback: update nav bar labels when username changes
                     currentUsername = newUsername;
                     topNavUserName.setText(newUsername);
                     topNavUserIcon.setText(
@@ -778,7 +797,6 @@ public class POSSystem extends javax.swing.JFrame {
                     setTitle("Better Mondays Coffee Cafe Management System - " + newUsername);
                 });
 
-        // Listen for the logout signal fired from the "Sign Out" action row
         dialog.addPropertyChangeListener("logout", evt -> {
             if (Boolean.TRUE.equals(evt.getNewValue())) {
                 dialog.dispose();
@@ -804,7 +822,7 @@ public class POSSystem extends javax.swing.JFrame {
 
         boolean isAdmin = currentUserRole == Role.ADMIN;
 
-        // Ordering
+        // ── Ordering ─────────────────────────────────────────────
         orderingPanel = new OrderingPanel(() -> {
             if (inventoryPanel != null)
                 inventoryPanel.refresh();
@@ -815,14 +833,23 @@ public class POSSystem extends javax.swing.JFrame {
         contentPanel.add(orderingPanel, "Ordering");
         contentPanel.add(new SearchModule(), "Search");
 
-        Menu.getInstance().addChangeListener(() -> javax.swing.SwingUtilities.invokeLater(() -> {
+        Menu.getInstance().addChangeListener(() -> SwingUtilities.invokeLater(() -> {
             if (orderingPanel != null) {
                 orderingPanel.refreshCategoryPills();
                 orderingPanel.rebuildProducts();
             }
         }));
 
-        // Inventory
+        // ── NEW: Order Queue ─────────────────────────────────────
+        orderQueuePanel = new OrderQueuePanel();
+        contentPanel.add(orderQueuePanel, "Order Queue");
+
+        // ── Wire OrderingPanel → OrderQueuePanel ──────────────────
+        orderingPanel.setOrderQueuePanel(orderQueuePanel);
+        orderQueuePanel.setOnKitchenCompleted(posOrderId -> SwingUtilities
+                .invokeLater(() -> orderingPanel.markOrderCompletedFromKitchen(posOrderId)));
+
+        // ── Inventory ────────────────────────────────────────────
         inventoryController = new InventoryController(Inventory.getInstance(), new SQLiteInventoryRepository());
         inventoryPanel = new InventoryPanel(isAdmin, inventoryController, () -> {
             if (monitoringPanel != null)
@@ -830,12 +857,12 @@ public class POSSystem extends javax.swing.JFrame {
         });
         contentPanel.add(inventoryPanel, "Inventory");
 
-        // Monitoring
+        // ── Monitoring ───────────────────────────────────────────
         monitoringPanel = new MonitoringPanel(isAdmin);
         monitoringPanel.setBackground(AppTheme.BG_PRIMARY);
         contentPanel.add(monitoringPanel, "Monitoring");
 
-        // Other tabs
+        // ── Other tabs ───────────────────────────────────────────
         try {
             contentPanel.add(new MenuMaintenancePanel(isAdmin), "Menu Maintenance");
         } catch (Exception e) {
@@ -872,6 +899,7 @@ public class POSSystem extends javax.swing.JFrame {
         contentPanel.add(new AboutModule(), "About");
         contentPanel.add(new HelpModule(), "Help");
 
+        // ── Layout ───────────────────────────────────────────────
         getContentPane().setLayout(new BorderLayout());
         getContentPane().add(sidebar, BorderLayout.WEST);
 
@@ -925,6 +953,9 @@ public class POSSystem extends javax.swing.JFrame {
         }
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // Transaction counter
+    // ─────────────────────────────────────────────────────────────
     private static int transactionCounter = loadTransactionCounter();
 
     private String truncate(String s, int len) {
@@ -956,6 +987,9 @@ public class POSSystem extends javax.swing.JFrame {
         }
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // Fields
+    // ─────────────────────────────────────────────────────────────
     private javax.swing.JTextField cashpayment;
     private CardLayout cardLayout;
     private JPanel contentPanel;

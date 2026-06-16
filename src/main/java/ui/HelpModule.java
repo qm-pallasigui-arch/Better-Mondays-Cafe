@@ -21,7 +21,7 @@ public class HelpModule extends JPanel {
             "/images/Help/login.gif",
             "/images/Help/navigate.gif",
             "/images/Help/order.gif",
-            "/images/Help/monitor.gif",
+            "/images/Help/monitoring.gif",
             "/images/Help/sales.gif",
     };
 

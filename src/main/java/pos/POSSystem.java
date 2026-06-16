@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.text.SimpleDateFormat;
 import java.awt.CardLayout;
 import java.awt.Color;
@@ -42,6 +43,7 @@ import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
+import java.util.concurrent.atomic.AtomicReference;
 import loginregister.Login;
 import loginregister.UserDataManager;
 import loginregister.UserDataManager.Role;
@@ -872,12 +874,8 @@ public class POSSystem extends javax.swing.JFrame {
                 inventory.Inventory.getInstance().reloadFromRepository();
                 if (inventoryPanel != null)
                     inventoryPanel.refresh();
-                if (orderingPanel != null) {
-                    orderingPanel.rebuildProducts();
-                    orderingPanel.refreshCategoryPills();
-                }
-                if (monitoringPanel != null)
-                    monitoringPanel.refreshData();
+                // Skip expensive UI rebuilds on every inventory update
+                // They'll refresh via monitoring and order UI separately
             } finally {
                 suppressPublish.set(false);
             }
@@ -893,52 +891,78 @@ public class POSSystem extends javax.swing.JFrame {
             orderSyncClient.publishStatusChange(payload[0], payload[1]);
         });
 
-        // Publish menu changes to other instances (send lightweight snapshot)
+        // Debounce menu changes (batch rapid edits, don't send every keystroke)
+        final AtomicReference<Timer> menuBroadcastTimer = new AtomicReference<>();
         Menu.getInstance().addChangeListener(() -> {
             if (suppressPublish.get())
                 return; // avoid loops
-            try {
-                StringBuilder sb = new StringBuilder();
-                sb.append("[");
-                boolean first = true;
-                for (var e : Menu.getInstance().getAllItems().values()) {
-                    if (!first)
-                        sb.append(',');
-                    first = false;
-                    sb.append('{');
-                    sb.append("\"name\":").append(q(e.getName())).append(',');
-                    sb.append("\"hotPrice\":").append(e.getHotPrice()).append(',');
-                    sb.append("\"icedRegularPrice\":").append(e.getIcedRegularPrice()).append(',');
-                    sb.append("\"icedLargePrice\":").append(e.getIcedLargePrice());
-                    sb.append('}');
+
+            Timer existingTimer = menuBroadcastTimer.getAndSet(null);
+            if (existingTimer != null)
+                existingTimer.stop();
+
+            // Wait 300ms before sending, to batch rapid changes
+            Timer newTimer = new Timer(300, e -> {
+                try {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("[");
+                    boolean first = true;
+                    for (var item : Menu.getInstance().getAllItems().values()) {
+                        if (!first)
+                            sb.append(',');
+                        first = false;
+                        sb.append('{');
+                        sb.append("\"name\":").append(q(item.getName())).append(',');
+                        sb.append("\"hotPrice\":").append(item.getHotPrice()).append(',');
+                        sb.append("\"icedRegularPrice\":").append(item.getIcedRegularPrice()).append(',');
+                        sb.append("\"icedLargePrice\":").append(item.getIcedLargePrice());
+                        sb.append('}');
+                    }
+                    sb.append("]");
+                    orderSyncClient.publishMenuUpdate(sb.toString());
+                } catch (Exception ignored) {
                 }
-                sb.append("]");
-                orderSyncClient.publishMenuUpdate(sb.toString());
-            } catch (Exception ignored) {
-            }
+            });
+            newTimer.setRepeats(false);
+            menuBroadcastTimer.set(newTimer);
+            newTimer.start();
         });
 
-        // Publish inventory changes to other instances
+        // Debounce inventory changes (batch rapid edits, don't send every keystroke)
+        final AtomicReference<Timer> inventoryBroadcastTimer = new AtomicReference<>();
         inventory.Inventory.getInstance().addChangeListener(() -> {
-            try {
-                StringBuilder sb = new StringBuilder();
-                sb.append("[");
-                boolean first = true;
-                for (var it : inventory.Inventory.getInstance().getAllItems().values()) {
-                    if (!first)
-                        sb.append(',');
-                    first = false;
-                    sb.append('{');
-                    sb.append("\"name\":").append(q(it.getName())).append(',');
-                    sb.append("\"quantity\":").append(it.getQuantity()).append(',');
-                    sb.append("\"unit\":").append(q(it.getUnit())).append(',');
-                    sb.append("\"alertLevel\":").append(it.getAlertLevel());
-                    sb.append('}');
+            if (suppressPublish.get())
+                return;
+
+            Timer existingTimer = inventoryBroadcastTimer.getAndSet(null);
+            if (existingTimer != null)
+                existingTimer.stop();
+
+            // Wait 300ms before sending, to batch rapid changes
+            Timer newTimer = new Timer(300, e -> {
+                try {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("[");
+                    boolean first = true;
+                    for (var it : inventory.Inventory.getInstance().getAllItems().values()) {
+                        if (!first)
+                            sb.append(',');
+                        first = false;
+                        sb.append('{');
+                        sb.append("\"name\":").append(q(it.getName())).append(',');
+                        sb.append("\"quantity\":").append(it.getQuantity()).append(',');
+                        sb.append("\"unit\":").append(q(it.getUnit())).append(',');
+                        sb.append("\"alertLevel\":").append(it.getAlertLevel());
+                        sb.append('}');
+                    }
+                    sb.append("]");
+                    orderSyncClient.publishInventoryUpdate(sb.toString());
+                } catch (Exception ignored) {
                 }
-                sb.append("]");
-                orderSyncClient.publishInventoryUpdate(sb.toString());
-            } catch (Exception ignored) {
-            }
+            });
+            newTimer.setRepeats(false);
+            inventoryBroadcastTimer.set(newTimer);
+            newTimer.start();
         });
 
         // Let OrderingPanel publish new orders via the shared client

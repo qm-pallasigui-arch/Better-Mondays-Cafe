@@ -294,10 +294,15 @@ public class Inventory {
     /** Reload all inventory items from the repository and notify listeners. */
     public void reloadFromRepository() {
         try {
-            inventoryItems.clear();
+            // Get fresh data from DB
+            Map<String, InventoryItem> fresh = new LinkedHashMap<>();
             for (InventoryItem item : repository.findAll()) {
-                inventoryItems.put(StringUtil.normalizeName(item.getName()), item);
+                fresh.put(StringUtil.normalizeName(item.getName()), item);
             }
+
+            // Update in-place to minimize listener churn
+            inventoryItems.clear();
+            inventoryItems.putAll(fresh);
             notifyChangeListeners();
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "reloadFromRepository failed: {0}", e.getMessage());

@@ -1,6 +1,7 @@
 package loginregister;
 
 import persistence.sqlite.SQLiteStaffShiftRepository;
+import persistence.OrderSyncServer;
 import pos.POSSystem;
 import ui.AppTheme;
 import util.FieldAssist;
@@ -832,6 +833,14 @@ public class Login extends javax.swing.JFrame {
         } catch (Exception ex) {
             Logger.getLogger(Login.class.getName())
                     .log(Level.WARNING, "Bootstrap: " + ex.getMessage(), ex);
+        }
+
+        // Start OrderSyncServer (embedded WebSocket) so local clients can sync
+        try {
+            OrderSyncServer.startIfNotRunning();
+        } catch (Exception ex) {
+            Logger.getLogger(Login.class.getName())
+                    .log(Level.WARNING, "OrderSyncServer start failed: " + ex.getMessage(), ex);
         }
 
         EventQueue.invokeLater(() -> new Login().setVisible(true));

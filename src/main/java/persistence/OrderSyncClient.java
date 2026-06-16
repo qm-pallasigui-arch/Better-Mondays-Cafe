@@ -59,7 +59,7 @@ public class OrderSyncClient {
     private volatile Socket socket = null;
 
     private static final int MAX_BACKOFF_MS = 30_000;
-    private static final int INITIAL_BACKOFF_MS = 1_000;
+    private static final int INITIAL_BACKOFF_MS = 500; // Reduced from 1s to 500ms for faster recovery
 
     // ── Public API ─────────────────────────────────────────────────────────
 

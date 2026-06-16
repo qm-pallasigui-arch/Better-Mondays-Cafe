@@ -247,10 +247,12 @@ public class Menu {
     /** Reload the menu items from the repository and notify listeners. */
     public void reloadFromRepository() {
         try {
-            menuItems.clear();
+            Map<String, MenuItem> fresh = new LinkedHashMap<>();
             for (MenuItem item : repository.findAll()) {
-                menuItems.put(StringUtil.normalizeName(item.getName()), item);
+                fresh.put(StringUtil.normalizeName(item.getName()), item);
             }
+            menuItems.clear();
+            menuItems.putAll(fresh);
             notifyChangeListeners();
         } catch (Exception e) {
             JOptionPane.showMessageDialog(null,

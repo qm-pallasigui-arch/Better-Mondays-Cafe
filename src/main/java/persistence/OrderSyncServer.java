@@ -174,6 +174,12 @@ public class OrderSyncServer {
                     repo.updateOrderStatus(p.orderId, p.statusCode);
                     // Broadcast to everyone else
                     broadcast(json, this);
+                } else if (OrderPayload.TYPE_MENU_UPDATE.equals(p.type)) {
+                    // Menu updates are broadcast to other clients to trigger reloads
+                    broadcast(json, this);
+                } else if (OrderPayload.TYPE_INVENTORY_UPDATE.equals(p.type)) {
+                    // Inventory updates are broadcast to other clients to trigger reloads
+                    broadcast(json, this);
                 }
             } catch (Exception e) {
                 System.err.println("[OrderSyncServer] handleMessage error: " + e.getMessage());

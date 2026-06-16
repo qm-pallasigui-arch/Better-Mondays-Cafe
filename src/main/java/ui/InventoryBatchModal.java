@@ -22,7 +22,9 @@ public class InventoryBatchModal extends JDialog {
     // Zebra-striping colors — kept consistent with the Register Product batch table
     private static final Color ROW_BASE = AppTheme.BG_SURFACE;
     private static final Color ROW_ALT = new Color(0xF3F4F6);
-    private static final Color SELECTION_BG = new Color(0x1A3A5C);
+    private static final Color ROW_HOVER = new Color(0xF3F4F6);
+    private static final Color SELECTION_BG = new Color(0xEFF6FF);
+    private static final Color SELECTION_FG = new Color(0x1D4ED8);
 
     private static final String[] COLS = { "Batch ID", "SKU", "Quantity", "Expiry", "Status", "Actions" };
 
@@ -32,6 +34,7 @@ public class InventoryBatchModal extends JDialog {
     private DefaultTableModel tableModel;
     private JTable table;
     private List<InventoryBatch> currentBatches = new java.util.ArrayList<>();
+    private int hoveredRow = -1;
 
     public InventoryBatchModal(Window owner, String itemName,
             InventoryController controller, Runnable onInventoryRefresh) {
@@ -65,8 +68,13 @@ public class InventoryBatchModal extends JDialog {
             @Override
             public Component prepareRenderer(javax.swing.table.TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
-                if (!isRowSelected(row))
-                    c.setBackground(row % 2 == 0 ? ROW_BASE : ROW_ALT);
+                if (!isRowSelected(row)) {
+                    if (row == hoveredRow) {
+                        c.setBackground(ROW_HOVER);
+                    } else {
+                        c.setBackground(row % 2 == 0 ? ROW_BASE : ROW_ALT);
+                    }
+                }
                 return c;
             }
         };
@@ -74,9 +82,28 @@ public class InventoryBatchModal extends JDialog {
         table.setShowGrid(false);
         table.setIntercellSpacing(new Dimension(0, 0));
         table.setSelectionBackground(SELECTION_BG);
-        table.setSelectionForeground(AppTheme.FG_PRIMARY);
+        table.setSelectionForeground(SELECTION_FG);
         table.getTableHeader().setReorderingAllowed(false);
         table.setRowHeight(32);
+
+        // ── Row hover tracking ───────────────────────────────────────
+        table.addMouseMotionListener(new MouseAdapter() {
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                int row = table.rowAtPoint(e.getPoint());
+                if (row != hoveredRow) {
+                    hoveredRow = row;
+                    table.repaint();
+                }
+            }
+        });
+        table.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseExited(MouseEvent e) {
+                hoveredRow = -1;
+                table.repaint();
+            }
+        });
 
         int[] widths = { 105, 130, 70, 105, 90, 80 };
         for (int i = 0; i < widths.length; i++)
@@ -121,6 +148,18 @@ public class InventoryBatchModal extends JDialog {
                 BorderFactory.createEmptyBorder(7, 18, 7, 18)));
         closeBtn.setFocusPainted(false);
         closeBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        closeBtn.setContentAreaFilled(true);
+        closeBtn.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                closeBtn.setBackground(new Color(0xF3F4F6));
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                closeBtn.setBackground(AppTheme.BG_SURFACE);
+            }
+        });
         closeBtn.addActionListener(e -> dispose());
         btnRow.add(closeBtn);
         root.add(btnRow, BorderLayout.SOUTH);
@@ -292,8 +331,8 @@ public class InventoryBatchModal extends JDialog {
                 boolean sel, boolean focus, int row, int col) {
             JLabel label = new JLabel("•••", SwingConstants.CENTER);
             label.setFont(new Font("Segoe UI", Font.BOLD, 14));
-            label.setForeground(sel ? Color.WHITE : AppTheme.FG_MUTED);
-            label.setBackground(sel ? t.getSelectionBackground() : t.getBackground());
+            label.setForeground(sel ? SELECTION_FG : AppTheme.FG_MUTED);
+            label.setBackground(sel ? SELECTION_BG : t.getBackground());
             label.setOpaque(true);
             label.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             return label;

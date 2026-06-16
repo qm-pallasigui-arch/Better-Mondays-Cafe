@@ -78,7 +78,8 @@ public class Inventory {
 
         // Specialty Drinks
         addDefaultItem("Cookie Butter Spread", new InventoryItem("Cookie Butter Spread", 500, "g", 200));
-        addDefaultItem("Crushed Biscoff Cookie Crumbs", new InventoryItem("Crushed Biscoff Cookie Crumbs", 500, "g", 200));
+        addDefaultItem("Crushed Biscoff Cookie Crumbs",
+                new InventoryItem("Crushed Biscoff Cookie Crumbs", 500, "g", 200));
         addDefaultItem("Dark Roast Coffee Grounds", new InventoryItem("Dark Roast Coffee Grounds", 500, "g", 200));
         addDefaultItem("Evaporated Milk", new InventoryItem("Evaporated Milk", 500, "mL", 200));
         addDefaultItem("Pumpkin Pie Spice Powder", new InventoryItem("Pumpkin Pie Spice Powder", 200, "g", 100));
@@ -131,13 +132,15 @@ public class Inventory {
         addDefaultItem("Chocolate Milk Bath", new InventoryItem("Chocolate Milk Bath", 500, "mL", 200));
         addDefaultItem("Chopped Spinach", new InventoryItem("Chopped Spinach", 500, "g", 200));
         addDefaultItem("Cocoa Powder", new InventoryItem("Cocoa Powder", 500, "g", 200));
-        addDefaultItem("Cream Cheese & Heavy Cream Mix", new InventoryItem("Cream Cheese & Heavy Cream Mix", 500, "g", 200));
+        addDefaultItem("Cream Cheese & Heavy Cream Mix",
+                new InventoryItem("Cream Cheese & Heavy Cream Mix", 500, "g", 200));
         addDefaultItem("Egg", new InventoryItem("Egg", 50, "pcs", 20));
         addDefaultItem("Flour", new InventoryItem("Flour", 500, "g", 200));
         addDefaultItem("Graham Cracker Crust Base", new InventoryItem("Graham Cracker Crust Base", 500, "g", 200));
         addDefaultItem("Ladyfinger Biscuits", new InventoryItem("Ladyfinger Biscuits", 50, "pcs", 20));
         addDefaultItem("Mashed Banana", new InventoryItem("Mashed Banana", 500, "g", 200));
-        addDefaultItem("Mascarpone & Heavy Cream Mixture", new InventoryItem("Mascarpone & Heavy Cream Mixture", 500, "g", 200));
+        addDefaultItem("Mascarpone & Heavy Cream Mixture",
+                new InventoryItem("Mascarpone & Heavy Cream Mixture", 500, "g", 200));
         addDefaultItem("Matcha Tea Bath", new InventoryItem("Matcha Tea Bath", 500, "mL", 200));
         addDefaultItem("Parmesan & Garlic Seasoning", new InventoryItem("Parmesan & Garlic Seasoning", 200, "g", 100));
         addDefaultItem("Powdered Sugar Coating", new InventoryItem("Powdered Sugar Coating", 500, "g", 200));
@@ -222,16 +225,17 @@ public class Inventory {
         String nn = StringUtil.normalizeName(name);
         InventoryItem item = inventoryItems.get(nn);
         if (item != null) {
-            LOGGER.log(Level.INFO, "Deducting {0} from {1}", new Object[]{amount, nn});
+            LOGGER.log(Level.INFO, "Deducting {0} from {1}", new Object[] { amount, nn });
             try {
-                // Prefer FEFO deduction when batches exist; falls back internally to aggregate-only flow.
+                // Prefer FEFO deduction when batches exist; falls back internally to
+                // aggregate-only flow.
                 repository.deductFEFO(nn, amount);
                 repository.findByName(nn).ifPresent(updated -> {
                     item.setQuantity(updated.getQuantity());
                     item.setUnit(updated.getUnit());
                     item.setAlertLevel(updated.getAlertLevel());
                 });
-                LOGGER.log(Level.INFO, "After deduction {0} has quantity {1}", new Object[]{nn, item.getQuantity()});
+                LOGGER.log(Level.INFO, "After deduction {0} has quantity {1}", new Object[] { nn, item.getQuantity() });
             } catch (Exception e) {
                 item.deduct(amount);
                 try {
@@ -241,7 +245,7 @@ public class Inventory {
                 JOptionPane.showMessageDialog(null,
                         "Unable to persist inventory deduction: " + e.getMessage(),
                         "Database", JOptionPane.WARNING_MESSAGE);
-                LOGGER.log(Level.WARNING, "Deduction fallback for {0}: {1}", new Object[]{nn, e.getMessage()});
+                LOGGER.log(Level.WARNING, "Deduction fallback for {0}: {1}", new Object[] { nn, e.getMessage() });
             }
         } else {
             LOGGER.log(Level.WARNING, "Attempted to deduct from unknown inventory item: {0}", name);
@@ -251,7 +255,8 @@ public class Inventory {
 
     /** Refreshes a single inventory item from the repository (if present). */
     public void refreshItem(String name) {
-        if (name == null || name.isBlank()) return;
+        if (name == null || name.isBlank())
+            return;
         String nn = StringUtil.normalizeName(name);
         try {
             repository.findByName(nn).ifPresent(found -> {
@@ -259,7 +264,7 @@ public class Inventory {
             });
             notifyChangeListeners();
         } catch (Exception e) {
-            LOGGER.log(Level.FINE, "refreshItem failed for {0}: {1}", new Object[]{nn, e.getMessage()});
+            LOGGER.log(Level.FINE, "refreshItem failed for {0}: {1}", new Object[] { nn, e.getMessage() });
         }
     }
 
@@ -268,7 +273,8 @@ public class Inventory {
     }
 
     public void addChangeListener(Runnable listener) {
-        if (listener == null) return;
+        if (listener == null)
+            return;
         changeListeners.add(listener);
     }
 
@@ -283,5 +289,18 @@ public class Inventory {
 
     public Map<String, InventoryItem> getAllItems() {
         return inventoryItems;
+    }
+
+    /** Reload all inventory items from the repository and notify listeners. */
+    public void reloadFromRepository() {
+        try {
+            inventoryItems.clear();
+            for (InventoryItem item : repository.findAll()) {
+                inventoryItems.put(StringUtil.normalizeName(item.getName()), item);
+            }
+            notifyChangeListeners();
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "reloadFromRepository failed: {0}", e.getMessage());
+        }
     }
 }

@@ -142,21 +142,25 @@ public class SidebarPanel extends JPanel {
         logoutBtn.setPreferredSize(new Dimension(EXPANDED_WIDTH, 44));
         logoutBtn.setIcon(new Icon() {
             @Override
-            public int getIconWidth() { return 16; }
+            public int getIconWidth() {
+                return 16;
+            }
+
             @Override
-            public int getIconHeight() { return 16; }
+            public int getIconHeight() {
+                return 16;
+            }
+
             @Override
             public void paintIcon(java.awt.Component c, Graphics g, int x, int y) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(Color.WHITE);
-                g2.setStroke(new java.awt.BasicStroke(2f, java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND));
-                // arrow shaft
+                g2.setStroke(new java.awt.BasicStroke(2f,
+                        java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND));
                 g2.drawLine(x + 3, y + 8, x + 13, y + 8);
-                // arrow head
                 g2.drawLine(x + 9, y + 4, x + 13, y + 8);
                 g2.drawLine(x + 9, y + 12, x + 13, y + 8);
-                // door/rectangle
                 g2.drawLine(x + 3, y + 3, x + 3, y + 13);
                 g2.drawLine(x + 3, y + 3, x + 7, y + 3);
                 g2.drawLine(x + 3, y + 13, x + 7, y + 13);
@@ -169,9 +173,8 @@ public class SidebarPanel extends JPanel {
                 BorderFactory.createMatteBorder(1, 0, 0, 0, AppTheme.BORDER),
                 new EmptyBorder(0, collapsed ? 0 : 20, 0, 0)));
         logoutBtn.addActionListener(e -> {
-            if (logoutListener != null) {
+            if (logoutListener != null)
                 logoutListener.onLogout();
-            }
         });
 
         footer.add(logoutBtn, BorderLayout.CENTER);
@@ -232,9 +235,13 @@ public class SidebarPanel extends JPanel {
         return p;
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // Nav content ← Order Queue entry added after Ordering/Search
+    // ─────────────────────────────────────────────────────────────
     private void buildNavContent() {
         addNavItem("Ordering", "Ordering", this::paintCoffeeIcon);
         addNavItem("Search", "Search", this::paintSearchIcon);
+        addNavItem("Order Queue", "Order Queue", this::paintQueueIcon); // ← NEW
         addNavItem("Inventory", "Inventory", this::paintBoxIcon);
         if (isAdmin) {
             addNavItem("Monitoring", "Monitoring", this::paintChartIcon);
@@ -262,9 +269,8 @@ public class SidebarPanel extends JPanel {
     }
 
     private void applyTransparentButtonChrome(JButton button) {
-        if (button == null) {
+        if (button == null)
             return;
-        }
         button.setBackground(new Color(0, 0, 0, 0));
         button.setOpaque(false);
         button.setContentAreaFilled(false);
@@ -273,7 +279,9 @@ public class SidebarPanel extends JPanel {
         button.setUI(new BasicButtonUI());
     }
 
-    // ─── Icon painters (minimalist line-art) ─────────────────
+    // ─────────────────────────────────────────────────────────────
+    // Icon painters (minimalist line-art, matching existing style)
+    // ─────────────────────────────────────────────────────────────
 
     @FunctionalInterface
     private interface IconPainter {
@@ -290,6 +298,21 @@ public class SidebarPanel extends JPanel {
         g.drawLine(x + s - 8, y + s - 8, x + s - 2, y + s - 2);
     }
 
+    /**
+     * Order Queue icon: three stacked rows with a right-pointing
+     * arrow on the last row — evokes a waiting line being served.
+     * Drawn in the same 1.6 pt cap-round stroke as all other icons.
+     */
+    private void paintQueueIcon(Graphics2D g, int x, int y, int s) {
+        // Three horizontal bars (the "queue" lines)
+        g.drawLine(x + 1, y + 3, x + s - 2, y + 3);
+        g.drawLine(x + 1, y + 3 + 5, x + s - 2, y + 3 + 5);
+        g.drawLine(x + 1, y + 3 + 10, x + s - 6, y + 3 + 10);
+        // Arrow head on the last bar (→ "next in queue")
+        g.drawLine(x + s - 6, y + 3 + 10, x + s - 3, y + 3 + 7);
+        g.drawLine(x + s - 6, y + 3 + 10, x + s - 3, y + 3 + 13);
+    }
+
     private void paintBoxIcon(Graphics2D g, int x, int y, int s) {
         g.drawRect(x + 1, y + 4, s - 2, s - 7);
         g.drawLine(x + 1, y + s / 2, x + s - 1, y + s / 2);
@@ -297,7 +320,7 @@ public class SidebarPanel extends JPanel {
 
     private void paintChartIcon(Graphics2D g, int x, int y, int s) {
         int bw = 3;
-        int[] hs = {s - 8, s - 4, s - 12};
+        int[] hs = { s - 8, s - 4, s - 12 };
         for (int i = 0; i < 3; i++) {
             g.fillRect(x + i * (bw + 3) + 1, y + s - hs[i] - 2, bw, hs[i]);
         }
@@ -312,8 +335,8 @@ public class SidebarPanel extends JPanel {
     }
 
     private void paintTagIcon(Graphics2D g, int x, int y, int s) {
-        int[] xs = {x + 1, x + s - 1, x + s - 1, x + 1};
-        int[] ys = {y + s / 2, y + 1, y + s - 1, y + s / 2};
+        int[] xs = { x + 1, x + s - 1, x + s - 1, x + 1 };
+        int[] ys = { y + s / 2, y + 1, y + s - 1, y + s / 2 };
         g.drawPolygon(xs, ys, 4);
     }
 
@@ -337,7 +360,8 @@ public class SidebarPanel extends JPanel {
         g.setFont(new Font("Segoe UI", Font.BOLD, 9));
         FontMetrics fm = g.getFontMetrics();
         String text = "i";
-        g.drawString(text, x + (s - fm.stringWidth(text)) / 2,
+        g.drawString(text,
+                x + (s - fm.stringWidth(text)) / 2,
                 y + (s - fm.getHeight()) / 2 + fm.getAscent() - 1);
     }
 
@@ -346,7 +370,8 @@ public class SidebarPanel extends JPanel {
         g.setFont(new Font("Segoe UI", Font.BOLD, 9));
         FontMetrics fm = g.getFontMetrics();
         String text = "?";
-        g.drawString(text, x + (s - fm.stringWidth(text)) / 2 + 1,
+        g.drawString(text,
+                x + (s - fm.stringWidth(text)) / 2 + 1,
                 y + (s - fm.getHeight()) / 2 + fm.getAscent() - 1);
     }
 
@@ -383,16 +408,16 @@ public class SidebarPanel extends JPanel {
 
     private ImageIcon loadSidebarLogoIcon(int width, int height) {
         java.net.URL location = getClass().getResource("/images/logo.png");
-        if (location == null) {
+        if (location == null)
             return null;
-        }
         ImageIcon original = new ImageIcon(location);
         Image scaled = original.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
         return new ImageIcon(scaled);
     }
 
-    // ─── NavItem inner class ────────────────────────────────
-
+    // ─────────────────────────────────────────────────────────────
+    // NavItem inner class
+    // ─────────────────────────────────────────────────────────────
     private class NavItem extends JPanel {
         private final String pageName;
         private final String label;
@@ -413,9 +438,8 @@ public class SidebarPanel extends JPanel {
                 @Override
                 public void mouseClicked(MouseEvent e) {
                     setActivePage(pageName);
-                    if (listener != null) {
+                    if (listener != null)
                         listener.onNavigate(pageName);
-                    }
                 }
 
                 @Override
@@ -445,8 +469,7 @@ public class SidebarPanel extends JPanel {
 
         @Override
         public Dimension getPreferredSize() {
-            int w = collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH;
-            return new Dimension(w, NAV_HEIGHT);
+            return new Dimension(collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH, NAV_HEIGHT);
         }
 
         @Override
@@ -481,7 +504,8 @@ public class SidebarPanel extends JPanel {
             int ix = collapsed ? (w - iconSize) / 2 : 14;
             int iy = (h - iconSize) / 2;
             Color iconColor = active ? AppTheme.ACCENT
-                    : (hovered ? AppTheme.FG_PRIMARY : AppTheme.FG_MUTED);
+                    : hovered ? AppTheme.FG_PRIMARY
+                            : AppTheme.FG_MUTED;
             g2.setColor(iconColor);
             g2.setStroke(new java.awt.BasicStroke(1.6f,
                     java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND));

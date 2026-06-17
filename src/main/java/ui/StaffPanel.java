@@ -697,75 +697,134 @@ public class StaffPanel extends JPanel {
     }
 
     // ─── Staff Requests View ─────────────────────────────────
+    // ─── Staff Requests View ─────────────────────────────────
+    // ─── Staff Requests View ─────────────────────────────────
     private JPanel buildStaffRequestsView() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setOpaque(false);
         panel.setBorder(new EmptyBorder(16, 24, 24, 24));
 
         if (currentRole == Role.ADMIN) {
-            JTabbedPane innerTabs = new JTabbedPane();
-            innerTabs.addTab("Password Request", createPasswordRequestsPanel());
-            innerTabs.addTab("Leave Request", createAdminLeaveRequestsPanel());
-            panel.add(innerTabs, BorderLayout.CENTER);
+            JPanel innerTabBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+            innerTabBar.setOpaque(false);
+            innerTabBar.setBorder(new EmptyBorder(0, 0, 12, 0));
+
+            CardLayout innerCards = new CardLayout();
+            JPanel innerContainer = new JPanel(innerCards);
+            innerContainer.setOpaque(false);
+
+            // ── Password Request panel (already exists) ──
+            JPanel passwordPanel = createPasswordRequestsPanel();
+
+            // ── Leave Request panel (inlined here) ──────
+            JPanel leavePanel = new JPanel(new BorderLayout(10, 10));
+            leavePanel.setBorder(new EmptyBorder(12, 16, 12, 16));
+
+            FilterRow leaveToolbar = new FilterRow();
+            leaveToolbar.addLabeled("Status:", leaveStatusFilter);
+            leaveToolbar.add(refreshLeaveBtn);
+
+            JPanel leaveActionBar = new JPanel(new FlowLayout(FlowLayout.LEFT));
+            approveLeaveBtn.setEnabled(false);
+            rejectLeaveBtn.setEnabled(false);
+            leaveActionBar.add(approveLeaveBtn);
+            leaveActionBar.add(rejectLeaveBtn);
+
+            JPanel leaveTopBar = new JPanel(new BorderLayout());
+            leaveTopBar.add(leaveToolbar, BorderLayout.NORTH);
+            leaveTopBar.add(leaveActionBar, BorderLayout.SOUTH);
+            leavePanel.add(leaveTopBar, BorderLayout.NORTH);
+
+            leaveRequestsTable.setModel(leaveRequestsModel);
+            leaveRequestsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            leaveRequestsSorter = new TableRowSorter<>(leaveRequestsModel);
+            leaveRequestsTable.setRowSorter(leaveRequestsSorter);
+            hideColumn(leaveRequestsTable, 0);
+            leaveRequestsTable.getColumnModel().getColumn(5).setCellRenderer(new LeaveStatusRenderer());
+
+            leaveRequestsTable.getSelectionModel().addListSelectionListener(e -> {
+                if (!e.getValueIsAdjusting()) {
+                    int row = leaveRequestsTable.getSelectedRow();
+                    if (row >= 0) {
+                        int modelRow = leaveRequestsTable.convertRowIndexToModel(row);
+                        String status = leaveRequestsModel.getValueAt(modelRow, 5).toString();
+                        boolean isPending = "pending".equalsIgnoreCase(status);
+                        approveLeaveBtn.setEnabled(isPending);
+                        rejectLeaveBtn.setEnabled(isPending);
+                    } else {
+                        approveLeaveBtn.setEnabled(false);
+                        rejectLeaveBtn.setEnabled(false);
+                    }
+                }
+            });
+
+            refreshLeaveBtn.addActionListener(e -> loadLeaveRequests());
+            leaveStatusFilter.addActionListener(e -> applyLeaveRequestsFilter());
+            approveLeaveBtn.addActionListener(e -> onApproveLeaveRequest());
+            rejectLeaveBtn.addActionListener(e -> onRejectLeaveRequest());
+
+            leavePanel.add(new JScrollPane(leaveRequestsTable), BorderLayout.CENTER);
+
+            innerContainer.add(passwordPanel, "Password Request");
+            innerContainer.add(leavePanel, "Leave Request");
+
+            String[] innerTabNames = { "Password Request", "Leave Request" };
+            for (String tabName : innerTabNames) {
+                boolean active = tabName.equals("Password Request");
+                JButton btn = new JButton(tabName);
+                btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+                btn.setForeground(active ? Color.WHITE : TEXT_PRIMARY);
+                btn.setBackground(active ? ACCENT_BLUE : new Color(0xF1F5F9));
+                btn.setOpaque(true);
+                btn.setContentAreaFilled(true);
+                btn.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createMatteBorder(0, 0, 0, 1, CARD_BORDER),
+                        new EmptyBorder(10, 18, 10, 18)));
+                btn.setBorderPainted(true);
+                btn.setFocusPainted(false);
+                btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                btn.addActionListener(e -> {
+                    innerCards.show(innerContainer, tabName);
+                    for (Component c : innerTabBar.getComponents()) {
+                        if (c instanceof JButton b) {
+                            boolean isActive = b.getText().equals(tabName);
+                            b.setBackground(isActive ? ACCENT_BLUE : new Color(0xF1F5F9));
+                            b.setForeground(isActive ? Color.WHITE : TEXT_PRIMARY);
+                        }
+                    }
+                    if ("Password Request".equals(tabName))
+                        loadPasswordRequests();
+                    else
+                        loadLeaveRequests();
+                });
+                innerTabBar.add(btn);
+            }
+
+            panel.add(innerTabBar, BorderLayout.NORTH);
+            panel.add(innerContainer, BorderLayout.CENTER);
+
         } else {
-            JTabbedPane innerTabs = new JTabbedPane();
-            innerTabs.addTab("My Requests", createStaffMyRequestsPanel());
-            panel.add(innerTabs, BorderLayout.CENTER);
+            JPanel innerTabBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+            innerTabBar.setOpaque(false);
+            innerTabBar.setBorder(new EmptyBorder(0, 0, 12, 0));
+
+            JButton btn = new JButton("My Requests");
+            btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            btn.setForeground(Color.WHITE);
+            btn.setBackground(ACCENT_BLUE);
+            btn.setOpaque(true);
+            btn.setContentAreaFilled(true);
+            btn.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createMatteBorder(0, 0, 0, 1, CARD_BORDER),
+                    new EmptyBorder(10, 18, 10, 18)));
+            btn.setBorderPainted(true);
+            btn.setFocusPainted(false);
+            innerTabBar.add(btn);
+
+            panel.add(innerTabBar, BorderLayout.NORTH);
+            panel.add(createStaffMyRequestsPanel(), BorderLayout.CENTER);
         }
 
-        return panel;
-    }
-
-    // ─── Admin: Leave Request panel ──────────────────────────
-    private JPanel createAdminLeaveRequestsPanel() {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(new EmptyBorder(12, 16, 12, 16));
-
-        FilterRow toolbar = new FilterRow();
-        toolbar.addLabeled("Status:", leaveStatusFilter);
-        toolbar.add(refreshLeaveBtn);
-
-        JPanel actionBar = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        approveLeaveBtn.setEnabled(false);
-        rejectLeaveBtn.setEnabled(false);
-        actionBar.add(approveLeaveBtn);
-        actionBar.add(rejectLeaveBtn);
-
-        JPanel topBar = new JPanel(new BorderLayout());
-        topBar.add(toolbar, BorderLayout.NORTH);
-        topBar.add(actionBar, BorderLayout.SOUTH);
-        panel.add(topBar, BorderLayout.NORTH);
-
-        leaveRequestsTable.setModel(leaveRequestsModel);
-        leaveRequestsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        leaveRequestsSorter = new TableRowSorter<>(leaveRequestsModel);
-        leaveRequestsTable.setRowSorter(leaveRequestsSorter);
-        hideColumn(leaveRequestsTable, 0);
-
-        leaveRequestsTable.getColumnModel().getColumn(5).setCellRenderer(new LeaveStatusRenderer());
-
-        leaveRequestsTable.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
-                int row = leaveRequestsTable.getSelectedRow();
-                if (row >= 0) {
-                    int modelRow = leaveRequestsTable.convertRowIndexToModel(row);
-                    String status = leaveRequestsModel.getValueAt(modelRow, 5).toString();
-                    boolean isPending = "pending".equalsIgnoreCase(status);
-                    approveLeaveBtn.setEnabled(isPending);
-                    rejectLeaveBtn.setEnabled(isPending);
-                } else {
-                    approveLeaveBtn.setEnabled(false);
-                    rejectLeaveBtn.setEnabled(false);
-                }
-            }
-        });
-
-        refreshLeaveBtn.addActionListener(e -> loadLeaveRequests());
-        leaveStatusFilter.addActionListener(e -> applyLeaveRequestsFilter());
-        approveLeaveBtn.addActionListener(e -> onApproveLeaveRequest());
-        rejectLeaveBtn.addActionListener(e -> onRejectLeaveRequest());
-
-        panel.add(new JScrollPane(leaveRequestsTable), BorderLayout.CENTER);
         return panel;
     }
 

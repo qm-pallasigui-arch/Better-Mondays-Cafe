@@ -279,7 +279,8 @@ public class StaffProfileDialog extends JDialog {
                                 LocalDate bd = LocalDate.parse(after, DateTimeFormatter.ISO_LOCAL_DATE);
                                 int age = java.time.Period.between(bd, LocalDate.now()).getYears();
                                 detailFields.get(2).setText(String.valueOf(age));
-                            } catch (Exception ignored) {}
+                            } catch (Exception ignored) {
+                            }
                         }
                     }
                 }
@@ -369,33 +370,35 @@ public class StaffProfileDialog extends JDialog {
                 dayLabel.setForeground(new Color(0x475569));
                 dayLabel.setPreferredSize(new Dimension(50, 28));
 
-                String[] opts = { "", "Morning", "Afternoon", "Night", "Rest Day" };
+                String[] opts = { "Rest Day", "Afternoon (11:00AM - 4:00PM)", "Night (4:00PM - 11:00PM)" };
                 JComboBox<String> combo = new JComboBox<>(opts);
                 combo.setFont(new Font("Segoe UI", Font.PLAIN, 12));
                 combo.setBackground(Color.WHITE);
                 combo.setBorder(BorderFactory.createLineBorder(new Color(0xE2E8F0)));
-                if (!shift.isEmpty()) {
-                    String display = shift.equals("rest") ? "Rest Day"
-                            : shift.equals("morning") ? "Morning"
-                            : shift.equals("afternoon") ? "Afternoon"
-                            : shift.equals("night") ? "Night" : "";
+
+                // Default unset days to "Rest Day"
+                if (shift.isEmpty()) {
+                    combo.setSelectedItem("Rest Day");
+                    editSchedule.put(day, "rest");
+                } else {
+                    String display = shift.equals("afternoon") ? "Afternoon (11:00AM - 4:00PM)"
+                            : shift.equals("night") ? "Night (4:00PM - 11:00PM)"
+                                    : "Rest Day";
                     combo.setSelectedItem(display);
                 }
+
                 combo.addActionListener(e -> {
                     String selected = (String) combo.getSelectedItem();
-                    if (selected == null || selected.isEmpty()) {
-                        editSchedule.put(day, "");
-                    } else if (selected.equals("Morning")) {
-                        editSchedule.put(day, "morning");
-                    } else if (selected.equals("Afternoon")) {
+                    if (selected == null)
+                        return;
+                    if (selected.startsWith("Afternoon")) {
                         editSchedule.put(day, "afternoon");
-                    } else if (selected.equals("Night")) {
+                    } else if (selected.startsWith("Night")) {
                         editSchedule.put(day, "night");
-                    } else if (selected.equals("Rest Day")) {
+                    } else {
                         editSchedule.put(day, "rest");
                     }
                 });
-
                 JPanel centerWrapper = new JPanel(new GridBagLayout());
                 centerWrapper.setOpaque(false);
                 centerWrapper.add(combo);
@@ -426,7 +429,8 @@ public class StaffProfileDialog extends JDialog {
             try {
                 editing = !editing;
                 setFieldsEditable(editing);
-                if (scheduleCard != null) scheduleCard.setVisible(editing);
+                if (scheduleCard != null)
+                    scheduleCard.setVisible(editing);
                 actionBtn.setText(editing ? "Save Changes" : "Edit Profile");
                 setResizable(true);
                 setSize(new Dimension(650, editing ? 760 : 600));
@@ -449,7 +453,8 @@ public class StaffProfileDialog extends JDialog {
         }
 
         private void saveChanges() {
-            if (!editing || accountRoleRepository == null) return;
+            if (!editing || accountRoleRepository == null)
+                return;
             try {
                 String fullName = detailFields.get(0).getText().trim();
                 String birthdate = birthdateField.getText().trim();
@@ -497,7 +502,8 @@ public class StaffProfileDialog extends JDialog {
         }
 
         private Map<Integer, String> loadExistingSchedule() {
-            if (scheduleRepo == null) return null;
+            if (scheduleRepo == null)
+                return null;
             try {
                 return scheduleRepo.loadSchedule(account.getUsername());
             } catch (Exception ignored) {
@@ -585,7 +591,8 @@ public class StaffProfileDialog extends JDialog {
                 } catch (Exception e1) {
                     try {
                         initial = LocalDate.parse(existing, DateTimeFormatter.ofPattern("MMM dd, yyyy"));
-                    } catch (Exception e2) {}
+                    } catch (Exception e2) {
+                    }
                 }
             }
             this.currentMonth = initial != null ? YearMonth.from(initial) : YearMonth.now();
@@ -618,14 +625,26 @@ public class StaffProfileDialog extends JDialog {
             JPanel nav = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 0));
             nav.setOpaque(false);
 
-            nav.add(navButton("<<", e -> { currentMonth = currentMonth.minusYears(1); renderGrid(); }));
-            nav.add(navButton("<", e -> { currentMonth = currentMonth.minusMonths(1); renderGrid(); }));
+            nav.add(navButton("<<", e -> {
+                currentMonth = currentMonth.minusYears(1);
+                renderGrid();
+            }));
+            nav.add(navButton("<", e -> {
+                currentMonth = currentMonth.minusMonths(1);
+                renderGrid();
+            }));
             monthLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
             monthLabel.setForeground(new Color(0x0F172A));
             monthLabel.setPreferredSize(new Dimension(160, 30));
             nav.add(monthLabel);
-            nav.add(navButton(">", e -> { currentMonth = currentMonth.plusMonths(1); renderGrid(); }));
-            nav.add(navButton(">>", e -> { currentMonth = currentMonth.plusYears(1); renderGrid(); }));
+            nav.add(navButton(">", e -> {
+                currentMonth = currentMonth.plusMonths(1);
+                renderGrid();
+            }));
+            nav.add(navButton(">>", e -> {
+                currentMonth = currentMonth.plusYears(1);
+                renderGrid();
+            }));
 
             header.add(nav, BorderLayout.CENTER);
             return header;
@@ -641,8 +660,15 @@ public class StaffProfileDialog extends JDialog {
             btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             btn.addActionListener(listener);
             btn.addMouseListener(new MouseAdapter() {
-                @Override public void mouseEntered(MouseEvent e) { btn.setForeground(BLUE); }
-                @Override public void mouseExited(MouseEvent e) { btn.setForeground(new Color(0x475569)); }
+                @Override
+                public void mouseEntered(MouseEvent e) {
+                    btn.setForeground(BLUE);
+                }
+
+                @Override
+                public void mouseExited(MouseEvent e) {
+                    btn.setForeground(new Color(0x475569));
+                }
             });
             return btn;
         }
@@ -677,8 +703,15 @@ public class StaffProfileDialog extends JDialog {
                 dispose();
             });
             apply.addMouseListener(new MouseAdapter() {
-                @Override public void mouseEntered(MouseEvent e) { apply.setBackground(new Color(0x1E293B)); }
-                @Override public void mouseExited(MouseEvent e) { apply.setBackground(new Color(0x0F172A)); }
+                @Override
+                public void mouseEntered(MouseEvent e) {
+                    apply.setBackground(new Color(0x1E293B));
+                }
+
+                @Override
+                public void mouseExited(MouseEvent e) {
+                    apply.setBackground(new Color(0x0F172A));
+                }
             });
 
             footer.add(cancel);
@@ -748,16 +781,21 @@ public class StaffProfileDialog extends JDialog {
 
                 lbl.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
                 lbl.addMouseListener(new MouseAdapter() {
-                    @Override public void mouseClicked(MouseEvent e) {
+                    @Override
+                    public void mouseClicked(MouseEvent e) {
                         pickedDate = cellDate;
                         renderGrid();
                     }
-                    @Override public void mouseEntered(MouseEvent e) {
+
+                    @Override
+                    public void mouseEntered(MouseEvent e) {
                         if (pickedDate == null || !pickedDate.equals(cellDate)) {
                             lbl.setBackground(new Color(0xE5E7EB));
                         }
                     }
-                    @Override public void mouseExited(MouseEvent e) {
+
+                    @Override
+                    public void mouseExited(MouseEvent e) {
                         if (pickedDate != null && pickedDate.equals(cellDate)) {
                             lbl.setBackground(BLUE);
                         } else if (today.equals(cellDate)) {

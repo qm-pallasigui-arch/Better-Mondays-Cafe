@@ -19,7 +19,8 @@ import java.util.*;
 /**
  * Add / Edit dialog for menu items.
  * Fixed 780×660 dialog. Two-column layout: image left, form right.
- * Ingredient list container + pre-populated Packaging container.
+ * Ingredient list container included. Packaging/materials are hardcoded
+ * internally (not shown in UI) with preset quantities per drink.
  */
 public class MenuItemDialog extends JDialog {
 
@@ -27,25 +28,39 @@ public class MenuItemDialog extends JDialog {
     private static final Color BG_PAGE = new Color(0xF9F9F8);
     private static final Color BG_SURFACE = Color.WHITE;
     private static final Color BG_SUBTLE = new Color(0xF4F3F0);
-    private static final Color BG_PKG = new Color(0xF0F5FF);
     private static final Color BORDER = new Color(0xE2E0D9);
-    private static final Color BORDER_PKG = new Color(0xC5D5F5);
     private static final Color TEXT_PRI = new Color(0x1A1A18);
     private static final Color TEXT_MUTED = new Color(0x7A7975);
     private static final Color TEXT_HINT = new Color(0xA8A6A0);
     private static final Color ACCENT = new Color(0x534AB7);
     private static final Color ACCENT_HVR = new Color(0x3D379A);
     private static final Color ACCENT_LIGHT = new Color(0xEEEDF9);
-    private static final Color PKG_ACCENT = new Color(0x3B6FD4);
     private static final Color DANGER = new Color(0xA32D2D);
 
     private static final String[] CATEGORIES = { "Coffee", "Non-Coffee", "Fruit Tea", "Herbal Tea", "Food" };
-    private static final String[] PACKAGING_DEFAULTS = { "Cup", "Cup Holder", "Lid", "Straw" };
+
+    /**
+     * Default packaging consumed per drink, keyed by material name.
+     * These are always included silently — no UI shown to the user.
+     * Cup → 1 pc
+     * Cup Holder → 1 pc
+     * Lid → 1 pc
+     * Straw → 1 pc
+     */
+    private static final LinkedHashMap<String, Double> PACKAGING_DEFAULTS;
+    static {
+        PACKAGING_DEFAULTS = new LinkedHashMap<>();
+        PACKAGING_DEFAULTS.put("Cup", 1.0);
+        PACKAGING_DEFAULTS.put("Cup Holder", 1.0);
+        PACKAGING_DEFAULTS.put("Lid", 1.0);
+        PACKAGING_DEFAULTS.put("Straw", 1.0);
+    }
+
     private static final Path RESOURCE_IMAGES_DIR = Paths.get("src", "main", "resources", "images");
 
     // Fixed dialog size
     private static final int DLG_W = 780;
-    private static final int DLG_H = 720;
+    private static final int DLG_H = 660;
 
     // ── Fields ────────────────────────────────────────────────────────────────
     private final JTextField nameField = styledField();
@@ -59,9 +74,14 @@ public class MenuItemDialog extends JDialog {
     private final JTextField ingQtyField = styledField();
 
     private final JPanel ingListPanel = new JPanel();
-    private final JPanel pkgListPanel = new JPanel();
 
     private final LinkedHashMap<String, JTextField> ingRows = new LinkedHashMap<>();
+
+    /**
+     * Packaging rows are kept as silent JTextField holders so their values
+     * are still included in getIngredientsMap() / getIngredientsCsv(),
+     * but they are never added to any visible panel.
+     */
     private final LinkedHashMap<String, JTextField> pkgRows = new LinkedHashMap<>();
 
     private ImageDropZone dropZone;
@@ -84,7 +104,7 @@ public class MenuItemDialog extends JDialog {
         root.add(buildFooter(), BorderLayout.SOUTH);
         setContentPane(root);
 
-        addDefaultPackaging();
+        initDefaultPackaging(); // populate pkgRows silently
         if (existing != null)
             populate(existing);
         else
@@ -125,30 +145,26 @@ public class MenuItemDialog extends JDialog {
 
     // ── Body ─────────────────────────────────────────────────────────────────
     private JPanel buildBody() {
-        // Fixed-size body so everything is predictable
-        JPanel body = new JPanel(null); // absolute layout for pixel-perfect sizing
+        JPanel body = new JPanel(null); // absolute layout
         body.setBackground(BG_PAGE);
-        body.setPreferredSize(new Dimension(DLG_W, DLG_H - 60 - 58)); // minus header & footer
+        body.setPreferredSize(new Dimension(DLG_W, DLG_H - 60 - 58));
 
-        // Drop zone: left column, fixed 190×190, top-aligned
         dropZone = new ImageDropZone();
         dropZone.setBounds(20, 16, 190, 190);
         body.add(dropZone);
 
-        // Right column form, starts at x=228
         int fx = 228, fy = 16, fw = DLG_W - fx - 20;
         body.add(buildFormPanel(fx, fy, fw));
 
         return body;
     }
 
-    // ── Form panel (absolute positioned inside body) ──────────────────────────
+    // ── Form panel ───────────────────────────────────────────────────────────
     private JPanel buildFormPanel(int x, int y, int w) {
-        // Use a real layout inside the form panel (BoxLayout)
         JPanel p = new JPanel();
         p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
         p.setBackground(BG_PAGE);
-        p.setBounds(x, y, w, DLG_H - 60 - 58 - 16); // fill remaining height
+        p.setBounds(x, y, w, DLG_H - 60 - 58 - 16);
 
         // ── Row 1: Name + Category ────────────────────────────────────────────
         styleComboBox(catBox);
@@ -189,30 +205,12 @@ public class MenuItemDialog extends JDialog {
         ingListPanel.setLayout(new BoxLayout(ingListPanel, BoxLayout.Y_AXIS));
         ingListPanel.setBackground(BG_SURFACE);
         JScrollPane ingScroll = listScroll(ingListPanel, BORDER, BG_SURFACE);
-        ingScroll.setPreferredSize(new Dimension(w, 130));
-        ingScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 130));
+        // Ingredients list now uses the extra vertical space freed by removing
+        // packaging
+        ingScroll.setPreferredSize(new Dimension(w, 310));
+        ingScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 310));
         ingScroll.setAlignmentX(LEFT_ALIGNMENT);
         p.add(ingScroll);
-        p.add(vgap(12));
-
-        // ── Packaging section ─────────────────────────────────────────────────
-        p.add(sectionPill("PACKAGING / MATERIALS", PKG_ACCENT, new Color(0xDEEAFF)));
-        p.add(vgap(3));
-
-        JLabel pkgHint = new JLabel("Cup, Cup Holder, Lid & Straw are included by default.");
-        pkgHint.setFont(new Font("Segoe UI", Font.ITALIC, 10));
-        pkgHint.setForeground(TEXT_HINT);
-        pkgHint.setAlignmentX(LEFT_ALIGNMENT);
-        p.add(pkgHint);
-        p.add(vgap(6));
-
-        pkgListPanel.setLayout(new BoxLayout(pkgListPanel, BoxLayout.Y_AXIS));
-        pkgListPanel.setBackground(BG_PKG);
-        JScrollPane pkgScroll = listScroll(pkgListPanel, BORDER_PKG, BG_PKG);
-        pkgScroll.setPreferredSize(new Dimension(w, 168));
-        pkgScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 168));
-        pkgScroll.setAlignmentX(LEFT_ALIGNMENT);
-        p.add(pkgScroll);
 
         return p;
     }
@@ -265,13 +263,13 @@ public class MenuItemDialog extends JDialog {
             return;
         }
 
-        for (String pkg : PACKAGING_DEFAULTS)
-            if (pkg.equalsIgnoreCase(name)) {
-                JOptionPane.showMessageDialog(this,
-                        "\"" + name + "\" is in the Packaging/Materials section.",
-                        "Already in Packaging", JOptionPane.INFORMATION_MESSAGE);
-                return;
-            }
+        // Block the user from manually adding a packaging material as an ingredient
+        if (PACKAGING_DEFAULTS.containsKey(name)) {
+            JOptionPane.showMessageDialog(this,
+                    "\"" + name + "\" is tracked automatically as a packaging material.",
+                    "Packaging Material", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
 
         double qty = 0;
         try {
@@ -291,7 +289,7 @@ public class MenuItemDialog extends JDialog {
         JTextField qf = qtyField();
         qf.setText(qty == 0 ? "" : String.valueOf(qty));
         ingRows.put(name, qf);
-        ingListPanel.add(listRow(name, qf, false));
+        ingListPanel.add(listRow(name, qf));
         ingListPanel.revalidate();
         ingListPanel.repaint();
         clearAdder();
@@ -320,27 +318,31 @@ public class MenuItemDialog extends JDialog {
         }
     }
 
-    private void addDefaultPackaging() {
-        for (String name : PACKAGING_DEFAULTS) {
+    /**
+     * Silently initialises pkgRows with the default packaging quantities.
+     * Nothing is added to any UI panel — values flow out via getIngredientsMap().
+     */
+    private void initDefaultPackaging() {
+        PACKAGING_DEFAULTS.forEach((name, defaultQty) -> {
             JTextField qf = qtyField();
+            qf.setText(String.valueOf(defaultQty.intValue())); // "1", "1", …
             pkgRows.put(name, qf);
-            pkgListPanel.add(listRow(name, qf, true));
-        }
+        });
     }
 
-    // ── Generic list row ──────────────────────────────────────────────────────
-    private JPanel listRow(String name, JTextField qtyField, boolean isPkg) {
+    // ── Generic ingredient list row ───────────────────────────────────────────
+    private JPanel listRow(String name, JTextField qtyField) {
         JPanel row = new JPanel(new BorderLayout(6, 0));
-        row.setBackground(isPkg ? BG_PKG : BG_SUBTLE);
+        row.setBackground(BG_SUBTLE);
         row.setBorder(new CompoundBorder(
-                new MatteBorder(0, 0, 1, 0, isPkg ? BORDER_PKG : BORDER),
+                new MatteBorder(0, 0, 1, 0, BORDER),
                 new EmptyBorder(8, 10, 8, 10)));
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
         row.setAlignmentX(LEFT_ALIGNMENT);
 
         JLabel dot = new JLabel("●");
         dot.setFont(new Font("Segoe UI", Font.PLAIN, 7));
-        dot.setForeground(isPkg ? PKG_ACCENT : ACCENT);
+        dot.setForeground(ACCENT);
         JLabel nameLbl = new JLabel(name);
         nameLbl.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         nameLbl.setForeground(TEXT_PRI);
@@ -349,7 +351,7 @@ public class MenuItemDialog extends JDialog {
         left.add(dot);
         left.add(nameLbl);
 
-        JLabel unit = new JLabel(isPkg ? "pcs" : "g");
+        JLabel unit = new JLabel("g");
         unit.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         unit.setForeground(TEXT_MUTED);
 
@@ -371,18 +373,11 @@ public class MenuItemDialog extends JDialog {
             }
         });
         rm.addActionListener(e -> {
-            if (isPkg) {
-                pkgRows.remove(name);
-                pkgListPanel.remove(row);
-                pkgListPanel.revalidate();
-                pkgListPanel.repaint();
-            } else {
-                ingRows.remove(name);
-                ingListPanel.remove(row);
-                ingListPanel.revalidate();
-                ingListPanel.repaint();
-                refreshIngEmptyState();
-            }
+            ingRows.remove(name);
+            ingListPanel.remove(row);
+            ingListPanel.revalidate();
+            ingListPanel.repaint();
+            refreshIngEmptyState();
         });
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
@@ -426,7 +421,7 @@ public class MenuItemDialog extends JDialog {
         return bar;
     }
 
-    // ── Populate ──────────────────────────────────────────────────────────────
+    // ── Populate (edit mode) ──────────────────────────────────────────────────
     private void populate(MenuItem item) {
         nameField.setText(item.getName());
         for (int i = 0; i < CATEGORIES.length; i++)
@@ -443,27 +438,21 @@ public class MenuItemDialog extends JDialog {
 
         ingListPanel.removeAll();
         item.getIngredients().forEach((k, v) -> {
-            boolean isPkg = false;
-            for (String p : PACKAGING_DEFAULTS)
-                if (p.equalsIgnoreCase(k)) {
-                    isPkg = true;
-                    break;
-                }
             String val = v % 1 == 0 ? String.valueOf((int) (double) v) : String.valueOf(v);
-            if (isPkg) {
-                if (pkgRows.containsKey(k))
+            if (PACKAGING_DEFAULTS.containsKey(k)) {
+                // Restore saved packaging quantity into the silent pkgRows field
+                if (pkgRows.containsKey(k)) {
                     pkgRows.get(k).setText(val);
-                else {
+                } else {
                     JTextField qf = qtyField();
                     qf.setText(val);
                     pkgRows.put(k, qf);
-                    pkgListPanel.add(listRow(k, qf, true));
                 }
             } else {
                 JTextField qf = qtyField();
                 qf.setText(val);
                 ingRows.put(k, qf);
-                ingListPanel.add(listRow(k, qf, false));
+                ingListPanel.add(listRow(k, qf));
             }
         });
         refreshIngEmptyState();
@@ -518,6 +507,11 @@ public class MenuItemDialog extends JDialog {
         return selectedImagePath;
     }
 
+    /**
+     * Returns all ingredients AND packaging materials in one map.
+     * Packaging quantities are the hardcoded defaults (or values restored
+     * from a previously saved item).
+     */
     public Map<String, Double> getIngredientsMap() {
         Map<String, Double> m = new LinkedHashMap<>();
         ingRows.forEach((k, tf) -> safePut(m, k, tf));
@@ -597,8 +591,8 @@ public class MenuItemDialog extends JDialog {
         void browseImage() {
             JFileChooser fc = new JFileChooser();
             fc.setDialogTitle("Choose Item Image");
-            fc.setFileFilter(
-                    new FileNameExtensionFilter("Images (*.jpg,*.jpeg,*.png,*.webp)", "jpg", "jpeg", "png", "webp"));
+            fc.setFileFilter(new FileNameExtensionFilter(
+                    "Images (*.jpg,*.jpeg,*.png,*.webp)", "jpg", "jpeg", "png", "webp"));
             fc.setAcceptAllFileFilterUsed(false);
             if (fc.showOpenDialog(MenuItemDialog.this) == JFileChooser.APPROVE_OPTION)
                 loadImage(fc.getSelectedFile());
@@ -634,19 +628,18 @@ public class MenuItemDialog extends JDialog {
         }
 
         private String mapCategoryToResourceFolder(String category, String itemName) {
-            if (category.equalsIgnoreCase("Coffee")) {
+            if (category.equalsIgnoreCase("Coffee"))
                 return "Espresso & Coffee";
-            }
-            if (category.equalsIgnoreCase("Non-Coffee") || category.equalsIgnoreCase("Fruit Tea")
-                    || category.equalsIgnoreCase("Herbal Tea")) {
+            if (category.equalsIgnoreCase("Non-Coffee")
+                    || category.equalsIgnoreCase("Fruit Tea")
+                    || category.equalsIgnoreCase("Herbal Tea"))
                 return category;
-            }
             if (category.equalsIgnoreCase("Food")) {
-                String normalized = itemName == null ? "" : itemName.toLowerCase();
-                if (normalized.contains("pandesal") || normalized.contains("pande"))
+                String n = itemName == null ? "" : itemName.toLowerCase();
+                if (n.contains("pandesal") || n.contains("pande"))
                     return "Pandesal Pairs";
-                if (normalized.contains("sandwich") || normalized.contains("ham") || normalized.contains("cheese")
-                        || normalized.contains("club"))
+                if (n.contains("sandwich") || n.contains("ham")
+                        || n.contains("cheese") || n.contains("club"))
                     return "Sandwiches";
                 return "Pastries";
             }
@@ -657,7 +650,6 @@ public class MenuItemDialog extends JDialog {
             BufferedImage img = ImageIO.read(file);
             if (img != null)
                 return img;
-
             Image iconImage = Toolkit.getDefaultToolkit().createImage(file.getAbsolutePath());
             MediaTracker tracker = new MediaTracker(this);
             tracker.addImage(iconImage, 0);
@@ -668,12 +660,9 @@ public class MenuItemDialog extends JDialog {
             }
             if (tracker.isErrorAny())
                 return null;
-
-            int w = iconImage.getWidth(null);
-            int h = iconImage.getHeight(null);
+            int w = iconImage.getWidth(null), h = iconImage.getHeight(null);
             if (w <= 0 || h <= 0)
                 return null;
-
             BufferedImage buffered = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g2 = buffered.createGraphics();
             g2.drawImage(iconImage, 0, 0, null);
@@ -694,7 +683,8 @@ public class MenuItemDialog extends JDialog {
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             int w = getWidth(), h = getHeight();
             if (preview != null) {
-                double sc = Math.min((double) (w - 12) / preview.getWidth(), (double) (h - 12) / preview.getHeight());
+                double sc = Math.min((double) (w - 12) / preview.getWidth(),
+                        (double) (h - 12) / preview.getHeight());
                 int iw = (int) (preview.getWidth() * sc), ih = (int) (preview.getHeight() * sc);
                 int ix = (w - iw) / 2, iy = (h - ih) / 2;
                 g2.setClip(new RoundRectangle2D.Float(ix, iy, iw, ih, 10, 10));
@@ -713,14 +703,15 @@ public class MenuItemDialog extends JDialog {
                 g2.setColor(hovering ? new Color(0xEBEBF8) : BG_SUBTLE);
                 g2.fillRoundRect(3, 3, w - 6, h - 6, 10, 10);
                 g2.setColor(hovering ? ACCENT : BORDER);
-                g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0,
-                        new float[] { 6, 4 }, 0));
+                g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND,
+                        0, new float[] { 6, 4 }, 0));
                 g2.drawRoundRect(3, 3, w - 7, h - 7, 10, 10);
                 g2.setStroke(new BasicStroke(1.5f));
                 int cx = w / 2, cy = h / 2 - 16, is = 28;
                 g2.setColor(hovering ? ACCENT : TEXT_HINT);
                 g2.drawRoundRect(cx - is / 2, cy - is / 2 + 2, is, is - 4, 5, 5);
-                g2.drawPolyline(new int[] { cx - 9, cx - 2, cx + 11 }, new int[] { cy + 7, cy - 2, cy + 7 }, 3);
+                g2.drawPolyline(new int[] { cx - 9, cx - 2, cx + 11 },
+                        new int[] { cy + 7, cy - 2, cy + 7 }, 3);
                 g2.fillOval(cx + 3, cy - 10, 6, 6);
                 g2.setFont(new Font("Segoe UI", Font.BOLD, 11));
                 g2.setColor(hovering ? ACCENT : TEXT_MUTED);
@@ -784,7 +775,6 @@ public class MenuItemDialog extends JDialog {
         return p;
     }
 
-    /** A row panel with a fixed height, aligned left for BoxLayout. */
     private static JPanel fixedRow(LayoutManager lm, int w, int h) {
         JPanel p = new JPanel(lm);
         p.setOpaque(false);

@@ -15,8 +15,6 @@ import java.awt.RenderingHints;
 import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.util.*;
-import java.util.List;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import javax.swing.*;
 import javax.swing.border.*;
@@ -25,7 +23,6 @@ import javax.swing.table.*;
 import persistence.MenuRepository;
 import persistence.sqlite.SQLiteMenuRepository;
 import pos.*;
-import pos.MenuItem;
 import util.StringUtil;
 
 public class MenuMaintenancePanel extends JPanel {
@@ -43,7 +40,6 @@ public class MenuMaintenancePanel extends JPanel {
     private static final Color TEXT_PRIMARY = new Color(0x1A1A18);
     private static final Color TEXT_MUTED = new Color(0x7A7975);
     private static final Color TEXT_HINT = new Color(0xA8A6A0);
-    private static final Color ROW_HOVER = new Color(0xF4F3F0);
     private static final Color ROW_SELECTED = new Color(0xEBEBF8);
     private static final Color ACCENT = new Color(0x534AB7);
 
@@ -57,38 +53,30 @@ public class MenuMaintenancePanel extends JPanel {
         PILL_COLORS.put("Food", new Color[] { new Color(0xFAECE7), new Color(0x712B13) });
     }
 
-    // ── Icon constants ──────────────────────────────────────────────────────
-    //
-    // ROOT CAUSE OF MISSING ICONS:
-    // Characters like ⌕ (U+2315), ☰ (U+2630), ✏ (U+270F), ⌫ (U+232B) live in
-    // the "Miscellaneous Technical" and "Dingbats" Unicode blocks. Even though
-    // they are within the BMP, they are absent from the fonts Java Swing uses
-    // by default on most systems (Segoe UI, SansSerif, Dialog). Java2D renders
-    // them as empty boxes (□) or skips them entirely.
-    //
-    // FIX: Replace every symbol that is not in the ASCII / Latin-1 Supplement /
-    // General Punctuation range with a safe ASCII-text alternative that looks
-    // equally clear in a small toolbar button. No extra font required.
-    //
-    // Old glyph U+ Block → Replacement
-    // ⌕ 2315 Misc Technical → "[S]" label / magnifier text
-    // ☰ 2630 Misc Technical (trigrams)→ "=" (looks like 3 lines)
-    // ✏ 270F Dingbats → "Edit" label only
-    // ⌫ 232B Misc Technical → "Del" label only
-    // ⇄ 21C4 Arrows (BMP, usually ok) → keep, add text fallback
-    //
-    // Buttons already carry a text label so the icon is purely decorative;
-    // removing unreliable glyphs and keeping clean ASCII labels is the correct
-    // solution. A "•" prefix (U+2022, Latin Extended) is universally available
-    // and visually distinguishes the button glyph from plain text.
-    //
-    private static final String ICON_BACKUP = "\u2194"; // ↔ LEFT RIGHT ARROW — widely supported, same idea as ⇄
-    private static final String ICON_ADD = "+"; // ASCII plus — universal
-    private static final String ICON_EDIT = "\u25A6"; // ▦ SQUARE WITH ORTHOGONAL CROSSHATCH — safe BMP, distinct shape
-    private static final String ICON_DELETE = "\u00D7"; // × MULTIPLICATION SIGN — universal, looks like a delete/close
-                                                        // mark
-    private static final String ICON_MENU = "\u2261"; // ≡ IDENTICAL TO (three horiz lines) — in every math/symbol font
-    private static final String ICON_SEARCH = "\u25CB "; // ○ WHITE CIRCLE (magnifier stand-in) — universally available
+    // ── Category → image subfolder mapping ──────────────────────────────────
+    // Keys must match the category strings stored in your MenuItem objects.
+    // Values must match the actual folder names inside your "images/" directory.
+    private static final Map<String, String[]> CATEGORY_FOLDERS = new LinkedHashMap<>();
+    static {
+        CATEGORY_FOLDERS.put("Coffee", new String[] { "Espresso & Coffee" });
+        CATEGORY_FOLDERS.put("Non-Coffee", new String[] { "Non-Coffee", "Specialty Drinks", "Tea Latte" });
+        CATEGORY_FOLDERS.put("Fruit Tea", new String[] { "Fruit Tea" });
+        CATEGORY_FOLDERS.put("Herbal Tea", new String[] { "Herbal Tea" });
+        CATEGORY_FOLDERS.put("Food", new String[] { "Pastries", "Sandwiches", "Pandesal Pairs" });
+    }
+
+    private static final String[] IMAGE_EXTENSIONS = { ".png", ".jpg", ".jpeg", ".webp" };
+
+    // Toggle this to see exactly what the resolver is doing/trying in the console.
+    private static final boolean DEBUG_IMAGE_RESOLUTION = true;
+
+    // ── Icon constants ───────────────────────────────────────────────────────
+    private static final String ICON_BACKUP = "\u2194";
+    private static final String ICON_ADD = "+";
+    private static final String ICON_EDIT = "\u25A6";
+    private static final String ICON_DELETE = "\u00D7";
+    private static final String ICON_MENU = "\u2261";
+    private static final String ICON_SEARCH = "\u25CB ";
 
     // ── State ────────────────────────────────────────────────────────────────
     private final MenuRepository repo;
@@ -99,6 +87,11 @@ public class MenuMaintenancePanel extends JPanel {
     private final boolean isAdmin;
     private List<MenuItem> cachedItems = new ArrayList<>();
     private OnMenuItemSavedCallback onItemSavedCallback = null;
+
+    // Cached resolved images root so we don't re-scan the filesystem on every
+    // selection.
+    private java.io.File cachedImagesRoot = null;
+    private boolean imagesRootSearched = false;
 
     // Detail panel components
     private final JLabel detailName = makeDetailValue();
@@ -168,7 +161,7 @@ public class MenuMaintenancePanel extends JPanel {
 
         JPanel filters = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         filters.setOpaque(false);
-        filters.add(makeIconLabel(ICON_MENU)); // ≡ hamburger
+        filters.add(makeIconLabel(ICON_MENU));
         filters.add(categoryFilter);
         filters.add(Box.createHorizontalStrut(4));
         filters.add(makeSearchBox());
@@ -214,11 +207,6 @@ public class MenuMaintenancePanel extends JPanel {
         JPanel wrap = new JPanel(new BorderLayout(0, 0));
         wrap.setOpaque(false);
         wrap.setPreferredSize(new Dimension(220, 32));
-        // Use a plain "○" circle as a reliable magnifier stand-in (see ICON_SEARCH
-        // comment).
-        // Font.DIALOG is Java's logical font and maps to a physical font that always
-        // covers
-        // Latin + General Punctuation + Mathematical Operators on every JVM platform.
         JLabel icon = new JLabel(ICON_SEARCH);
         icon.setFont(new Font(Font.DIALOG, Font.PLAIN, 14));
         icon.setForeground(TEXT_HINT);
@@ -274,11 +262,16 @@ public class MenuMaintenancePanel extends JPanel {
         body.setBackground(BG_SURFACE);
         body.setBorder(new EmptyBorder(14, 14, 14, 14));
 
+        // ── Image placeholder ──────────────────────────────────────────────
         detailImage.setAlignmentX(LEFT_ALIGNMENT);
         detailImage.setVisible(false);
+        detailImage.setHorizontalAlignment(SwingConstants.CENTER);
         detailImage.setBorder(new CompoundBorder(
                 new LineBorder(BORDER_COLOR, 1, true),
                 new EmptyBorder(0, 0, 0, 0)));
+        // Fix preferred size so the panel doesn't jump when an image loads
+        detailImage.setPreferredSize(new Dimension(242, 130));
+        detailImage.setMaximumSize(new Dimension(242, 130));
         body.add(detailImage);
         body.add(Box.createVerticalStrut(10));
 
@@ -318,9 +311,6 @@ public class MenuMaintenancePanel extends JPanel {
                 new MatteBorder(1, 0, 0, 0, BORDER_COLOR),
                 new EmptyBorder(8, 12, 8, 12)));
 
-        // ↔ (U+2194 LEFT RIGHT ARROW) — in the Arrows block, present in every
-        // Java logical font mapping (Dialog, Serif, SansSerif). Safe replacement
-        // for the original ⇄ (U+21C4) which can miss on some Linux JVMs.
         JButton backupBtn = new JButton(ICON_BACKUP + "  Backup & Restore") {
             @Override
             protected void paintComponent(Graphics g) {
@@ -333,7 +323,6 @@ public class MenuMaintenancePanel extends JPanel {
                 super.paintComponent(g);
             }
         };
-        // Font.DIALOG guaranteed to cover the Arrows block on all JVM platforms
         backupBtn.setFont(new Font(Font.DIALOG, Font.PLAIN, 11));
         backupBtn.setForeground(TEXT_MUTED);
         backupBtn.setBorder(new CompoundBorder(
@@ -405,7 +394,7 @@ public class MenuMaintenancePanel extends JPanel {
     }
 
     private void setDetailEmpty() {
-        detailName.setText("\u2014"); // em dash
+        detailName.setText("\u2014");
         detailCat.setText("\u2014");
         priceHot.setText("\u2014");
         priceReg.setText("\u2014");
@@ -421,6 +410,196 @@ public class MenuMaintenancePanel extends JPanel {
         ingredientList.repaint();
     }
 
+    // ── Image resolution ──────────────────────────────────────────────────────
+    /**
+     * Resolves the best image file for a menu item.
+     *
+     * Strategy (in priority order):
+     * 1. item.getImagePath() — stored absolute/relative path (non-blank wins
+     * immediately, as long as the file actually exists).
+     * 2. Auto-search in images/&lt;CategoryFolder&gt;/ for a file whose normalised
+     * name matches the item name, preferring a "Hot " / "Iced " prefixed file
+     * that matches whichever price variants the item actually has.
+     *
+     * "Normalised" means lower-cased and stripped of everything that is not a-z
+     * or 0-9, so "Caramel Macchiato" matches "caramel-macchiato.png",
+     * "Hot Caramel Macchiato.jpg", "Iced Caramel Macchiato.jpg" etc.
+     */
+    private String resolveImagePath(MenuItem item) {
+        // 1. Honour whatever path is already stored on the item
+        String stored = item.getImagePath();
+        if (stored != null && !stored.isBlank()) {
+            java.io.File f = new java.io.File(stored);
+            if (f.exists() && f.isFile()) {
+                debugLog("Using stored image path for '" + item.getName() + "': " + stored);
+                return f.getAbsolutePath();
+            }
+            debugLog("Stored image path for '" + item.getName() + "' does not exist on disk: " + stored);
+        }
+
+        // 2. Auto-resolve from the images/ folder tree
+        java.io.File imagesRoot = findImagesRoot();
+        if (imagesRoot == null)
+            return null;
+
+        String[] folders = CATEGORY_FOLDERS.getOrDefault(item.getCategory(), new String[] {});
+        String nameNorm = normalize(item.getName());
+
+        boolean hasHot = item.getHotPrice() > 0;
+        boolean hasIced = item.getIcedRegularPrice() > 0 || item.getIcedLargePrice() > 0;
+        List<String> preferredPrefixes = new ArrayList<>();
+        if (hasHot)
+            preferredPrefixes.add("hot");
+        if (hasIced)
+            preferredPrefixes.add("iced");
+        if (preferredPrefixes.isEmpty()) {
+            preferredPrefixes.add("hot");
+            preferredPrefixes.add("iced");
+        }
+
+        for (String folder : folders) {
+            java.io.File dir = new java.io.File(imagesRoot, folder);
+            if (!dir.exists() || !dir.isDirectory())
+                continue;
+
+            java.io.File[] files = dir.listFiles();
+            if (files == null || files.length == 0)
+                continue;
+
+            List<java.io.File> candidates = new ArrayList<>();
+            for (java.io.File f : files) {
+                if (!f.isFile())
+                    continue;
+                String fname = f.getName();
+                boolean hasExt = false;
+                for (String ext : IMAGE_EXTENSIONS) {
+                    if (fname.toLowerCase().endsWith(ext)) {
+                        hasExt = true;
+                        break;
+                    }
+                }
+                if (!hasExt)
+                    continue;
+
+                String fnameNoPrefix = stripLeadingTempWord(normalize(stripExtension(fname)));
+                if (fnameNoPrefix.equals(nameNorm) || fnameNoPrefix.startsWith(nameNorm)
+                        || fnameNoPrefix.contains(nameNorm)) {
+                    candidates.add(f);
+                }
+            }
+
+            if (candidates.isEmpty())
+                continue;
+
+            java.io.File best = null;
+            outer: for (String prefix : preferredPrefixes) {
+                for (java.io.File c : candidates) {
+                    if (normalize(stripExtension(c.getName())).startsWith(prefix)) {
+                        best = c;
+                        break outer;
+                    }
+                }
+            }
+            if (best == null) {
+                for (java.io.File c : candidates) {
+                    if (normalize(stripExtension(c.getName())).equals(nameNorm)) {
+                        best = c;
+                        break;
+                    }
+                }
+            }
+            if (best == null)
+                best = candidates.get(0);
+
+            return best.getAbsolutePath();
+        }
+
+        return null;
+    }
+
+    /**
+     * Finds the images/ root directory. Checks multiple candidate locations so
+     * the app works whether launched from the project root, an out/ or bin/
+     * build folder, or an IDE run configuration — then walks a few levels up
+     * from the working directory as a last resort. Result is cached after the
+     * first successful (or failed) lookup.
+     */
+    private java.io.File findImagesRoot() {
+        if (imagesRootSearched)
+            return cachedImagesRoot;
+        imagesRootSearched = true;
+
+        String sep = java.io.File.separator;
+        java.net.URL classUrl = getClass().getProtectionDomain().getCodeSource().getLocation();
+        List<String> candidates = new ArrayList<>();
+
+        if (classUrl != null) {
+            try {
+                java.io.File classRoot = new java.io.File(classUrl.toURI());
+                java.io.File cursor = classRoot;
+                for (int i = 0; i < 6 && cursor != null; i++) {
+                    candidates.add(cursor.getPath() + sep + "resources" + sep + "images");
+                    candidates.add(cursor.getPath() + sep + "src" + sep + "main" + sep + "resources" + sep + "images");
+                    candidates.add(cursor.getPath() + sep + "images");
+                    cursor = cursor.getParentFile();
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        String userDir = System.getProperty("user.dir");
+        if (userDir != null) {
+            candidates.add(userDir + sep + "resources" + sep + "images");
+            candidates.add(userDir + sep + "src" + sep + "main" + sep + "resources" + sep + "images");
+            candidates.add(userDir + sep + "images");
+
+            java.io.File cursor = new java.io.File(userDir);
+            for (int i = 0; i < 4 && cursor != null; i++) {
+                candidates.add(cursor.getPath() + sep + "resources" + sep + "images");
+                candidates.add(cursor.getPath() + sep + "images");
+                cursor = cursor.getParentFile();
+            }
+        }
+
+        for (String path : candidates) {
+            if (path == null)
+                continue;
+            java.io.File dir = new java.io.File(path);
+            if (dir.exists() && dir.isDirectory()) {
+                cachedImagesRoot = dir;
+                return dir;
+            }
+        }
+
+        return null;
+    }
+
+    /** Lower-cases and keeps only a-z / 0-9 characters. */
+    private static String normalize(String s) {
+        return s == null ? "" : s.toLowerCase().replaceAll("[^a-z0-9]", "");
+    }
+
+    /** Strips the file extension, e.g. "latte.png" → "latte". */
+    private static String stripExtension(String filename) {
+        int dot = filename.lastIndexOf('.');
+        return dot < 0 ? filename : filename.substring(0, dot);
+    }
+
+    /** Strips a leading "hot" or "iced" token from an already-normalized string. */
+    private static String stripLeadingTempWord(String normalized) {
+        if (normalized.startsWith("hot"))
+            return normalized.substring(3);
+        if (normalized.startsWith("iced"))
+            return normalized.substring(4);
+        return normalized;
+    }
+
+    private static void debugLog(String msg) {
+        if (DEBUG_IMAGE_RESOLUTION)
+            System.out.println("[MenuMaintenance/Image] " + msg);
+    }
+
+    // ── Detail panel population ───────────────────────────────────────────────
     private void updateDetailPanel() {
         int row = table.getSelectedRow();
         if (row < 0 || row >= model.getRowCount()) {
@@ -444,36 +623,10 @@ public class MenuMaintenancePanel extends JPanel {
         priceReg.setText(item.getIcedRegularPrice() > 0 ? "\u20B1" + (int) item.getIcedRegularPrice() : "\u2014");
         priceLarge.setText(item.getIcedLargePrice() > 0 ? "\u20B1" + (int) item.getIcedLargePrice() : "\u2014");
 
-        String imgPath = item.getImagePath();
-        if (imgPath != null && !imgPath.isBlank()) {
-            try {
-                java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(new java.io.File(imgPath));
-                if (img != null) {
-                    int tw = 242, th = 130;
-                    double scale = Math.min((double) tw / img.getWidth(),
-                            (double) th / img.getHeight());
-                    int iw = (int) (img.getWidth() * scale);
-                    int ih = (int) (img.getHeight() * scale);
-                    java.awt.image.BufferedImage scaled = new java.awt.image.BufferedImage(iw, ih,
-                            java.awt.image.BufferedImage.TYPE_INT_ARGB);
-                    java.awt.Graphics2D g2 = scaled.createGraphics();
-                    g2.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
-                            java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                    g2.drawImage(img, 0, 0, iw, ih, null);
-                    g2.dispose();
-                    detailImage.setIcon(new ImageIcon(scaled));
-                    detailImage.setVisible(true);
-                } else {
-                    detailImage.setVisible(false);
-                }
-            } catch (Exception ignored) {
-                detailImage.setVisible(false);
-            }
-        } else {
-            detailImage.setIcon(null);
-            detailImage.setVisible(false);
-        }
+        // ── Image loading (auto-resolved) ────────────────────────────────────
+        loadItemImage(item);
 
+        // ── Ingredients ──────────────────────────────────────────────────────
         ingredientList.removeAll();
         if (item.getIngredients().isEmpty()) {
             JLabel none = new JLabel("None configured");
@@ -485,6 +638,101 @@ public class MenuMaintenancePanel extends JPanel {
         }
         ingredientList.revalidate();
         ingredientList.repaint();
+    }
+
+    /**
+     * Resolves, scales, and displays the image for {@code item} in
+     * {@link #detailImage}.
+     * Hides the label when no usable image is found.
+     *
+     * The method runs the file I/O on a background thread so the UI stays
+     * responsive while large images are decoded. The label is updated back on
+     * the EDT. Each invocation is tagged with the requesting item's name so a
+     * slow/stale background load can never overwrite the panel for a item the
+     * user has since deselected (fixes a race when clicking through rows fast).
+     */
+    private volatile String pendingImageRequestFor = null;
+
+    private void loadItemImage(MenuItem item) {
+        final String requestedFor = item.getName();
+        pendingImageRequestFor = requestedFor;
+
+        // Show a "loading" placeholder immediately so the panel doesn't shift
+        detailImage.setIcon(null);
+        detailImage.setText("\u25A2"); // ▢ light placeholder glyph
+        detailImage.setForeground(BORDER_COLOR);
+        detailImage.setVisible(true);
+
+        SwingWorker<ImageIcon, Void> worker = new SwingWorker<>() {
+            @Override
+            protected ImageIcon doInBackground() {
+                String imgPath = resolveImagePath(item);
+                if (imgPath == null || imgPath.isBlank())
+                    return null;
+
+                java.io.File file = new java.io.File(imgPath);
+                if (!file.exists() || !file.isFile()) {
+                    debugLog("Resolved path does not exist at load time: " + imgPath);
+                    return null;
+                }
+
+                try {
+                    java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(file);
+                    if (img == null) {
+                        debugLog("ImageIO could not decode file (unsupported format?): " + imgPath);
+                        return null;
+                    }
+
+                    // Scale to fit inside the 242×130 chip while keeping aspect ratio
+                    int tw = 242, th = 130;
+                    double scale = Math.min((double) tw / img.getWidth(),
+                            (double) th / img.getHeight());
+                    int iw = Math.max(1, (int) (img.getWidth() * scale));
+                    int ih = Math.max(1, (int) (img.getHeight() * scale));
+
+                    java.awt.image.BufferedImage scaled = new java.awt.image.BufferedImage(iw, ih,
+                            java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                    java.awt.Graphics2D g2 = scaled.createGraphics();
+                    g2.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                            java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                    g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
+                            java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+                    g2.drawImage(img, 0, 0, iw, ih, null);
+                    g2.dispose();
+
+                    return new ImageIcon(scaled);
+                } catch (Exception ex) {
+                    System.err.println("[MenuMaintenance] Could not load image: " + ex.getMessage());
+                    return null;
+                }
+            }
+
+            @Override
+            protected void done() {
+                // If the user has selected a different row while this was loading,
+                // discard the result instead of stomping on the newer request.
+                if (!requestedFor.equals(pendingImageRequestFor))
+                    return;
+                try {
+                    ImageIcon icon = get();
+                    if (icon != null) {
+                        detailImage.setIcon(icon);
+                        detailImage.setText(null);
+                        detailImage.setVisible(true);
+                    } else {
+                        // No image available — hide the slot entirely
+                        detailImage.setIcon(null);
+                        detailImage.setText(null);
+                        detailImage.setVisible(false);
+                    }
+                } catch (Exception ignored) {
+                    detailImage.setIcon(null);
+                    detailImage.setText(null);
+                    detailImage.setVisible(false);
+                }
+            }
+        };
+        worker.execute();
     }
 
     private JPanel buildIngRow(String name, double qty) {
@@ -639,7 +887,7 @@ public class MenuMaintenancePanel extends JPanel {
     }
 
     private String formatPrice(double p) {
-        return p > 0 ? "\u20B1" + (int) p : "\u2014"; // ₱ and —
+        return p > 0 ? "\u20B1" + (int) p : "\u2014";
     }
 
     private void onAdd() {
@@ -798,20 +1046,11 @@ public class MenuMaintenancePanel extends JPanel {
 
     private static JLabel makePriceLabel() {
         JLabel l = new JLabel("\u2014");
-        // Font.DIALOG BOLD reliably renders ₱ (U+20B1, Philippine Peso, Latin
-        // Extended-B)
-        // and — (U+2014, em dash, General Punctuation) on all JVM platforms.
         l.setFont(new Font(Font.DIALOG, Font.BOLD, 13));
         l.setForeground(TEXT_PRIMARY);
         return l;
     }
 
-    /**
-     * Creates a toolbar icon label using Java's logical "Dialog" font.
-     * Font.DIALOG is a guaranteed alias on every JVM; the JVM maps it to the
-     * best physical font available on the current OS that covers the
-     * Basic Multilingual Plane, ensuring icon glyphs actually render.
-     */
     private static JLabel makeIconLabel(String text) {
         JLabel l = new JLabel(text);
         l.setFont(new Font(Font.DIALOG, Font.PLAIN, 14));
@@ -877,7 +1116,6 @@ public class MenuMaintenancePanel extends JPanel {
                 super.paintComponent(g);
             }
         };
-        // Font.DIALOG ensures × (U+00D7), ▦ (U+25A6), ↔ (U+2194) all render
         btn.setFont(new Font(Font.DIALOG, Font.PLAIN, 12));
         btn.setForeground(primary ? Color.WHITE : (danger ? new Color(0xA32D2D) : TEXT_PRIMARY));
         btn.setBorder(new CompoundBorder(
@@ -899,8 +1137,7 @@ public class MenuMaintenancePanel extends JPanel {
             JLabel label = (JLabel) super.getTableCellRendererComponent(
                     table, value, isSelected, hasFocus, row, col);
             String cat = value == null ? "" : value.toString();
-            Color[] colors = PILL_COLORS.getOrDefault(cat,
-                    new Color[] { BG_SUBTLE, TEXT_MUTED });
+            Color[] colors = PILL_COLORS.getOrDefault(cat, new Color[] { BG_SUBTLE, TEXT_MUTED });
             label.setOpaque(true);
             label.setBackground(isSelected ? ROW_SELECTED : colors[0]);
             label.setForeground(colors[1]);

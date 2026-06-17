@@ -32,6 +32,7 @@ public class SearchModule extends JPanel {
     private static final Color ACCENT = AppTheme.ACCENT;
     private static final Color ROW_ALT = new Color(0xF3F4F6);
     private static final Color ROW_HOVER_CLR = new Color(0xE5E7EB);
+    private static final Color ROW_SELECTED = new Color(0xDBEAFE);
     private static final Color HEADER_BG = AppTheme.ACCENT;
 
     // Status badge colors
@@ -164,9 +165,20 @@ public class SearchModule extends JPanel {
 
         // Live search — re-run as the user types or edits dates, no button needed.
         javax.swing.event.DocumentListener liveSearch = new javax.swing.event.DocumentListener() {
-            @Override public void insertUpdate(javax.swing.event.DocumentEvent e) { runSearch(); }
-            @Override public void removeUpdate(javax.swing.event.DocumentEvent e) { runSearch(); }
-            @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { runSearch(); }
+            @Override
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                runSearch();
+            }
+
+            @Override
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                runSearch();
+            }
+
+            @Override
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                runSearch();
+            }
         };
         queryField.getDocument().addDocumentListener(liveSearch);
         fromDateField.getDocument().addDocumentListener(liveSearch);
@@ -211,7 +223,7 @@ public class SearchModule extends JPanel {
         table.setFont(FONT_TABLE);
         table.setRowHeight(40);
         table.setShowGrid(false);
-        table.setSelectionBackground(new Color(0x1A3A5C));
+        table.setSelectionBackground(ROW_SELECTED);
         table.setSelectionForeground(TEXT_PRIMARY);
         table.setFocusable(false);
         table.setBackground(BG_CARD);
@@ -232,7 +244,8 @@ public class SearchModule extends JPanel {
         // Type column — badge renderer
         table.getColumnModel().getColumn(0).setCellRenderer(new BadgeCellRenderer());
 
-        // Status column — smart renderer for menu availability, inventory alerts, and sales dates
+        // Status column — smart renderer for menu availability, inventory alerts, and
+        // sales dates
         table.getColumnModel().getColumn(3).setCellRenderer(new StatusCellRenderer());
 
         // Alternating row renderer for other columns
@@ -246,6 +259,8 @@ public class SearchModule extends JPanel {
                 setBorder(new EmptyBorder(0, 14, 0, 14));
                 if (!sel)
                     setBackground(row % 2 == 0 ? BG_CARD : ROW_ALT);
+                else
+                    setBackground(ROW_SELECTED);
                 return this;
             }
         };
@@ -332,10 +347,10 @@ public class SearchModule extends JPanel {
                 double quantity = rs.getDouble("quantity");
                 double alert = rs.getDouble("alert_level");
                 String status = quantity <= 0 ? "Out of Stock"
-                    : quantity <= alert ? "Low Stock"
-                    : "Good";
+                        : quantity <= alert ? "Low Stock"
+                                : "Good";
                 String details = "Qty: " + String.format("%.1f", quantity)
-                    + " " + unit;
+                        + " " + unit;
                 tableModel.addRow(new Object[] { "Inventory", name, details, status });
             }
         }
@@ -412,6 +427,8 @@ public class SearchModule extends JPanel {
                 setBorder(new EmptyBorder(0, 14, 0, 14));
                 if (!sel)
                     setBackground(row % 2 == 0 ? BG_CARD : ROW_ALT);
+                else
+                    setBackground(ROW_SELECTED);
                 return this;
             }
 
@@ -452,7 +469,7 @@ public class SearchModule extends JPanel {
             }
 
             JPanel cell = new JPanel(new GridBagLayout());
-            cell.setBackground(sel ? new Color(0x1A3A5C) : (row % 2 == 0 ? BG_CARD : ROW_ALT));
+            cell.setBackground(sel ? ROW_SELECTED : (row % 2 == 0 ? BG_CARD : ROW_ALT));
 
             JLabel badge = new JLabel(label) {
                 @Override
@@ -483,9 +500,9 @@ public class SearchModule extends JPanel {
         public Component getTableCellRendererComponent(JTable table, Object value,
                 boolean sel, boolean foc, int row, int col) {
             JPanel cell = new JPanel(new GridBagLayout());
-            cell.setBackground(row % 2 == 0 ? BG_CARD : ROW_ALT);
+            cell.setBackground(sel ? ROW_SELECTED : (row % 2 == 0 ? BG_CARD : ROW_ALT));
             if (sel)
-                cell.setBackground(new Color(0x1A3A5C));
+                cell.setBackground(ROW_SELECTED);
 
             String text = value == null ? "" : value.toString();
             Color[] colors = switch (text) {

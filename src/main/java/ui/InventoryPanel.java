@@ -80,6 +80,8 @@ public class InventoryPanel extends JPanel {
     private JTextArea detailArea;
     private JLabel dateSubtitle;
     private JButton bellBtn;
+    private JPanel detailBody;
+    private JLabel detailEmptyLabel;
 
     // ── Constructor ───────────────────────────────────────────────────────────
     public InventoryPanel(boolean isAdmin, InventoryController inventoryController, Runnable monitoringRefresh) {
@@ -511,19 +513,24 @@ public class InventoryPanel extends JPanel {
         detailTitle.setForeground(TEXT_PRIMARY);
         card.add(detailTitle, BorderLayout.NORTH);
 
-        detailArea = new JTextArea("Select an ingredient to see its full stock and menu usage.");
-        detailArea.setEditable(false);
-        detailArea.setLineWrap(true);
-        detailArea.setWrapStyleWord(true);
-        detailArea.setFont(FONT_BODY);
-        detailArea.setForeground(TEXT_PRIMARY);
-        detailArea.setBackground(BG_SURFACE);
-        detailArea.setBorder(new EmptyBorder(6, 6, 6, 6));
+        // ── Scrollable body ───────────────────────────────────────────────
+        detailBody = new JPanel();
+        detailBody.setLayout(new BoxLayout(detailBody, BoxLayout.Y_AXIS));
+        detailBody.setBackground(BG_SURFACE);
 
-        JScrollPane detailScroll = new JScrollPane(detailArea);
+        detailEmptyLabel = new JLabel("Select an ingredient to see details.");
+        detailEmptyLabel.setFont(FONT_BODY);
+        detailEmptyLabel.setForeground(TEXT_MUTED);
+        detailEmptyLabel.setBorder(new EmptyBorder(6, 4, 6, 4));
+        detailEmptyLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        detailBody.add(detailEmptyLabel);
+
+        JScrollPane detailScroll = new JScrollPane(detailBody);
         detailScroll.setBorder(BorderFactory.createLineBorder(BORDER_COLOR, 1));
         detailScroll.getViewport().setBackground(BG_SURFACE);
+        detailScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         card.add(detailScroll, BorderLayout.CENTER);
+
         return card;
     }
 
@@ -602,12 +609,14 @@ public class InventoryPanel extends JPanel {
     // ─────────────────────────────────────────────────────────────────────────
     // Detail panel
     // ─────────────────────────────────────────────────────────────────────────
+
     private void updateDetail() {
-        if (detailArea == null || inventoryTable == null)
+        if (detailBody == null || inventoryTable == null)
             return;
+
         int sel = inventoryTable.getSelectedRow();
         if (sel < 0) {
-            detailArea.setText("Select an ingredient to see details.");
+            showDetailEmpty("Select an ingredient to see details.");
             return;
         }
 
@@ -623,41 +632,114 @@ public class InventoryPanel extends JPanel {
         for (InventoryRowView r : rows) {
             if (!r.getName().equals(name))
                 continue;
+
             InventoryItem item = byName.get(name);
             double eoq = svc.computeRecommendedEoq(item);
             double rop = svc.computeReorderPoint(item);
             String tier = tiers.getOrDefault(name, "C");
 
-            StringBuilder sb = new StringBuilder();
-            sb.append("Name: ").append(r.getName()).append('\n');
-            sb.append("Quantity: ").append(r.getQuantity()).append(' ').append(r.getUnit()).append('\n');
-            sb.append("Alert Level: ").append(r.getAlertLevel()).append(' ').append(r.getUnit()).append('\n');
-            sb.append("Status: ").append(r.getStatus()).append('\n');
-            sb.append("Updated: ")
-                    .append(r.getLastUpdated() == null || r.getLastUpdated().isBlank() ? "N/A" : r.getLastUpdated())
-                    .append('\n');
-            sb.append("Categories: ")
-                    .append(r.getCategories() == null || r.getCategories().isBlank() ? "N/A" : r.getCategories())
-                    .append('\n');
-            sb.append('\n');
-            sb.append("--- Replenishment Insights ---\n");
-            sb.append("ABC Tier: ").append(tier).append(" (")
-                    .append(tier.equals("A") ? "high priority — ~80% of usage"
-                            : tier.equals("B") ? "medium priority — next ~15%"
-                                    : "low priority — remaining ~5%")
-                    .append(")\n");
-            sb.append("Recommended Order Qty (EOQ): ~").append(Math.round(eoq)).append(' ').append(r.getUnit())
-                    .append('\n');
-            sb.append("Reorder Point (ROP): ~").append(Math.round(rop)).append(' ').append(r.getUnit());
-            if (r.getQuantity() <= rop)
-                sb.append("  \u2190 reorder now");
-            sb.append('\n');
-            sb.append("Deduction order: FEFO\n");
-            detailArea.setText(sb.toString());
-            detailArea.setCaretPosition(0);
+            detailBody.removeAll();
+
+            // ── Section: basic info ──────────────────────────────────────
+            addSectionLabel("ITEM");
+            addDetailRow("Name", r.getName());
+            addDetailRow("Quantity", r.getQuantity() + " " + r.getUnit());
+            addDetailRow("Alert Level", r.getAlertLevel() + " " + r.getUnit());
+            addDetailRow("Status", r.getStatus());
+            addDetailRow("Updated", r.getLastUpdated() == null || r.getLastUpdated().isBlank()
+                    ? "N/A"
+                    : r.getLastUpdated());
+            addDetailRow("Categories", r.getCategories() == null || r.getCategories().isBlank()
+                    ? "N/A"
+                    : r.getCategories());
+
+            // ── Section: replenishment insights ──────────────────────────
+            detailBody.add(Box.createVerticalStrut(10));
+            addSectionLabel("REPLENISHMENT INSIGHTS");
+
+            // ABC tier on one row, description on the next as a sub-label
+            String tierDesc = tier.equals("A") ? "high priority — ~80% of usage"
+                    : tier.equals("B") ? "medium priority — next ~15%"
+                            : "low priority — remaining ~5%";
+            addDetailRow("ABC Tier", tier);
+            addSubLabel(tierDesc);
+
+            addDetailRow("EOQ", "~" + Math.round(eoq) + " " + r.getUnit());
+
+            boolean reorderNow = r.getQuantity() <= rop;
+            addDetailRowHighlighted(
+                    "ROP",
+                    "~" + Math.round(rop) + " " + r.getUnit(),
+                    reorderNow ? STATUS_OUT_FG : null);
+            if (reorderNow)
+                addSubLabelColored("← reorder now", STATUS_OUT_FG);
+
+            addDetailRow("Deduction", "FEFO");
+
+            detailBody.add(Box.createVerticalGlue());
+            detailBody.revalidate();
+            detailBody.repaint();
             return;
         }
-        detailArea.setText("No detail found for the selected item.");
+
+        showDetailEmpty("No detail found for the selected item.");
+    }
+
+    private void showDetailEmpty(String message) {
+        detailBody.removeAll();
+        detailEmptyLabel.setText(message);
+        detailBody.add(detailEmptyLabel);
+        detailBody.revalidate();
+        detailBody.repaint();
+    }
+
+    private void addSectionLabel(String text) {
+        JLabel lbl = new JLabel(text);
+        lbl.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        lbl.setForeground(TEXT_MUTED);
+        lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        lbl.setBorder(new EmptyBorder(4, 4, 2, 4));
+        detailBody.add(lbl);
+    }
+
+    /** Muted italic sub-line shown below a row (e.g. tier description). */
+    private void addSubLabel(String text) {
+        addSubLabelColored(text, TEXT_MUTED);
+    }
+
+    private void addSubLabelColored(String text, Color color) {
+        JLabel lbl = new JLabel(text);
+        lbl.setFont(new Font("Segoe UI", Font.ITALIC, 11));
+        lbl.setForeground(color);
+        lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        lbl.setBorder(new EmptyBorder(0, 8, 5, 8));
+        detailBody.add(lbl);
+    }
+
+    private void addDetailRow(String label, String value) {
+        addDetailRowHighlighted(label, value, null);
+    }
+
+    private void addDetailRowHighlighted(String label, String value, Color valueColor) {
+        JPanel row = new JPanel(new BorderLayout());
+        row.setBackground(BG_SURFACE);
+        row.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER_COLOR),
+                new EmptyBorder(6, 8, 6, 8)));
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel nameLbl = new JLabel(label);
+        nameLbl.setFont(FONT_BODY);
+        nameLbl.setForeground(TEXT_SECONDARY);
+
+        JLabel valLbl = new JLabel(value);
+        valLbl.setFont(FONT_BOLD);
+        valLbl.setForeground(valueColor != null ? valueColor : TEXT_MUTED);
+
+        row.add(nameLbl, BorderLayout.WEST);
+        row.add(valLbl, BorderLayout.EAST);
+        detailBody.add(row);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -785,6 +867,7 @@ public class InventoryPanel extends JPanel {
 
                 final Color bFg = badgeFg;
                 JLabel badge = new JLabel(sevText) {
+
                     @Override
                     protected void paintComponent(Graphics g) {
                         Graphics2D g2 = (Graphics2D) g.create();
@@ -805,7 +888,8 @@ public class InventoryPanel extends JPanel {
                 badgeWrap.setOpaque(false);
                 badgeWrap.add(badge);
 
-                JLabel msg = new JLabel(dispMsg);
+                JLabel msg = new JLabel(
+                        dispMsg);
                 msg.setFont(FONT_BODY);
                 msg.setForeground(TEXT_PRIMARY);
                 if (!dispMsg.equals(rawMsg))
@@ -826,23 +910,25 @@ public class InventoryPanel extends JPanel {
         }
 
         // ── Scroll pane ───────────────────────────────────────────────────────
-        JScrollPane scroll = new JScrollPane(listPanel);
+        JScrollPane scroll = new JScrollPane(
+                listPanel);
         scroll.setBorder(BorderFactory.createEmptyBorder());
         scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         int listH = latestAlerts.isEmpty()
                 ? 52
-                : Math.min(latestAlerts.size(), MAX_ROWS) * ROW_H + 4;
+                : Math.min(latestAlerts.size(), MAX_ROWS) * ROW_H
+                        + 4;
         scroll.setPreferredSize(new Dimension(POPUP_W, listH));
         scroll.getVerticalScrollBar().setUnitIncrement(ROW_H);
         scroll.getViewport().setBackground(Color.WHITE);
         popup.add(scroll, BorderLayout.CENTER);
 
         // ── "Show All Alerts" footer ──────────────────────────────────────────
-        JPanel footer = new JPanel(new BorderLayout());
+        JPanel footer = new JPanel(
+                new BorderLayout());
         footer.setBackground(Color.WHITE);
-        footer.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(1, 0, 0, 0, BORDER_COLOR),
+        footer.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, BORDER_COLOR),
                 new EmptyBorder(8, 14, 8, 14)));
 
         JButton showMoreBtn = new JButton("Show All Alerts") {
@@ -879,8 +965,7 @@ public class InventoryPanel extends JPanel {
                 g2.setFont(FONT_BODY);
                 g2.setColor(Color.WHITE);
                 FontMetrics fm = g2.getFontMetrics();
-                g2.drawString(getText(),
-                        (getWidth() - fm.stringWidth(getText())) / 2,
+                g2.drawString(getText(), (getWidth() - fm.stringWidth(getText())) / 2,
                         (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
                 g2.dispose();
             }
